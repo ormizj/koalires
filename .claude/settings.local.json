@@ -21,7 +21,8 @@
       "Bash(npm run lint:*)",
       "Bash(npx tsc:*)",
       "mcp__ide__getDiagnostics",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(dir:*)"
     ]
   }
 }
