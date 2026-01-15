@@ -4,7 +4,7 @@ import '~~/server/types';
 
 export default defineNitroPlugin((nitroApp) => {
   try {
-    const databaseUrl = process.env.DATABASE_URL || 'file:./data/koalires.db';
+    const databaseUrl = process.env.DATABASE_URL || 'file:./koalires.db';
     console.log('Database URL:', databaseUrl);
 
     const adapter = new PrismaLibSql({ url: databaseUrl });
