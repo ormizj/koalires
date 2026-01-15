@@ -1,9 +1,17 @@
 import withNuxt from './.nuxt/eslint.config.mjs'
+import eslintJs from '@eslint/js'
+import eslintConfigPrettier from 'eslint-config-prettier'
 
-export default withNuxt({
-  rules: {
-    '@stylistic/no-trailing-spaces': 'error',
-    '@stylistic/eol-last': 'error',
-    '@stylistic/no-multiple-empty-lines': ['error', { max: 1 }],
+export default withNuxt(
+  eslintJs.configs.recommended,
+  {
+    rules: {
+      // Disable base rules that conflict with TypeScript
+      'no-undef': 'off', // TypeScript handles this
+      'no-unused-vars': 'off', // Use @typescript-eslint/no-unused-vars instead
+      'no-redeclare': 'off',
+      '@typescript-eslint/no-redeclare': 'error',
+    },
   },
-})
+  eslintConfigPrettier,
+)

@@ -9,7 +9,8 @@
       "Bash(timeout /t 10 /nobreak)",
       "Bash(cd:*)",
       "Bash(npm run build:*)",
-      "Bash(npm run lint)"
+      "Bash(npm run lint)",
+      "Bash(npx nuxt prepare)"
     ]
   }
 }
