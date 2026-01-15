@@ -27,18 +27,28 @@ const isSelected = computed(() => props.currentFolderId === props.folder.id)
     >
       <button
         v-if="hasChildren"
-        @click.stop="emit('toggleExpand', folder.id)"
         class="p-0.5 hover:bg-surface-secondary rounded"
+        @click.stop="emit('toggleExpand', folder.id)"
       >
-        <Icon name="heroicons:chevron-right" class="w-4 h-4 transition-transform" :class="{ 'rotate-90': isExpanded }" />
+        <Icon
+          name="heroicons:chevron-right"
+          class="w-4 h-4 transition-transform"
+          :class="{ 'rotate-90': isExpanded }"
+        />
       </button>
-      <span v-else class="w-5" />
+      <span
+        v-else
+        class="w-5"
+      />
 
       <button
-        @click="emit('selectFolder', folder.id)"
         class="flex items-center gap-2 flex-1 text-left"
+        @click="emit('selectFolder', folder.id)"
       >
-        <Icon name="heroicons:folder-solid" class="w-4 h-4 text-yellow-500" />
+        <Icon
+          name="heroicons:folder-solid"
+          class="w-4 h-4 text-yellow-500"
+        />
         <span class="truncate">{{ folder.name }}</span>
       </button>
     </div>

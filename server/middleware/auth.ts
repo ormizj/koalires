@@ -2,7 +2,7 @@ import { verifyToken } from '../utils/jwt'
 
 const PUBLIC_ROUTES = [
   { method: 'POST', path: '/api/auth/register' },
-  { method: 'POST', path: '/api/auth/login' }
+  { method: 'POST', path: '/api/auth/login' },
 ]
 
 export default defineEventHandler(async (event) => {
@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const isPublic = PUBLIC_ROUTES.some(
-    route => route.method === method && path === route.path
+    route => route.method === method && path === route.path,
   )
   if (isPublic) {
     return

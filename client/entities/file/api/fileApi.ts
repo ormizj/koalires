@@ -4,7 +4,7 @@ import { apiClient } from '~/shared/api'
 export const fileApi = {
   async getFiles(folderId: number | null = null): Promise<File[]> {
     return apiClient.get<File[]>('/api/files', {
-      params: { folder_id: folderId }
+      params: { folder_id: folderId },
     })
   },
 
@@ -16,7 +16,7 @@ export const fileApi = {
     const fileName = name.endsWith('.md') ? name : `${name}.md`
     return apiClient.post<File>('/api/files', {
       name: fileName,
-      folder_id: folderId
+      folder_id: folderId,
     })
   },
 
@@ -26,5 +26,5 @@ export const fileApi = {
 
   async deleteFile(id: number): Promise<void> {
     return apiClient.delete(`/api/files/${id}`)
-  }
+  },
 }

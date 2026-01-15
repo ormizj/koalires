@@ -14,8 +14,8 @@ const { user, logout } = useAuth()
         <ThemeToggle />
         <span class="text-content-secondary">{{ user?.email }}</span>
         <button
-          @click="logout"
           class="px-4 py-2 rounded text-content-secondary hover:text-content hover:bg-surface-secondary transition-colors"
+          @click="logout"
         >
           Logout
         </button>

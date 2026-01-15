@@ -2,10 +2,12 @@ interface RequestOptions extends RequestInit {
   params?: Record<string, string | number | null | undefined>
 }
 
+type RequestBody = BodyInit | Record<string, unknown> | null
+
 interface ApiClient {
   get: <T>(url: string, options?: RequestOptions) => Promise<T>
-  post: <T>(url: string, body?: unknown, options?: RequestOptions) => Promise<T>
-  put: <T>(url: string, body?: unknown, options?: RequestOptions) => Promise<T>
+  post: <T>(url: string, body?: RequestBody, options?: RequestOptions) => Promise<T>
+  put: <T>(url: string, body?: RequestBody, options?: RequestOptions) => Promise<T>
   delete: <T>(url: string, options?: RequestOptions) => Promise<T>
 }
 
@@ -32,7 +34,7 @@ function buildUrl(url: string, params?: Record<string, string | number | null | 
 
 function createHeaders(customHeaders?: HeadersInit): HeadersInit {
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
   }
 
   const token = getToken()
@@ -50,39 +52,43 @@ function createHeaders(customHeaders?: HeadersInit): HeadersInit {
 export const apiClient: ApiClient = {
   async get<T>(url: string, options?: RequestOptions): Promise<T> {
     const fullUrl = buildUrl(url, options?.params)
-    return $fetch<T>(fullUrl, {
+    const { params: _, headers: __, ...rest } = options ?? {}
+    return await $fetch(fullUrl, {
+      ...rest,
       method: 'GET',
       headers: createHeaders(options?.headers as HeadersInit),
-      ...options
-    })
+    }) as T
   },
 
-  async post<T>(url: string, body?: unknown, options?: RequestOptions): Promise<T> {
+  async post<T>(url: string, body?: RequestBody, options?: RequestOptions): Promise<T> {
     const fullUrl = buildUrl(url, options?.params)
-    return $fetch<T>(fullUrl, {
+    const { params: _, headers: __, ...rest } = options ?? {}
+    return await $fetch(fullUrl, {
+      ...rest,
       method: 'POST',
       headers: createHeaders(options?.headers as HeadersInit),
       body,
-      ...options
-    })
+    }) as T
   },
 
-  async put<T>(url: string, body?: unknown, options?: RequestOptions): Promise<T> {
+  async put<T>(url: string, body?: RequestBody, options?: RequestOptions): Promise<T> {
     const fullUrl = buildUrl(url, options?.params)
-    return $fetch<T>(fullUrl, {
+    const { params: _, headers: __, ...rest } = options ?? {}
+    return await $fetch(fullUrl, {
+      ...rest,
       method: 'PUT',
       headers: createHeaders(options?.headers as HeadersInit),
       body,
-      ...options
-    })
+    }) as T
   },
 
   async delete<T>(url: string, options?: RequestOptions): Promise<T> {
     const fullUrl = buildUrl(url, options?.params)
-    return $fetch<T>(fullUrl, {
+    const { params: _, headers: __, ...rest } = options ?? {}
+    return await $fetch(fullUrl, {
+      ...rest,
       method: 'DELETE',
       headers: createHeaders(options?.headers as HeadersInit),
-      ...options
-    })
-  }
+    }) as T
+  },
 }

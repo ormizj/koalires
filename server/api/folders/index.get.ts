@@ -19,7 +19,8 @@ export default defineEventHandler((event) => {
       WHERE user_id = ? AND parent_id IS NULL
       ORDER BY name
     `).all(user.userId)
-  } else {
+  }
+  else {
     folders = db.prepare(`
       SELECT id, user_id, parent_id, name, created_at, updated_at
       FROM folders

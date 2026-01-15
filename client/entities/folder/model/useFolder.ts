@@ -35,20 +35,22 @@ export function useFolder() {
     const map = new Map<number, Folder>()
     const roots: Folder[] = []
 
-    folderList.forEach(f => {
+    folderList.forEach((f) => {
       map.set(f.id, { ...f, children: [] })
     })
 
-    folderList.forEach(f => {
+    folderList.forEach((f) => {
       const node = map.get(f.id)!
       if (f.parentId === null) {
         roots.push(node)
-      } else {
+      }
+      else {
         const parent = map.get(f.parentId)
         if (parent) {
           parent.children = parent.children || []
           parent.children.push(node)
-        } else {
+        }
+        else {
           roots.push(node)
         }
       }
@@ -66,6 +68,6 @@ export function useFolder() {
     loadAllFolders,
     createFolder,
     deleteFolder,
-    buildFolderTree
+    buildFolderTree,
   }
 }

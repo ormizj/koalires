@@ -13,7 +13,8 @@ onMounted(async () => {
 
   if (isAuthenticated.value) {
     router.replace('/files')
-  } else {
+  }
+  else {
     router.replace('/login')
   }
 })
@@ -21,6 +22,8 @@ onMounted(async () => {
 
 <template>
   <div class="min-h-screen flex items-center justify-center">
-    <div class="text-gray-500">Loading...</div>
+    <div class="text-gray-500">
+      Loading...
+    </div>
   </div>
 </template>

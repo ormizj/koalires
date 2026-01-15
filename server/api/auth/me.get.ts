@@ -6,6 +6,6 @@ export default defineEventHandler((event) => {
 
   return {
     id: user.userId,
-    email: user.email
+    email: user.email,
   }
 })

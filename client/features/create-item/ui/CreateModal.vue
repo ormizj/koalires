@@ -45,13 +45,13 @@ function handleSubmit() {
             type="text"
             :placeholder="type === 'file' ? 'filename.md' : 'Folder name'"
             class="w-full px-3 py-2 border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-surface text-content"
-          />
+          >
 
           <div class="flex justify-end gap-3 mt-6">
             <button
               type="button"
-              @click="emit('close')"
               class="px-4 py-2 rounded text-content-secondary hover:bg-surface-secondary transition-colors"
+              @click="emit('close')"
             >
               Cancel
             </button>

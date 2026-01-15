@@ -35,9 +35,10 @@ export default defineEventHandler(async (event) => {
       id: result.lastInsertRowid,
       user_id: user.userId,
       parent_id: parentId,
-      name: trimmedName
+      name: trimmedName,
     }
-  } catch (error: unknown) {
+  }
+  catch (error: unknown) {
     if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
       throw createError({ statusCode: 409, message: 'A folder with this name already exists in this location' })
     }

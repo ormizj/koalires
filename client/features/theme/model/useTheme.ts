@@ -11,7 +11,8 @@ export function useTheme() {
     if (import.meta.client) {
       if (isDark.value) {
         document.documentElement.classList.add('dark')
-      } else {
+      }
+      else {
         document.documentElement.classList.remove('dark')
       }
       localStorage.setItem('theme', isDark.value ? 'dark' : 'light')
@@ -24,6 +25,6 @@ export function useTheme() {
 
   return {
     isDark: readonly(isDark),
-    toggle
+    toggle,
   }
 }

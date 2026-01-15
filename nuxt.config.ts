@@ -1,27 +1,6 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-  compatibilityDate: '2025-07-15',
-  devtools: { enabled: true },
-  srcDir: 'client',
-  modules: ['@nuxtjs/tailwindcss', '@nuxt/icon'],
-  css: ['~/app/styles/global.css'],
-
-  dir: {
-    layouts: 'app/layouts'
-  },
-  runtimeConfig: {
-    jwtSecret: process.env.JWT_SECRET || 'dev-secret-change-in-production'
-  },
-  app: {
-    head: {
-      script: [
-        {
-          innerHTML: `(function(){var s=localStorage.getItem('theme');var p=window.matchMedia('(prefers-color-scheme:dark)').matches;if(s==='dark'||(!s&&p)){document.documentElement.classList.add('dark')}})();`,
-          type: 'text/javascript'
-        }
-      ]
-    }
-  },
+  modules: ['@nuxtjs/tailwindcss', '@nuxt/icon', '@nuxt/eslint'],
 
   // Feature-Sliced Design auto-imports
   components: [
@@ -29,7 +8,7 @@ export default defineNuxtConfig({
     { path: '~/entities/**/ui', prefix: '' },
     { path: '~/features/**/ui', prefix: '' },
     { path: '~/widgets/**/ui', prefix: '' },
-    '~/components'
+    '~/components',
   ],
 
   imports: {
@@ -41,15 +20,42 @@ export default defineNuxtConfig({
       'entities/**/api',
       'features/**/model',
       'features/**/api',
-      'widgets/**/model'
-    ]
+      'widgets/**/model',
+    ],
   },
+  devtools: { enabled: true },
+  app: {
+    head: {
+      script: [
+        {
+          innerHTML: `(function(){var s=localStorage.getItem('theme');var p=window.matchMedia('(prefers-color-scheme:dark)').matches;if(s==='dark'||(!s&&p)){document.documentElement.classList.add('dark')}})();`,
+          type: 'text/javascript',
+        },
+      ],
+    },
+  },
+  css: ['~/app/styles/global.css'],
+  runtimeConfig: {
+    jwtSecret: process.env.JWT_SECRET || 'dev-secret-change-in-production',
+  },
+
+  dir: {
+    layouts: 'app/layouts',
+  },
+  srcDir: 'client',
 
   alias: {
     '@app': '~/app',
     '@shared': '~/shared',
     '@entities': '~/entities',
     '@features': '~/features',
-    '@widgets': '~/widgets'
-  }
+    '@widgets': '~/widgets',
+  },
+  compatibilityDate: '2025-07-15',
+
+  eslint: {
+    config: {
+      stylistic: true,
+    },
+  },
 })

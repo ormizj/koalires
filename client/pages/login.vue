@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { LoginForm, useAuth } from '~/features/auth'
+import { LoginForm } from '~/features/auth'
 import { ThemeToggle } from '~/features/theme'
 </script>
 

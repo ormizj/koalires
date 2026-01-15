@@ -3,14 +3,14 @@ export function formatDate(date: Date | string, locale = 'en-US'): string {
   return d.toLocaleDateString(locale, {
     year: 'numeric',
     month: 'long',
-    day: 'numeric'
+    day: 'numeric',
   })
 }
 
 export function formatCurrency(amount: number, currency = 'USD', locale = 'en-US'): string {
   return new Intl.NumberFormat(locale, {
     style: 'currency',
-    currency
+    currency,
   }).format(amount)
 }
 

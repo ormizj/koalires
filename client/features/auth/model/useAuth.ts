@@ -30,6 +30,6 @@ export function useAuth() {
     login,
     register,
     logout,
-    fetchUser
+    fetchUser,
   }
 }

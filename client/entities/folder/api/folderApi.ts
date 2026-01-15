@@ -4,7 +4,7 @@ import { apiClient } from '~/shared/api'
 export const folderApi = {
   async getFolders(parentId: number | null = null): Promise<Folder[]> {
     return apiClient.get<Folder[]>('/api/folders', {
-      params: { parent_id: parentId }
+      params: { parent_id: parentId },
     })
   },
 
@@ -15,7 +15,7 @@ export const folderApi = {
   async createFolder(name: string, parentId: number | null = null): Promise<Folder> {
     return apiClient.post<Folder>('/api/folders', {
       name,
-      parent_id: parentId
+      parent_id: parentId,
     })
   },
 
@@ -25,5 +25,5 @@ export const folderApi = {
 
   async deleteFolder(id: number): Promise<void> {
     return apiClient.delete(`/api/folders/${id}`)
-  }
+  },
 }

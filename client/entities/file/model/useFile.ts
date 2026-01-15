@@ -45,6 +45,6 @@ export function useFile() {
     updateFile,
     deleteFile,
     selectFile,
-    closeFile
+    closeFile,
   }
 }

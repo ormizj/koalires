@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const db = getDb()
-  const user = db.prepare('SELECT id, email, password_hash FROM users WHERE email = ?').get(email) as { id: number; email: string; password_hash: string } | undefined
+  const user = db.prepare('SELECT id, email, password_hash FROM users WHERE email = ?').get(email) as { id: number, email: string, password_hash: string } | undefined
 
   if (!user) {
     throw createError({ statusCode: 401, message: 'Invalid email or password' })
@@ -28,7 +28,7 @@ export default defineEventHandler(async (event) => {
     token,
     user: {
       id: user.id,
-      email: user.email
-    }
+      email: user.email,
+    },
   }
 })

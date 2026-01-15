@@ -16,7 +16,8 @@ export function useUser() {
     if (import.meta.client) {
       if (newToken) {
         localStorage.setItem('token', newToken)
-      } else {
+      }
+      else {
         localStorage.removeItem('token')
       }
     }
@@ -45,7 +46,8 @@ export function useUser() {
     try {
       const response = await userApi.fetchCurrentUser()
       user.value = response
-    } catch {
+    }
+    catch {
       clearUser()
     }
   }
@@ -58,6 +60,6 @@ export function useUser() {
     setToken,
     initFromStorage,
     clearUser,
-    fetchUser
+    fetchUser,
   }
 }

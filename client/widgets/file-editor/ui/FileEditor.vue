@@ -26,21 +26,27 @@ function handleSave() {
   <div class="h-full flex flex-col bg-surface">
     <div class="flex items-center justify-between px-4 py-3 border-b border-border">
       <div class="flex items-center gap-2">
-        <Icon name="heroicons:document-text" class="w-5 h-5 text-primary" />
+        <Icon
+          name="heroicons:document-text"
+          class="w-5 h-5 text-primary"
+        />
         <span class="font-medium text-content">{{ file.name }}</span>
-        <span v-if="isDirty" class="text-xs text-content-muted">(unsaved)</span>
+        <span
+          v-if="isDirty"
+          class="text-xs text-content-muted"
+        >(unsaved)</span>
       </div>
       <div class="flex items-center gap-2">
         <button
-          @click="handleSave"
           :disabled="!isDirty"
           class="px-4 py-2 rounded bg-primary text-white hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          @click="handleSave"
         >
           Save
         </button>
         <button
-          @click="emit('close')"
           class="px-4 py-2 rounded text-content-secondary hover:bg-surface-secondary transition-colors"
+          @click="emit('close')"
         >
           Close
         </button>

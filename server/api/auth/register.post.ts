@@ -34,7 +34,7 @@ export default defineEventHandler(async (event) => {
     token,
     user: {
       id: result.lastInsertRowid,
-      email
-    }
+      email,
+    },
   }
 })

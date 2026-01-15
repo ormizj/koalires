@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
   const trimmedName = name.trim()
   const db = getDb()
 
-  const folder = db.prepare('SELECT id, parent_id FROM folders WHERE id = ? AND user_id = ?').get(id, user.userId) as { id: number; parent_id: number | null } | undefined
+  const folder = db.prepare('SELECT id, parent_id FROM folders WHERE id = ? AND user_id = ?').get(id, user.userId) as { id: number, parent_id: number | null } | undefined
   if (!folder) {
     throw createError({ statusCode: 404, message: 'Folder not found' })
   }
@@ -35,9 +35,10 @@ export default defineEventHandler(async (event) => {
 
     return {
       id,
-      name: trimmedName
+      name: trimmedName,
     }
-  } catch (error: unknown) {
+  }
+  catch (error: unknown) {
     if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
       throw createError({ statusCode: 409, message: 'A folder with this name already exists in this location' })
     }

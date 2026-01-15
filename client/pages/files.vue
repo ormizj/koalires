@@ -23,7 +23,7 @@ const {
   deleteFile,
   selectFile,
   closeFile,
-  getBreadcrumbs
+  getBreadcrumbs,
 } = useFileManager()
 const router = useRouter()
 
@@ -45,7 +45,8 @@ onMounted(async () => {
       return
     }
     await Promise.all([loadContents(null), loadAllFolders()])
-  } catch {
+  }
+  catch {
     router.replace('/login')
   }
 })
@@ -59,7 +60,8 @@ async function handleCreate(name: string) {
   showCreateModal.value = false
   if (createType.value === 'file') {
     await createFile(name)
-  } else {
+  }
+  else {
     await createFolder(name)
   }
 }
@@ -76,10 +78,13 @@ async function handleSaveFile(content: string) {
     <aside class="w-64 bg-surface border-r border-border flex flex-col">
       <div class="p-4 border-b border-border">
         <button
-          @click="openCreateModal('folder')"
           class="w-full px-4 py-2 rounded bg-primary text-white hover:bg-primary-hover transition-colors flex items-center justify-center gap-2"
+          @click="openCreateModal('folder')"
         >
-          <Icon name="heroicons:plus" class="w-4 h-4" />
+          <Icon
+            name="heroicons:plus"
+            class="w-4 h-4"
+          />
           New Folder
         </button>
       </div>
@@ -105,26 +110,32 @@ async function handleSaveFile(content: string) {
         <header class="bg-surface border-b border-border px-4 py-3 flex items-center justify-between">
           <div class="flex items-center gap-2 text-sm">
             <button
-              @click="navigateToFolder(null)"
               class="text-content-secondary hover:text-content"
+              @click="navigateToFolder(null)"
             >
               Root
             </button>
-            <template v-for="crumb in getBreadcrumbs()" :key="crumb.id">
+            <template
+              v-for="crumb in getBreadcrumbs()"
+              :key="crumb.id"
+            >
               <span class="text-content-muted">/</span>
               <button
-                @click="navigateToFolder(crumb.id)"
                 class="text-content-secondary hover:text-content"
+                @click="navigateToFolder(crumb.id)"
               >
                 {{ crumb.name }}
               </button>
             </template>
           </div>
           <button
-            @click="openCreateModal('file')"
             class="px-4 py-2 rounded bg-primary text-white hover:bg-primary-hover transition-colors flex items-center gap-2"
+            @click="openCreateModal('file')"
           >
-            <Icon name="heroicons:plus" class="w-4 h-4" />
+            <Icon
+              name="heroicons:plus"
+              class="w-4 h-4"
+            />
             New File
           </button>
         </header>

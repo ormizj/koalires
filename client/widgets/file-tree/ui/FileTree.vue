@@ -2,7 +2,7 @@
 import type { Folder } from '~/entities/folder'
 import FileTreeItem from './FileTreeItem.vue'
 
-const props = defineProps<{
+defineProps<{
   folders: Folder[]
   currentFolderId: number | null
 }>()
@@ -16,7 +16,8 @@ const expandedFolders = ref<Set<number>>(new Set())
 function toggleExpand(id: number) {
   if (expandedFolders.value.has(id)) {
     expandedFolders.value.delete(id)
-  } else {
+  }
+  else {
     expandedFolders.value.add(id)
   }
 }
@@ -25,20 +26,22 @@ function buildTree(folders: Folder[]): Folder[] {
   const map = new Map<number, Folder>()
   const roots: Folder[] = []
 
-  folders.forEach(f => {
+  folders.forEach((f) => {
     map.set(f.id, { ...f, children: [] })
   })
 
-  folders.forEach(f => {
+  folders.forEach((f) => {
     const node = map.get(f.id)!
     if (f.parentId === null) {
       roots.push(node)
-    } else {
+    }
+    else {
       const parent = map.get(f.parentId)
       if (parent) {
         parent.children = parent.children || []
         parent.children.push(node)
-      } else {
+      }
+      else {
         roots.push(node)
       }
     }
@@ -51,11 +54,14 @@ function buildTree(folders: Folder[]): Folder[] {
 <template>
   <div class="py-2">
     <button
-      @click="emit('selectFolder', null)"
       class="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-surface-secondary rounded transition-colors"
       :class="{ 'bg-primary-soft text-primary': currentFolderId === null }"
+      @click="emit('selectFolder', null)"
     >
-      <Icon name="heroicons:home" class="w-4 h-4" />
+      <Icon
+        name="heroicons:home"
+        class="w-4 h-4"
+      />
       <span class="font-medium">Root</span>
     </button>
 

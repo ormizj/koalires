@@ -10,7 +10,7 @@ export function useFileManager() {
     loadAllFolders,
     createFolder,
     deleteFolder,
-    buildFolderTree
+    buildFolderTree,
   } = useFolder()
 
   const {
@@ -21,13 +21,13 @@ export function useFileManager() {
     updateFile,
     deleteFile,
     selectFile,
-    closeFile
+    closeFile,
   } = useFile()
 
   async function loadContents(folderId: number | null = null) {
     await Promise.all([
       loadFolders(folderId),
-      loadFiles(folderId)
+      loadFiles(folderId),
     ])
   }
 
@@ -59,7 +59,7 @@ export function useFileManager() {
   function getBreadcrumbs() {
     if (currentFolderId.value === null) return []
 
-    const crumbs: { id: number | null; name: string }[] = []
+    const crumbs: { id: number | null, name: string }[] = []
     let current = allFolders.value.find(f => f.id === currentFolderId.value)
 
     while (current) {
@@ -87,6 +87,6 @@ export function useFileManager() {
     selectFile,
     closeFile,
     getBreadcrumbs,
-    buildFolderTree
+    buildFolderTree,
   }
 }

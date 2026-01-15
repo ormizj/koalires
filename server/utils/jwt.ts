@@ -23,9 +23,10 @@ export async function verifyToken(token: string): Promise<JwtPayload | null> {
     const { payload } = await jwtVerify(token, getSecret())
     return {
       userId: payload.userId as number,
-      email: payload.email as string
+      email: payload.email as string,
     }
-  } catch {
+  }
+  catch {
     return null
   }
 }
