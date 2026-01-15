@@ -1,0 +1,9 @@
+model Jwt {
+  email     String   @id
+  token     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [email], references: [email])
+
+  @@map("jwts")
+}

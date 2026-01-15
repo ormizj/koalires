@@ -58,9 +58,9 @@ export function useFolder() {
   }
 
   return {
-    currentFolderId: readonly(currentFolderId),
-    folders: readonly(folders),
-    allFolders: readonly(allFolders),
+    currentFolderId,
+    folders,
+    allFolders,
     setCurrentFolderId,
     loadFolders,
     loadAllFolders,

@@ -34,6 +34,7 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
 ```
 
 Guidelines:
+
 - First line: branch name only
 - Second line: brief, high-level description of what the commit accomplishes
 - Keep it simple - describe what someone would expect to see from the outside

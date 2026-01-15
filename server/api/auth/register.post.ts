@@ -1,9 +1,12 @@
-import bcrypt from 'bcrypt';
-import { getDb } from '../../utils/db';
 import { signToken } from '../../utils/jwt';
+import { hashPassword } from '../../utils/bcrypt';
+import { usePrisma } from '~~/server/composables/prisma';
+import { isUserExistsByEmail } from '~~/server/database/repositories/users';
+import { addJwtToken } from '~~/server/database/repositories/jwt';
+import type { RegisterRequestBody } from '~~/server/types';
 
 export default defineEventHandler(async (event) => {
-  const body = await readBody(event);
+  const body = await readBody<RegisterRequestBody>(event);
   const { email, password } = body;
 
   if (!email || !password) {
@@ -25,29 +28,29 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  const db = getDb();
-  const existing = db
-    .prepare('SELECT id FROM users WHERE email = ?')
-    .get(email);
+  const normalizedEmail = email.toLowerCase();
+  const existing = await isUserExistsByEmail(normalizedEmail);
   if (existing) {
     throw createError({ statusCode: 409, message: 'Email already registered' });
   }
 
-  const passwordHash = await bcrypt.hash(password, 10);
-  const result = db
-    .prepare('INSERT INTO users (email, password_hash) VALUES (?, ?)')
-    .run(email, passwordHash);
-
-  const token = await signToken({
-    userId: result.lastInsertRowid as number,
-    email,
+  const passwordHash = hashPassword(password);
+  const db = usePrisma();
+  const user = await db.user.create({
+    data: {
+      email: normalizedEmail,
+      passwordHash,
+    },
   });
+
+  const token = await signToken(user.email);
+  await addJwtToken(normalizedEmail, token);
 
   return {
     token,
     user: {
-      id: result.lastInsertRowid,
-      email,
+      id: user.id,
+      email: user.email,
     },
   };
 });

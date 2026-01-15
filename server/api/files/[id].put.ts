@@ -1,4 +1,7 @@
-import { getDb } from '../../utils/db';
+import { Prisma } from '@prisma/client';
+import { usePrisma } from '~~/server/composables/prisma';
+import type { UpdateFileRequestBody } from '~~/server/types';
+import '~~/server/types';
 
 export default defineEventHandler(async (event) => {
   const user = event.context.user;
@@ -11,24 +14,23 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Invalid file ID' });
   }
 
-  const body = await readBody(event);
+  const body = await readBody<UpdateFileRequestBody>(event);
   const { name, content } = body;
 
-  const db = getDb();
+  const prisma = usePrisma();
 
-  const file = db
-    .prepare(
-      'SELECT id, folder_id, name FROM files WHERE id = ? AND user_id = ?'
-    )
-    .get(id, user.userId) as
-    | { id: number; folder_id: number | null; name: string }
-    | undefined;
+  const file = await prisma.file.findFirst({
+    where: {
+      id: id,
+      userId: user.userId,
+    },
+  });
+
   if (!file) {
     throw createError({ statusCode: 404, message: 'File not found' });
   }
 
-  const updates: string[] = [];
-  const values: (string | number)[] = [];
+  const updateData: { name?: string; content?: string } = {};
 
   if (name !== undefined) {
     let trimmedName = String(name).trim();
@@ -41,41 +43,38 @@ export default defineEventHandler(async (event) => {
     if (!trimmedName.endsWith('.md')) {
       trimmedName += '.md';
     }
-    updates.push('name = ?');
-    values.push(trimmedName);
+    updateData.name = trimmedName;
   }
 
   if (content !== undefined) {
-    updates.push('content = ?');
-    values.push(String(content));
+    updateData.content = String(content);
   }
 
-  if (updates.length === 0) {
+  if (Object.keys(updateData).length === 0) {
     throw createError({ statusCode: 400, message: 'No fields to update' });
   }
 
-  updates.push("updated_at = datetime('now')");
-  values.push(id, user.userId);
-
   try {
-    db.prepare(
-      `
-      UPDATE files
-      SET ${updates.join(', ')}
-      WHERE id = ? AND user_id = ?
-    `
-    ).run(...values);
+    const updated = await prisma.file.update({
+      where: {
+        id: id,
+      },
+      data: updateData,
+    });
 
-    const updated = db
-      .prepare(
-        'SELECT id, user_id, folder_id, name, content, created_at, updated_at FROM files WHERE id = ?'
-      )
-      .get(id);
-    return updated;
+    return {
+      id: updated.id,
+      user_id: updated.userId,
+      folder_id: updated.folderId,
+      name: updated.name,
+      content: updated.content,
+      created_at: updated.createdAt,
+      updated_at: updated.updatedAt,
+    };
   } catch (error: unknown) {
     if (
-      error instanceof Error &&
-      error.message.includes('UNIQUE constraint failed')
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
     ) {
       throw createError({
         statusCode: 409,

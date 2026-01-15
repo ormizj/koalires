@@ -1,4 +1,7 @@
-import { getDb } from '../../utils/db';
+import { Prisma } from '@prisma/client';
+import { usePrisma } from '~~/server/composables/prisma';
+import type { UpdateFolderRequestBody } from '~~/server/types';
+import '~~/server/types';
 
 export default defineEventHandler(async (event) => {
   const user = event.context.user;
@@ -11,7 +14,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Invalid folder ID' });
   }
 
-  const body = await readBody(event);
+  const body = await readBody<UpdateFolderRequestBody>(event);
   const { name } = body;
 
   if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -19,25 +22,28 @@ export default defineEventHandler(async (event) => {
   }
 
   const trimmedName = name.trim();
-  const db = getDb();
+  const prisma = usePrisma();
 
-  const folder = db
-    .prepare('SELECT id, parent_id FROM folders WHERE id = ? AND user_id = ?')
-    .get(id, user.userId) as
-    | { id: number; parent_id: number | null }
-    | undefined;
+  const folder = await prisma.folder.findFirst({
+    where: {
+      id: id,
+      userId: user.userId,
+    },
+    select: { id: true, parentId: true },
+  });
   if (!folder) {
     throw createError({ statusCode: 404, message: 'Folder not found' });
   }
 
   try {
-    db.prepare(
-      `
-      UPDATE folders
-      SET name = ?, updated_at = datetime('now')
-      WHERE id = ? AND user_id = ?
-    `
-    ).run(trimmedName, id, user.userId);
+    await prisma.folder.update({
+      where: {
+        id: id,
+      },
+      data: {
+        name: trimmedName,
+      },
+    });
 
     return {
       id,
@@ -45,8 +51,8 @@ export default defineEventHandler(async (event) => {
     };
   } catch (error: unknown) {
     if (
-      error instanceof Error &&
-      error.message.includes('UNIQUE constraint failed')
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
     ) {
       throw createError({
         statusCode: 409,

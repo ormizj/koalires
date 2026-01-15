@@ -1,9 +1,11 @@
-import bcrypt from 'bcrypt';
-import { getDb } from '../../utils/db';
 import { signToken } from '../../utils/jwt';
+import { compareHashedPassword } from '../../utils/bcrypt';
+import { getUserByEmail } from '~~/server/database/repositories/users';
+import { addJwtToken } from '~~/server/database/repositories/jwt';
+import type { LoginRequestBody } from '~~/server/types';
 
 export default defineEventHandler(async (event) => {
-  const body = await readBody(event);
+  const body = await readBody<LoginRequestBody>(event);
   const { email, password } = body;
 
   if (!email || !password) {
@@ -13,12 +15,8 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  const db = getDb();
-  const user = db
-    .prepare('SELECT id, email, password_hash FROM users WHERE email = ?')
-    .get(email) as
-    | { id: number; email: string; password_hash: string }
-    | undefined;
+  const normalizedEmail = email.toLowerCase();
+  const user = await getUserByEmail(normalizedEmail);
 
   if (!user) {
     throw createError({
@@ -27,7 +25,7 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  const valid = await bcrypt.compare(password, user.password_hash);
+  const valid = compareHashedPassword(password, user.passwordHash);
   if (!valid) {
     throw createError({
       statusCode: 401,
@@ -35,7 +33,8 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  const token = await signToken({ userId: user.id, email: user.email });
+  const token = await signToken(user.email);
+  await addJwtToken(normalizedEmail, token);
 
   return {
     token,

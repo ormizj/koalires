@@ -1,0 +1,18 @@
+model Folder {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  parentId  Int?     @map("parent_id")
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent   Folder?  @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children Folder[] @relation("FolderHierarchy")
+  files    File[]
+
+  @@unique([userId, parentId, name])
+  @@index([userId], map: "idx_folders_user")
+  @@index([parentId], map: "idx_folders_parent")
+  @@map("folders")
+}

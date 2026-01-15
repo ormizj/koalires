@@ -1,6 +1,6 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-  modules: ['@nuxtjs/tailwindcss', '@nuxt/icon', '@nuxt/eslint'],
+  modules: ['@nuxtjs/tailwindcss', '@nuxt/icon', '@nuxt/eslint', '@pinia/nuxt'],
 
   // Feature-Sliced Design auto-imports
   components: [
@@ -16,6 +16,7 @@ export default defineNuxtConfig({
       'shared/lib',
       'shared/api',
       'shared/config',
+      'shared/stores',
       'entities/**/model',
       'entities/**/api',
       'features/**/model',
@@ -36,7 +37,8 @@ export default defineNuxtConfig({
   },
   css: ['~/app/styles/global.css'],
   runtimeConfig: {
-    jwtSecret: process.env.JWT_SECRET || 'dev-secret-change-in-production',
+    jwtSecret: process.env.JWT_SECRET,
+    databaseUrl: process.env.DATABASE_URL,
   },
 
   dir: {
@@ -45,11 +47,11 @@ export default defineNuxtConfig({
   srcDir: 'client',
 
   alias: {
-    '@app': '~/app',
-    '@shared': '~/shared',
-    '@entities': '~/entities',
-    '@features': '~/features',
-    '@widgets': '~/widgets',
+    '@app': '../client/app',
+    '@shared': '../client/shared',
+    '@entities': '../client/entities',
+    '@features': '../client/features',
+    '@widgets': '../client/widgets',
   },
   compatibilityDate: '2025-07-15',
 

@@ -31,21 +31,25 @@ koalires/
 ### 1. NO Layer-Level index.ts Files
 
 **VIOLATION**: Creating `index.ts` at the layer root level:
+
 - ❌ `features/index.ts`
 - ❌ `entities/index.ts`
 - ❌ `widgets/index.ts`
 - ❌ `shared/index.ts`
 
 **CORRECT**: Public APIs exist ONLY at:
+
 - Slice level: `features/auth/index.ts`, `entities/user/index.ts`, `widgets/file-tree/index.ts`
 - Segment level (Shared only): `shared/api/index.ts`, `shared/ui/index.ts`, `shared/lib/index.ts`
 
 ### 2. Business Types Belong in Entities, NOT Shared
 
 **VIOLATION**: Putting business domain types in Shared:
+
 - ❌ `shared/types/index.ts` containing `User`, `Product`, `Order` interfaces
 
 **CORRECT**: Business types belong in their entity's model segment:
+
 - ✅ `entities/user/model/types.ts` → exports `User` interface
 - ✅ `entities/product/model/types.ts` → exports `Product` interface
 - ✅ Entity public API re-exports: `export type { User } from './model/types'`
@@ -55,6 +59,7 @@ Shared should ONLY contain utility types with no business meaning (e.g., `ArrayV
 ### 3. Only 6 FSD Layers Exist - No Made-Up Directories
 
 **VIOLATION**: Creating non-FSD directories at the layer level:
+
 - ❌ `client/assets/`
 - ❌ `client/composables/`
 - ❌ `client/components/`
@@ -62,6 +67,7 @@ Shared should ONLY contain utility types with no business meaning (e.g., `ArrayV
 - ❌ `client/types/`
 
 **CORRECT**: Only these 6 layers exist:
+
 - ✅ `client/app/` - App layer (with segments like `layouts/`, `styles/`, `providers/`)
 - ✅ `client/pages/` - Pages layer
 - ✅ `client/widgets/` - Widgets layer
@@ -72,11 +78,13 @@ Shared should ONLY contain utility types with no business meaning (e.g., `ArrayV
 ### 4. Shared Contains NO Business Logic
 
 **VIOLATION**: Business-specific code in Shared:
+
 - ❌ `shared/types/User.ts` (User is a business entity)
 - ❌ `shared/api/userApi.ts` (user-specific API calls)
 - ❌ `shared/lib/calculateOrderTotal.ts` (order-specific logic)
 
 **CORRECT**: Shared contains ONLY infrastructure code:
+
 - ✅ `shared/api/client.ts` - Generic HTTP client
 - ✅ `shared/ui/BaseButton.vue` - Generic UI components
 - ✅ `shared/lib/formatters.ts` - Generic utilities (dates, currency)
@@ -85,9 +93,11 @@ Shared should ONLY contain utility types with no business meaning (e.g., `ArrayV
 ### 5. Internal vs External Imports
 
 **VIOLATION**: Using absolute paths within the same slice:
+
 - ❌ `import { useAuth } from '~/features/auth/model/useAuth'` (inside auth slice)
 
 **CORRECT**:
+
 - Internal (same slice): Use relative paths → `import { useAuth } from '../model/useAuth'`
 - External (different slice): Use absolute paths → `import { useAuth } from '~/features/auth'`
 
@@ -144,12 +154,15 @@ When reviewing code, check for these violations in order:
 **Files Reviewed**: [list files]
 
 **Critical Violations** (must fix):
+
 - [File path]: [Rule violated] - [Fix required]
 
 **Warnings** (should fix):
+
 - [File path]: [Issue] - [Recommendation]
 
 **Structure Issues**:
+
 - [Any incorrect directories or missing public APIs]
 
 ## Red Flags - ALWAYS Flag These

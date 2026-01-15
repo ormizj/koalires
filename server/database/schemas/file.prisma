@@ -1,0 +1,17 @@
+model File {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  folderId  Int?     @map("folder_id")
+  name      String
+  content   String   @default("")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  folder Folder? @relation(fields: [folderId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, folderId, name])
+  @@index([userId], map: "idx_files_user")
+  @@index([folderId], map: "idx_files_folder")
+  @@map("files")
+}

@@ -10,7 +10,17 @@
       "Bash(cd:*)",
       "Bash(npm run build:*)",
       "Bash(npm run lint)",
-      "Bash(npx nuxt prepare)"
+      "Bash(npx nuxt prepare)",
+      "Bash(npm run db:generate:*)",
+      "Bash(npm run lint:fix:*)",
+      "Bash(if not exist .env copy .env.example .env)",
+      "Bash(npm ls:*)",
+      "Bash(node -e:*)",
+      "Bash(npx eslint:*)",
+      "Bash(xargs:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npx tsc:*)",
+      "mcp__ide__getDiagnostics"
     ]
   }
 }

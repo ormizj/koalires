@@ -7,15 +7,12 @@ A nuxt.js - V4 template, using [Feature-Sliced Design](https://feature-sliced.de
 - Import - **Layers** and **Slices** may only import from layers below them _(see: Layer Hierarchy)_. <br>
   **Segments**, however, are allowed to import from their siblings _(see: Segments)_.
 
-
 - Export - Exports to external modules should be from a **public API**, which serves as a contract between a group of
   modules (files), and the code that uses it. <br>
   It also acts as a gate, only allowing access to certain objects, and only through that public API _(see: Public API)_.
 
-
 - Nesting - Most **Layers** should be limited to **3 levels of nesting** _(Layer > Slice > Segment)_. <br>
   The **App** and **Shared** layers can exceed this limit due to their unique rules _(see: Levels)_.
-
 
 - Navigation - When creating new **segments** is that segment names should describe **purpose (the "why")**, not essence
   **(the "what")**. Avoid like “components”, “hooks”, “modals”, since they describe what these files
@@ -28,12 +25,12 @@ A nuxt.js - V4 template, using [Feature-Sliced Design](https://feature-sliced.de
 There are 3 nesting levels in the application:
 
 1. **Layer**
-	- **standard:** app, pages, widgets, features, entities, shared
+   - **standard:** app, pages, widgets, features, entities, shared
 2. **Slices**
-	- **custom:** photo, effects, gallery-page, post, comments, news-feed etc...
+   - **custom:** photo, effects, gallery-page, post, comments, news-feed etc...
 3. **Segments**
-	- **standard:** ui, api, model, lib, config
-	- **custom:** compose, like, delete, etc...
+   - **standard:** ui, api, model, lib, config
+   - **custom:** compose, like, delete, etc...
 
 > ### [Layers](https://feature-sliced.design/docs/reference/layers)
 
@@ -51,18 +48,18 @@ features, entities, shared.
 
 _modules on one layer can only know about and import from modules from the layers strictly below._
 
-1. **_App_*** - everything that makes the app run — routing, entrypoints, global styles, providers.
+1. **_App_\*** - everything that makes the app run — routing, entrypoints, global styles, providers.
 2. **Pages** - full pages or large parts of a page in nested routing.
 3. **Widgets** - large **self-contained** chunks of functionality or UI, usually delivering an entire use case.
 4. **Features** - reused implementations of entire product features, i.e. **actions** that bring business value to the
    user.
 5. **Entities** - business entities that the project works with, like `user` or `product`.
-6. **_Shared_*** - reusable functionality, especially when it's detached from the specifics of the project/business,
+6. **_Shared_\*** - reusable functionality, especially when it's detached from the specifics of the project/business,
    though not necessarily.
 
-*_App & Shared: Layers App and Shared, unlike other layers, do not have slices and are divided into segments directly._
+\*_App & Shared: Layers App and Shared, unlike other layers, do not have slices and are divided into segments directly._
 
-*_The most common places for custom segments are the App layer and the Shared layer, where slices don't make sense._
+\*_The most common places for custom segments are the App layer and the Shared layer, where slices don't make sense._
 
 #### 1. [App](https://feature-sliced.design/docs/reference/layers#app)
 
@@ -87,7 +84,7 @@ This layer is for the main interactions in your app, things that your users care
 business entities, because that's what the app is about.
 
 - There can be no "map-office" feature
-	- But `booking-meeting-on-the-map`, `search-for-an-employee`, `change-of-workplace` - yes
+  - But `booking-meeting-on-the-map`, `search-for-an-employee`, `change-of-workplace` - yes
 
 #### 5. [Entities](https://feature-sliced.design/docs/reference/layers#entities)
 
@@ -100,8 +97,6 @@ like User, Post, and Group.
 This layer forms a foundation for the rest of the app. It's a place to create connections with the external world, for
 example, backends, third-party libraries, the environment. It is also a place to define your own highly contained
 libraries.
-
-
 
 > ### [Slices](https://feature-sliced.design/docs/reference/slices-segments#slices)
 
@@ -144,13 +139,12 @@ only allowing access to certain objects, and only through that public API.
 
 In practice, it's usually implemented as an **index** file with re-exports:
 
+> `pages/auth/index.ts`
 >
->`pages/auth/index.ts`
->
->```ts
->export {LoginPage} from "./ui/LoginPage";
->export {RegisterPage} from "./ui/RegisterPage";
->```
+> ```ts
+> export { LoginPage } from './ui/LoginPage';
+> export { RegisterPage } from './ui/RegisterPage';
+> ```
 
 A good public API makes using and integrating into other code a slice convenient and reliable. It can be achieved by
 setting these three goals:
@@ -177,10 +171,10 @@ And if a single public API in App or Shared (e.g. `shared/ui` or `shared/lib`) s
 prefer creating a dedicated index file for each component or library instead:
 
 - `shared/ui/`
-	- `button`
-		- `index.js`
-	- `text-field`
-		- `index.js`
+  - `button`
+    - `index.js`
+  - `text-field`
+    - `index.js`
 
 ### [Public API for cross-imports](https://feature-sliced.design/docs/reference/public-api#public-api-for-cross-imports)
 
@@ -196,15 +190,15 @@ For this purpose, there's a special kind of public API, also known as the @x-not
 entity B needs to import from entity A, then entity A can declare a separate public API just for entity B.
 
 - 📂 `entities`
-	- 📂 `A`
-		- 📂 `@x`
-			- 📄 `B.ts` — a special public API just for code inside entities/B/
-		- 📄 `index.ts` — the regular public API
+  - 📂 `A`
+    - 📂 `@x`
+      - 📄 `B.ts` — a special public API just for code inside entities/B/
+    - 📄 `index.ts` — the regular public API
 
 Then the code inside `entities/B/` can import from `entities/A/@x/B`:
 
 ```ts
-import type { EntityA } from "entities/A/@x/B";
+import type { EntityA } from 'entities/A/@x/B';
 ```
 
 The notation `A/@x/B` is meant to be read as "A crossed with B".
@@ -256,12 +250,12 @@ and as such, not every utility type needs to be in Shared. Some utility types ar
 needed:
 
 - 📂 pages
-	- 📂 home
-		- 📂 api
-			- 📄 ArrayValues.ts (utility type)
-			- 📄 getMemoryUsageMetrics.ts (the code that uses the utility type)
+  - 📂 home
+    - 📂 api
+      - 📄 ArrayValues.ts (utility type)
+      - 📄 getMemoryUsageMetrics.ts (the code that uses the utility type)
 
-#### [Ambient declaration files (*.d.ts)](https://feature-sliced.design/docs/guides/examples/types#ambient-declaration-files-dts)
+#### [Ambient declaration files (\*.d.ts)](https://feature-sliced.design/docs/guides/examples/types#ambient-declaration-files-dts)
 
 Some packages, for example, [Vite](https://vitejs.dev/) or [ts-reset](https://www.totaltypescript.com/ts-reset), require
 ambient declaration files to work
@@ -274,13 +268,12 @@ Other packages simply don't have typings, and you might want to declare them as 
 for them. A good place for those typings would be `shared/lib`, in a folder like `shared/lib/untyped-packages`. Create a
 `%LIBRARY_NAME%.d.ts` file there and declare the types you need:
 
+> `shared/lib/untyped-packages/use-react-screenshot.d.ts`
 >
->`shared/lib/untyped-packages/use-react-screenshot.d.ts`
->
->```ts
->// This library doesn't have typings, and we didn't want to bother writing our own.
->declare module "use-react-screenshot";
->```
+> ```ts
+> // This library doesn't have typings, and we didn't want to bother writing our own.
+> declare module 'use-react-screenshot';
+> ```
 
 ### [Naming Conflicts](https://feature-sliced.design/docs/about/understanding/naming#when-can-naming-interfere)
 

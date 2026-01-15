@@ -38,7 +38,7 @@ export function useFile() {
   }
 
   return {
-    files: readonly(files),
+    files,
     selectedFile,
     loadFiles,
     createFile,

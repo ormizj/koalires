@@ -1,0 +1,12 @@
+model User {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  folders Folder[]
+  files   File[]
+  jwts    Jwt[]
+
+  @@map("users")
+}

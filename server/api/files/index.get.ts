@@ -1,6 +1,7 @@
-import { getDb } from '../../utils/db';
+import { usePrisma } from '~~/server/composables/prisma';
+import '~~/server/types';
 
-export default defineEventHandler((event) => {
+export default defineEventHandler(async (event) => {
   const user = event.context.user;
   if (!user) {
     throw createError({ statusCode: 401, message: 'Not authenticated' });
@@ -9,32 +10,32 @@ export default defineEventHandler((event) => {
   const query = getQuery(event);
   const folderId = query.folder_id ? Number(query.folder_id) : null;
 
-  const db = getDb();
-  let files;
+  const prisma = usePrisma();
 
-  if (folderId === null) {
-    files = db
-      .prepare(
-        `
-      SELECT id, user_id, folder_id, name, created_at, updated_at
-      FROM files
-      WHERE user_id = ? AND folder_id IS NULL
-      ORDER BY name
-    `
-      )
-      .all(user.userId);
-  } else {
-    files = db
-      .prepare(
-        `
-      SELECT id, user_id, folder_id, name, created_at, updated_at
-      FROM files
-      WHERE user_id = ? AND folder_id = ?
-      ORDER BY name
-    `
-      )
-      .all(user.userId, folderId);
-  }
+  const files = await prisma.file.findMany({
+    where: {
+      userId: user.userId,
+      folderId: folderId,
+    },
+    orderBy: {
+      name: 'asc',
+    },
+    select: {
+      id: true,
+      userId: true,
+      folderId: true,
+      name: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
 
-  return files;
+  return files.map((file) => ({
+    id: file.id,
+    user_id: file.userId,
+    folder_id: file.folderId,
+    name: file.name,
+    created_at: file.createdAt,
+    updated_at: file.updatedAt,
+  }));
 });

@@ -1,4 +1,7 @@
-import { getDb } from '../../utils/db';
+import { Prisma } from '@prisma/client';
+import { usePrisma } from '~~/server/composables/prisma';
+import type { CreateFileRequestBody } from '~~/server/types';
+import '~~/server/types';
 
 export default defineEventHandler(async (event) => {
   const user = event.context.user;
@@ -6,7 +9,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 401, message: 'Not authenticated' });
   }
 
-  const body = await readBody(event);
+  const body = await readBody<CreateFileRequestBody>(event);
   const { name, folder_id } = body;
 
   if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -20,38 +23,41 @@ export default defineEventHandler(async (event) => {
 
   const folderId = folder_id ? Number(folder_id) : null;
 
-  const db = getDb();
+  const prisma = usePrisma();
 
   if (folderId !== null) {
-    const folder = db
-      .prepare('SELECT id FROM folders WHERE id = ? AND user_id = ?')
-      .get(folderId, user.userId);
+    const folder = await prisma.folder.findFirst({
+      where: {
+        id: folderId,
+        userId: user.userId,
+      },
+    });
     if (!folder) {
       throw createError({ statusCode: 404, message: 'Folder not found' });
     }
   }
 
   try {
-    const result = db
-      .prepare(
-        `
-      INSERT INTO files (user_id, folder_id, name, content)
-      VALUES (?, ?, ?, '')
-    `
-      )
-      .run(user.userId, folderId, trimmedName);
+    const file = await prisma.file.create({
+      data: {
+        userId: user.userId,
+        folderId: folderId,
+        name: trimmedName,
+        content: '',
+      },
+    });
 
     return {
-      id: result.lastInsertRowid,
-      user_id: user.userId,
-      folder_id: folderId,
-      name: trimmedName,
-      content: '',
+      id: file.id,
+      user_id: file.userId,
+      folder_id: file.folderId,
+      name: file.name,
+      content: file.content,
     };
   } catch (error: unknown) {
     if (
-      error instanceof Error &&
-      error.message.includes('UNIQUE constraint failed')
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
     ) {
       throw createError({
         statusCode: 409,

@@ -1,8 +1,12 @@
 import { verifyToken } from '../utils/jwt';
+import { isJwtTokenExistByToken } from '~~/server/database/repositories/jwt';
+import { getUserByEmail } from '~~/server/database/repositories/users';
+import '~~/server/types';
 
 const PUBLIC_ROUTES = [
   { method: 'POST', path: '/api/auth/register' },
   { method: 'POST', path: '/api/auth/login' },
+  { method: 'DELETE', path: '/api/auth/logout' },
 ];
 
 export default defineEventHandler(async (event) => {
@@ -31,8 +35,21 @@ export default defineEventHandler(async (event) => {
   const token = authHeader.slice(7);
   const payload = await verifyToken(token);
   if (!payload) {
-    throw createError({ statusCode: 401, message: 'Invalid or expired token' });
+    throw createError({ statusCode: 401, message: 'Invalid token' });
   }
 
-  event.context.user = payload;
+  const tokenExists = await isJwtTokenExistByToken(token, payload.email);
+  if (!tokenExists) {
+    throw createError({ statusCode: 401, message: 'Token has been revoked' });
+  }
+
+  const user = await getUserByEmail(payload.email);
+  if (!user) {
+    throw createError({ statusCode: 401, message: 'User not found' });
+  }
+
+  event.context.user = {
+    userId: user.id,
+    email: user.email,
+  };
 });

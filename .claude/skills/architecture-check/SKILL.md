@@ -37,14 +37,14 @@ For each discovered rule file:
 
 Based on the rules content, determine what checks to perform:
 
-| Rule Type | How to Validate |
-|-----------|-----------------|
-| Directory structure | Glob for expected directories, flag missing/extra |
-| Import hierarchy | Grep imports, verify layer compliance |
-| Public API (index.ts) | Check cross-module imports use public API |
-| Naming conventions | Grep/Glob for pattern violations |
-| Forbidden patterns | Grep for disallowed code patterns |
-| Required patterns | Grep to verify required patterns exist |
+| Rule Type             | How to Validate                                   |
+| --------------------- | ------------------------------------------------- |
+| Directory structure   | Glob for expected directories, flag missing/extra |
+| Import hierarchy      | Grep imports, verify layer compliance             |
+| Public API (index.ts) | Check cross-module imports use public API         |
+| Naming conventions    | Grep/Glob for pattern violations                  |
+| Forbidden patterns    | Grep for disallowed code patterns                 |
+| Required patterns     | Grep to verify required patterns exist            |
 
 ### Step 4: Execute Validation
 
@@ -106,6 +106,7 @@ Use the Edit tool to apply fixes.
 When this skill is invoked:
 
 1. **Always start by discovering rules:**
+
    ```
    Glob: .claude/rules/**/*.md
    ```
@@ -131,11 +132,13 @@ When this skill is invoked:
 ## Example: Processing FSD Rules
 
 If `.claude/rules/frontend/nuxt-fsd.md` defines:
+
 - Layer hierarchy: shared < entities < features < widgets < pages < app
 - Public API requirement: Cross-slice imports use index.ts
 - Segment naming: ui, api, model, lib, config
 
 Then validate:
+
 1. Grep for imports, check layer compliance
 2. Grep for imports bypassing index.ts
 3. Glob directories, check segment names

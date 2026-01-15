@@ -1,22 +1,37 @@
-import { getDb } from '../../utils/db';
+import { usePrisma } from '~~/server/composables/prisma';
+import '~~/server/types';
 
-export default defineEventHandler((event) => {
+export default defineEventHandler(async (event) => {
   const user = event.context.user;
   if (!user) {
     throw createError({ statusCode: 401, message: 'Not authenticated' });
   }
 
-  const db = getDb();
-  const folders = db
-    .prepare(
-      `
-    SELECT id, user_id, parent_id, name, created_at, updated_at
-    FROM folders
-    WHERE user_id = ?
-    ORDER BY name
-  `
-    )
-    .all(user.userId);
+  const prisma = usePrisma();
 
-  return folders;
+  const folders = await prisma.folder.findMany({
+    where: {
+      userId: user.userId,
+    },
+    orderBy: {
+      name: 'asc',
+    },
+    select: {
+      id: true,
+      userId: true,
+      parentId: true,
+      name: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+
+  return folders.map((folder) => ({
+    id: folder.id,
+    user_id: folder.userId,
+    parent_id: folder.parentId,
+    name: folder.name,
+    created_at: folder.createdAt,
+    updated_at: folder.updatedAt,
+  }));
 });

@@ -1,6 +1,7 @@
-import { getDb } from '../../utils/db';
+import { usePrisma } from '~~/server/composables/prisma';
+import '~~/server/types';
 
-export default defineEventHandler((event) => {
+export default defineEventHandler(async (event) => {
   const user = event.context.user;
   if (!user) {
     throw createError({ statusCode: 401, message: 'Not authenticated' });
@@ -11,19 +12,24 @@ export default defineEventHandler((event) => {
     throw createError({ statusCode: 400, message: 'Invalid file ID' });
   }
 
-  const db = getDb();
+  const prisma = usePrisma();
 
-  const file = db
-    .prepare('SELECT id FROM files WHERE id = ? AND user_id = ?')
-    .get(id, user.userId);
+  const file = await prisma.file.findFirst({
+    where: {
+      id: id,
+      userId: user.userId,
+    },
+  });
+
   if (!file) {
     throw createError({ statusCode: 404, message: 'File not found' });
   }
 
-  db.prepare('DELETE FROM files WHERE id = ? AND user_id = ?').run(
-    id,
-    user.userId
-  );
+  await prisma.file.delete({
+    where: {
+      id: id,
+    },
+  });
 
   return { success: true };
 });
