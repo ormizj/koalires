@@ -7,7 +7,8 @@
       "Bash(timeout 15 npm run dev:*)",
       "Bash(npm run dev:*)",
       "Bash(timeout /t 10 /nobreak)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(npm run build:*)"
     ]
   }
 }

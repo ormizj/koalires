@@ -30,15 +30,7 @@ const isSelected = computed(() => props.currentFolderId === props.folder.id)
         @click.stop="emit('toggleExpand', folder.id)"
         class="p-0.5 hover:bg-surface-secondary rounded"
       >
-        <svg
-          class="w-4 h-4 transition-transform"
-          :class="{ 'rotate-90': isExpanded }"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-        </svg>
+        <Icon name="heroicons:chevron-right" class="w-4 h-4 transition-transform" :class="{ 'rotate-90': isExpanded }" />
       </button>
       <span v-else class="w-5" />
 
@@ -46,9 +38,7 @@ const isSelected = computed(() => props.currentFolderId === props.folder.id)
         @click="emit('selectFolder', folder.id)"
         class="flex items-center gap-2 flex-1 text-left"
       >
-        <svg class="w-4 h-4 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M10 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V8a2 2 0 00-2-2h-8l-2-2z" />
-        </svg>
+        <Icon name="heroicons:folder-solid" class="w-4 h-4 text-yellow-500" />
         <span class="truncate">{{ folder.name }}</span>
       </button>
     </div>
