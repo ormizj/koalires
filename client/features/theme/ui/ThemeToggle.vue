@@ -8,7 +8,8 @@ const shouldAnimate = ref(false)
 onMounted(() => {
   if (hasInitialized.value) {
     shouldAnimate.value = true
-  } else {
+  }
+  else {
     hasInitialized.value = true
   }
 })
