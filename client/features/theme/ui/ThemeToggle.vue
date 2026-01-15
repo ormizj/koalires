@@ -1,22 +1,21 @@
 <script setup lang="ts">
-import { useTheme } from '../model/useTheme'
+import { useTheme } from '../model/useTheme';
 
-const { isDark, toggle } = useTheme()
-const hasInitialized = useState('theme-toggle-initialized', () => false)
-const shouldAnimate = ref(false)
+const { isDark, toggle } = useTheme();
+const hasInitialized = useState('theme-toggle-initialized', () => false);
+const shouldAnimate = ref(false);
 
 onMounted(() => {
   if (hasInitialized.value) {
-    shouldAnimate.value = true
+    shouldAnimate.value = true;
+  } else {
+    hasInitialized.value = true;
   }
-  else {
-    hasInitialized.value = true
-  }
-})
+});
 
 function handleToggle() {
-  shouldAnimate.value = true
-  toggle()
+  shouldAnimate.value = true;
+  toggle();
 }
 </script>
 
@@ -26,11 +25,7 @@ function handleToggle() {
     :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
     @click="handleToggle"
   >
-    <Transition
-      v-if="shouldAnimate"
-      name="icon"
-      mode="out-in"
-    >
+    <Transition v-if="shouldAnimate" name="icon" mode="out-in">
       <Icon
         v-if="isDark"
         key="sun"
@@ -45,16 +40,8 @@ function handleToggle() {
       />
     </Transition>
     <template v-else>
-      <Icon
-        v-if="isDark"
-        name="heroicons:sun"
-        class="w-6 h-6 text-content"
-      />
-      <Icon
-        v-else
-        name="heroicons:moon"
-        class="w-6 h-6 text-content"
-      />
+      <Icon v-if="isDark" name="heroicons:sun" class="w-6 h-6 text-content" />
+      <Icon v-else name="heroicons:moon" class="w-6 h-6 text-content" />
     </template>
   </button>
 </template>
@@ -62,7 +49,9 @@ function handleToggle() {
 <style scoped>
 .icon-enter-active,
 .icon-leave-active {
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
 }
 
 .icon-enter-from {

@@ -1,1 +1,1 @@
-export { default as FileEditor } from './ui/FileEditor.vue'
+export { default as FileEditor } from './ui/FileEditor.vue';

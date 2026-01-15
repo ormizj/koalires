@@ -1,5 +1,5 @@
-import { useFolder } from '~/entities/folder'
-import { useFile } from '~/entities/file'
+import { useFolder } from '~/entities/folder';
+import { useFile } from '~/entities/file';
 
 export function useFileManager() {
   const {
@@ -11,7 +11,7 @@ export function useFileManager() {
     createFolder,
     deleteFolder,
     buildFolderTree,
-  } = useFolder()
+  } = useFolder();
 
   const {
     files,
@@ -22,52 +22,51 @@ export function useFileManager() {
     deleteFile,
     selectFile,
     closeFile,
-  } = useFile()
+  } = useFile();
 
   async function loadContents(folderId: number | null = null) {
-    await Promise.all([
-      loadFolders(folderId),
-      loadFiles(folderId),
-    ])
+    await Promise.all([loadFolders(folderId), loadFiles(folderId)]);
   }
 
   async function navigateToFolder(id: number | null) {
-    closeFile()
-    await loadContents(id)
+    closeFile();
+    await loadContents(id);
   }
 
   async function handleCreateFolder(name: string) {
-    await createFolder(name)
+    await createFolder(name);
   }
 
   async function handleCreateFile(name: string) {
-    await createFile(name, currentFolderId.value)
+    await createFile(name, currentFolderId.value);
   }
 
   async function handleDeleteFolder(id: number) {
-    await deleteFolder(id)
+    await deleteFolder(id);
   }
 
   async function handleDeleteFile(id: number) {
-    await deleteFile(id, currentFolderId.value)
+    await deleteFile(id, currentFolderId.value);
   }
 
   async function handleUpdateFile(id: number, content: string) {
-    await updateFile(id, content)
+    await updateFile(id, content);
   }
 
   function getBreadcrumbs() {
-    if (currentFolderId.value === null) return []
+    if (currentFolderId.value === null) return [];
 
-    const crumbs: { id: number | null, name: string }[] = []
-    let current = allFolders.value.find(f => f.id === currentFolderId.value)
+    const crumbs: { id: number | null; name: string }[] = [];
+    let current = allFolders.value.find((f) => f.id === currentFolderId.value);
 
     while (current) {
-      crumbs.unshift({ id: current.id, name: current.name })
-      current = current.parentId ? allFolders.value.find(f => f.id === current!.parentId) : undefined
+      crumbs.unshift({ id: current.id, name: current.name });
+      current = current.parentId
+        ? allFolders.value.find((f) => f.id === current!.parentId)
+        : undefined;
     }
 
-    return crumbs
+    return crumbs;
   }
 
   return {
@@ -88,5 +87,5 @@ export function useFileManager() {
     closeFile,
     getBreadcrumbs,
     buildFolderTree,
-  }
+  };
 }

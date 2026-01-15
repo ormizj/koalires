@@ -1,1 +1,1 @@
-export { default as FileTree } from './ui/FileTree.vue'
+export { default as FileTree } from './ui/FileTree.vue';

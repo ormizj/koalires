@@ -1,21 +1,23 @@
 <script setup lang="ts">
-import type { Folder } from '~/entities/folder'
+import type { Folder } from '~/entities/folder';
 
 const props = defineProps<{
-  folder: Folder
-  currentFolderId: number | null
-  expandedFolders: Set<number>
-  depth: number
-}>()
+  folder: Folder;
+  currentFolderId: number | null;
+  expandedFolders: Set<number>;
+  depth: number;
+}>();
 
 const emit = defineEmits<{
-  selectFolder: [id: number]
-  toggleExpand: [id: number]
-}>()
+  selectFolder: [id: number];
+  toggleExpand: [id: number];
+}>();
 
-const hasChildren = computed(() => props.folder.children && props.folder.children.length > 0)
-const isExpanded = computed(() => props.expandedFolders.has(props.folder.id))
-const isSelected = computed(() => props.currentFolderId === props.folder.id)
+const hasChildren = computed(
+  () => props.folder.children && props.folder.children.length > 0
+);
+const isExpanded = computed(() => props.expandedFolders.has(props.folder.id));
+const isSelected = computed(() => props.currentFolderId === props.folder.id);
 </script>
 
 <template>
@@ -36,19 +38,13 @@ const isSelected = computed(() => props.currentFolderId === props.folder.id)
           :class="{ 'rotate-90': isExpanded }"
         />
       </button>
-      <span
-        v-else
-        class="w-5"
-      />
+      <span v-else class="w-5" />
 
       <button
         class="flex items-center gap-2 flex-1 text-left"
         @click="emit('selectFolder', folder.id)"
       >
-        <Icon
-          name="heroicons:folder-solid"
-          class="w-4 h-4 text-yellow-500"
-        />
+        <Icon name="heroicons:folder-solid" class="w-4 h-4 text-yellow-500" />
         <span class="truncate">{{ folder.name }}</span>
       </button>
     </div>

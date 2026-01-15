@@ -1,6 +1,6 @@
-import withNuxt from './.nuxt/eslint.config.mjs'
-import eslintJs from '@eslint/js'
-import eslintConfigPrettier from 'eslint-config-prettier'
+import withNuxt from './.nuxt/eslint.config.mjs';
+import eslintJs from '@eslint/js';
+import eslintPluginPrettier from 'eslint-plugin-prettier/recommended';
 
 export default withNuxt(
   eslintJs.configs.recommended,
@@ -13,5 +13,5 @@ export default withNuxt(
       '@typescript-eslint/no-redeclare': 'error',
     },
   },
-  eslintConfigPrettier,
-)
+  eslintPluginPrettier // Enforces Prettier formatting as ESLint errors
+);

@@ -1,27 +1,30 @@
 <script setup lang="ts">
 const props = defineProps<{
-  show: boolean
-  type: 'file' | 'folder'
-}>()
+  show: boolean;
+  type: 'file' | 'folder';
+}>();
 
 const emit = defineEmits<{
-  create: [name: string]
-  close: []
-}>()
+  create: [name: string];
+  close: [];
+}>();
 
-const name = ref('')
-const inputRef = ref<HTMLInputElement>()
+const name = ref('');
+const inputRef = ref<HTMLInputElement>();
 
-watch(() => props.show, (isShown) => {
-  if (isShown) {
-    name.value = ''
-    nextTick(() => inputRef.value?.focus())
+watch(
+  () => props.show,
+  (isShown) => {
+    if (isShown) {
+      name.value = '';
+      nextTick(() => inputRef.value?.focus());
+    }
   }
-})
+);
 
 function handleSubmit() {
   if (name.value.trim()) {
-    emit('create', name.value.trim())
+    emit('create', name.value.trim());
   }
 }
 </script>
@@ -45,7 +48,7 @@ function handleSubmit() {
             type="text"
             :placeholder="type === 'file' ? 'filename.md' : 'Folder name'"
             class="w-full px-3 py-2 border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-surface text-content"
-          >
+          />
 
           <div class="flex justify-end gap-3 mt-6">
             <button

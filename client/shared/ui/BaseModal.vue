@@ -1,20 +1,23 @@
 <script setup lang="ts">
 const props = defineProps<{
-  show: boolean
-  title?: string
-}>()
+  show: boolean;
+  title?: string;
+}>();
 
 const emit = defineEmits<{
-  close: []
-}>()
+  close: [];
+}>();
 
-const inputRef = ref<HTMLElement>()
+const inputRef = ref<HTMLElement>();
 
-watch(() => props.show, (isShown) => {
-  if (isShown) {
-    nextTick(() => inputRef.value?.focus())
+watch(
+  () => props.show,
+  (isShown) => {
+    if (isShown) {
+      nextTick(() => inputRef.value?.focus());
+    }
   }
-})
+);
 </script>
 
 <template>
@@ -25,19 +28,13 @@ watch(() => props.show, (isShown) => {
       @click.self="emit('close')"
     >
       <div class="bg-surface rounded-lg shadow-xl w-full max-w-md p-6">
-        <h2
-          v-if="title"
-          class="text-lg font-semibold text-content mb-4"
-        >
+        <h2 v-if="title" class="text-lg font-semibold text-content mb-4">
           {{ title }}
         </h2>
 
         <slot />
 
-        <div
-          v-if="$slots.footer"
-          class="flex justify-end gap-3 mt-6"
-        >
+        <div v-if="$slots.footer" class="flex justify-end gap-3 mt-6">
           <slot name="footer" />
         </div>
       </div>

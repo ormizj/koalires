@@ -1,1 +1,1 @@
-export { useFileManager } from './model/useFileManager'
+export { useFileManager } from './model/useFileManager';

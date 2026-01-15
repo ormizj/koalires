@@ -1,20 +1,20 @@
-import Database from 'better-sqlite3'
-import { existsSync, mkdirSync } from 'fs'
-import { dirname, resolve } from 'path'
+import Database from 'better-sqlite3';
+import { existsSync, mkdirSync } from 'fs';
+import { dirname, resolve } from 'path';
 
-const DB_PATH = resolve('./data/koalires.db')
+const DB_PATH = resolve('./data/koalires.db');
 
-let db: Database.Database | null = null
+let db: Database.Database | null = null;
 
 function initializeDb(): Database.Database {
-  const dir = dirname(DB_PATH)
+  const dir = dirname(DB_PATH);
   if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true })
+    mkdirSync(dir, { recursive: true });
   }
 
-  const database = new Database(DB_PATH)
-  database.pragma('journal_mode = WAL')
-  database.pragma('foreign_keys = ON')
+  const database = new Database(DB_PATH);
+  database.pragma('journal_mode = WAL');
+  database.pragma('foreign_keys = ON');
 
   database.exec(`
     CREATE TABLE IF NOT EXISTS users (
@@ -53,14 +53,14 @@ function initializeDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_folders_parent ON folders(parent_id);
     CREATE INDEX IF NOT EXISTS idx_files_user ON files(user_id);
     CREATE INDEX IF NOT EXISTS idx_files_folder ON files(folder_id);
-  `)
+  `);
 
-  return database
+  return database;
 }
 
 export function getDb(): Database.Database {
   if (!db) {
-    db = initializeDb()
+    db = initializeDb();
   }
-  return db
+  return db;
 }

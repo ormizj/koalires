@@ -1,1 +1,1 @@
-export { default as FileList } from './ui/FileList.vue'
+export { default as FileList } from './ui/FileList.vue';

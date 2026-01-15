@@ -1,11 +1,11 @@
 export default defineEventHandler((event) => {
-  const user = event.context.user
+  const user = event.context.user;
   if (!user) {
-    throw createError({ statusCode: 401, message: 'Not authenticated' })
+    throw createError({ statusCode: 401, message: 'Not authenticated' });
   }
 
   return {
     id: user.userId,
     email: user.email,
-  }
-})
+  };
+});

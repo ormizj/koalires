@@ -1,35 +1,33 @@
 <script setup lang="ts">
-import { useAuth } from '../model/useAuth'
+import { useAuth } from '../model/useAuth';
 
-const { login, isAuthenticated, initFromStorage } = useAuth()
-const router = useRouter()
+const { login, isAuthenticated, initFromStorage } = useAuth();
+const router = useRouter();
 
-const email = ref('')
-const password = ref('')
-const error = ref('')
-const loading = ref(false)
+const email = ref('');
+const password = ref('');
+const error = ref('');
+const loading = ref(false);
 
 onMounted(() => {
-  initFromStorage()
+  initFromStorage();
   if (isAuthenticated.value) {
-    router.replace('/files')
+    router.replace('/files');
   }
-})
+});
 
 async function handleSubmit() {
-  error.value = ''
-  loading.value = true
+  error.value = '';
+  loading.value = true;
 
   try {
-    await login(email.value, password.value)
-    router.push('/files')
-  }
-  catch (e: unknown) {
-    const err = e as { data?: { message?: string } }
-    error.value = err.data?.message || 'Login failed. Please try again.'
-  }
-  finally {
-    loading.value = false
+    await login(email.value, password.value);
+    router.push('/files');
+  } catch (e: unknown) {
+    const err = e as { data?: { message?: string } };
+    error.value = err.data?.message || 'Login failed. Please try again.';
+  } finally {
+    loading.value = false;
   }
 }
 </script>
@@ -40,10 +38,7 @@ async function handleSubmit() {
       Sign in to Koalires
     </h1>
 
-    <form
-      class="space-y-6"
-      @submit.prevent="handleSubmit"
-    >
+    <form class="space-y-6" @submit.prevent="handleSubmit">
       <div
         v-if="error"
         class="p-3 bg-danger-soft border border-danger-border rounded text-danger text-sm"
@@ -55,7 +50,8 @@ async function handleSubmit() {
         <label
           for="email"
           class="block text-sm font-medium text-content-secondary mb-1"
-        >Email</label>
+          >Email</label
+        >
         <input
           id="email"
           v-model="email"
@@ -63,14 +59,15 @@ async function handleSubmit() {
           required
           class="w-full px-3 py-2 border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-surface text-content"
           placeholder="you@example.com"
-        >
+        />
       </div>
 
       <div>
         <label
           for="password"
           class="block text-sm font-medium text-content-secondary mb-1"
-        >Password</label>
+          >Password</label
+        >
         <input
           id="password"
           v-model="password"
@@ -78,7 +75,7 @@ async function handleSubmit() {
           required
           class="w-full px-3 py-2 border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-surface text-content"
           placeholder="Enter your password"
-        >
+        />
       </div>
 
       <button

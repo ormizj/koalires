@@ -1,28 +1,28 @@
 <script setup lang="ts">
-import type { Folder } from '~/entities/folder'
-import type { File } from '~/entities/file'
+import type { Folder } from '~/entities/folder';
+import type { File } from '~/entities/file';
 
 defineProps<{
-  folders: Folder[]
-  files: File[]
-}>()
+  folders: Folder[];
+  files: File[];
+}>();
 
 const emit = defineEmits<{
-  openFolder: [id: number]
-  openFile: [file: File]
-  deleteFolder: [id: number]
-  deleteFile: [id: number]
-}>()
+  openFolder: [id: number];
+  openFile: [file: File];
+  deleteFolder: [id: number];
+  deleteFile: [id: number];
+}>();
 
 function confirmDeleteFolder(id: number, name: string) {
   if (confirm(`Delete folder "${name}" and all its contents?`)) {
-    emit('deleteFolder', id)
+    emit('deleteFolder', id);
   }
 }
 
 function confirmDeleteFile(id: number, name: string) {
   if (confirm(`Delete file "${name}"?`)) {
-    emit('deleteFile', id)
+    emit('deleteFile', id);
   }
 }
 </script>
@@ -36,10 +36,7 @@ function confirmDeleteFile(id: number, name: string) {
       This folder is empty
     </div>
 
-    <div
-      v-else
-      class="space-y-1"
-    >
+    <div v-else class="space-y-1">
       <div
         v-for="folder in folders"
         :key="'folder-' + folder.id"
@@ -55,10 +52,7 @@ function confirmDeleteFile(id: number, name: string) {
           class="p-1 text-content-muted hover:text-danger opacity-0 group-hover:opacity-100 transition-opacity"
           @click.stop="confirmDeleteFolder(folder.id, folder.name)"
         >
-          <Icon
-            name="heroicons:trash"
-            class="w-4 h-4"
-          />
+          <Icon name="heroicons:trash" class="w-4 h-4" />
         </button>
       </div>
 
@@ -77,10 +71,7 @@ function confirmDeleteFile(id: number, name: string) {
           class="p-1 text-content-muted hover:text-danger opacity-0 group-hover:opacity-100 transition-opacity"
           @click.stop="confirmDeleteFile(file.id, file.name)"
         >
-          <Icon
-            name="heroicons:trash"
-            class="w-4 h-4"
-          />
+          <Icon name="heroicons:trash" class="w-4 h-4" />
         </button>
       </div>
     </div>

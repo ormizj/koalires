@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { useAuth } from '~/features/auth'
-import { AppHeader } from '~/widgets/app-header'
+import { useAuth } from '~/features/auth';
+import { AppHeader } from '~/widgets/app-header';
 
-const { isAuthenticated } = useAuth()
+const { isAuthenticated } = useAuth();
 </script>
 
 <template>

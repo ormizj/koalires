@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { useAuth } from '~/features/auth'
-import { useFileManager } from '~/features/file-manager'
-import { CreateModal } from '~/features/create-item'
-import { FileTree } from '~/widgets/file-tree'
-import { FileList } from '~/widgets/file-list'
-import { FileEditor } from '~/widgets/file-editor'
+import { useAuth } from '~/features/auth';
+import { useFileManager } from '~/features/file-manager';
+import { CreateModal } from '~/features/create-item';
+import { FileTree } from '~/widgets/file-tree';
+import { FileList } from '~/widgets/file-list';
+import { FileEditor } from '~/widgets/file-editor';
 
-const { isAuthenticated, initFromStorage, fetchUser } = useAuth()
+const { isAuthenticated, initFromStorage, fetchUser } = useAuth();
 const {
   currentFolderId,
   folders,
@@ -24,51 +24,49 @@ const {
   selectFile,
   closeFile,
   getBreadcrumbs,
-} = useFileManager()
-const router = useRouter()
+} = useFileManager();
+const router = useRouter();
 
-const showCreateModal = ref(false)
-const createType = ref<'file' | 'folder'>('file')
+const showCreateModal = ref(false);
+const createType = ref<'file' | 'folder'>('file');
 
 onMounted(async () => {
-  initFromStorage()
+  initFromStorage();
 
   if (!isAuthenticated.value) {
-    router.replace('/login')
-    return
+    router.replace('/login');
+    return;
   }
 
   try {
-    await fetchUser()
+    await fetchUser();
     if (!isAuthenticated.value) {
-      router.replace('/login')
-      return
+      router.replace('/login');
+      return;
     }
-    await Promise.all([loadContents(null), loadAllFolders()])
+    await Promise.all([loadContents(null), loadAllFolders()]);
+  } catch {
+    router.replace('/login');
   }
-  catch {
-    router.replace('/login')
-  }
-})
+});
 
 function openCreateModal(type: 'file' | 'folder') {
-  createType.value = type
-  showCreateModal.value = true
+  createType.value = type;
+  showCreateModal.value = true;
 }
 
 async function handleCreate(name: string) {
-  showCreateModal.value = false
+  showCreateModal.value = false;
   if (createType.value === 'file') {
-    await createFile(name)
-  }
-  else {
-    await createFolder(name)
+    await createFile(name);
+  } else {
+    await createFolder(name);
   }
 }
 
 async function handleSaveFile(content: string) {
   if (selectedFile.value) {
-    await updateFile(selectedFile.value.id, content)
+    await updateFile(selectedFile.value.id, content);
   }
 }
 </script>
@@ -81,10 +79,7 @@ async function handleSaveFile(content: string) {
           class="w-full px-4 py-2 rounded bg-primary text-white hover:bg-primary-hover transition-colors flex items-center justify-center gap-2"
           @click="openCreateModal('folder')"
         >
-          <Icon
-            name="heroicons:plus"
-            class="w-4 h-4"
-          />
+          <Icon name="heroicons:plus" class="w-4 h-4" />
           New Folder
         </button>
       </div>
@@ -107,7 +102,9 @@ async function handleSaveFile(content: string) {
       </template>
 
       <template v-else>
-        <header class="bg-surface border-b border-border px-4 py-3 flex items-center justify-between">
+        <header
+          class="bg-surface border-b border-border px-4 py-3 flex items-center justify-between"
+        >
           <div class="flex items-center gap-2 text-sm">
             <button
               class="text-content-secondary hover:text-content"
@@ -115,10 +112,7 @@ async function handleSaveFile(content: string) {
             >
               Root
             </button>
-            <template
-              v-for="crumb in getBreadcrumbs()"
-              :key="crumb.id"
-            >
+            <template v-for="crumb in getBreadcrumbs()" :key="crumb.id">
               <span class="text-content-muted">/</span>
               <button
                 class="text-content-secondary hover:text-content"
@@ -132,10 +126,7 @@ async function handleSaveFile(content: string) {
             class="px-4 py-2 rounded bg-primary text-white hover:bg-primary-hover transition-colors flex items-center gap-2"
             @click="openCreateModal('file')"
           >
-            <Icon
-              name="heroicons:plus"
-              class="w-4 h-4"
-            />
+            <Icon name="heroicons:plus" class="w-4 h-4" />
             New File
           </button>
         </header>
