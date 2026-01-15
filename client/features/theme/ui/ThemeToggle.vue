@@ -2,30 +2,36 @@
 import { useTheme } from '../model/useTheme'
 
 const { isDark, toggle } = useTheme()
-const ready = ref(false)
+const hasInitialized = useState('theme-toggle-initialized', () => false)
+const shouldAnimate = ref(false)
 
 onMounted(() => {
-  ready.value = true
+  if (hasInitialized.value) {
+    shouldAnimate.value = true
+  } else {
+    hasInitialized.value = true
+  }
 })
+
+function handleToggle() {
+  shouldAnimate.value = true
+  toggle()
+}
 </script>
 
 <template>
   <button
     class="p-2 rounded-lg hover:bg-surface-secondary transition-colors w-10 h-10 flex items-center justify-center"
     :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
-    @click="toggle"
+    @click="handleToggle"
   >
     <Transition
+      v-if="shouldAnimate"
       name="icon"
       mode="out-in"
     >
-      <span
-        v-if="!ready"
-        key="placeholder"
-        class="w-6 h-6 inline-block"
-      />
       <Icon
-        v-else-if="isDark"
+        v-if="isDark"
         key="sun"
         name="heroicons:sun"
         class="w-6 h-6 text-content"
@@ -37,6 +43,18 @@ onMounted(() => {
         class="w-6 h-6 text-content"
       />
     </Transition>
+    <template v-else>
+      <Icon
+        v-if="isDark"
+        name="heroicons:sun"
+        class="w-6 h-6 text-content"
+      />
+      <Icon
+        v-else
+        name="heroicons:moon"
+        class="w-6 h-6 text-content"
+      />
+    </template>
   </button>
 </template>
 
