@@ -83,7 +83,7 @@ This is a Nuxt 4 project using Feature-Sliced Design (FSD) with `client/` as the
 - **nuxt.config.ts** - Nuxt configuration with FSD auto-imports
 - **tailwind.config.ts** - Tailwind CSS configuration
 - **prisma.config.ts** - Prisma configuration
-- **koalires.db** - SQLite database file
+- **database/koalires.db** - SQLite database file
 
 ## Key Conventions
 
