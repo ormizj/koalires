@@ -22,7 +22,8 @@
       "Bash(npx tsc:*)",
       "mcp__ide__getDiagnostics",
       "Bash(git push:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(timeout 20 sh:*)"
     ]
   }
 }

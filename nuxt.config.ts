@@ -1,22 +1,19 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-  modules: ['@nuxtjs/tailwindcss', '@nuxt/icon', '@nuxt/eslint', '@pinia/nuxt'],
-
-  // Feature-Sliced Design auto-imports
-  components: [
-    { path: '~/shared/ui', prefix: '' },
-    { path: '~/entities/**/ui', prefix: '' },
-    { path: '~/features/**/ui', prefix: '' },
-    { path: '~/widgets/**/ui', prefix: '' },
-    '~/components',
+  modules: [
+    '@nuxtjs/tailwindcss',
+    '@nuxt/icon',
+    '@nuxt/eslint',
+    '@pinia/nuxt',
+    '~/app/modules/fsd-components',
   ],
 
   imports: {
     dirs: [
       'shared/lib',
-      'shared/api',
+      'shared/api/index.ts',
+      'shared/stores/index.ts',
       'shared/config',
-      'shared/stores',
       'entities/**/model',
       'entities/**/api',
       'features/**/model',
