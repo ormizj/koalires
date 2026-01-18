@@ -115,6 +115,14 @@ This is a Nuxt 4 project using Feature-Sliced Design (FSD) with `client/` as the
   - Change impact analysis → `change-impact-analyzer`
   - Do NOT implement code directly. Only use Edit/Write for trivial single-line fixes.
 
+- **MANDATORY POST-CHANGE ANALYSIS**: After ANY code change (file creation, edit, or deletion), you MUST:
+  1. Invoke `change-impact-analyzer` to detect ripple effects
+  2. If the analyzer identifies files that need updates, make those updates
+  3. After making those updates, invoke `change-impact-analyzer` AGAIN recursively
+  4. Continue this loop until the analyzer reports NO breaking changes or warnings
+  5. This rule applies to ALL changes including: new files, edited files, new skills, new agents, config changes
+  6. The only exceptions are: pure documentation updates (README, comments-only changes) and this CLAUDE.md file itself
+
 ## Available Agents
 
 | Agent                       | When to Use                                                                                      |
@@ -146,5 +154,5 @@ This is a Nuxt 4 project using Feature-Sliced Design (FSD) with `client/` as the
 10. **For updating this file**: Use `context-documenter`
 11. **For creating CLAUDE skills**: Use `claude-skill-creator`
 12. **For coordinating multiple agents**: Use `agent-organizer` or `multi-agent-coordinator`
-13. **For analyzing code change impact**: Use `change-impact-analyzer`
+13. **⚠️ AFTER ANY CODE CHANGE**: Use `change-impact-analyzer` (MANDATORY - run recursively until no issues)
 14. **When uncertain**: Ask the user for clarification
