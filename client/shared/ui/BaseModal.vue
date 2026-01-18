@@ -14,7 +14,7 @@ watch(
   () => props.show,
   (isShown) => {
     if (isShown) {
-      nextTick(() => inputRef.value?.focus());
+      void nextTick(() => inputRef.value?.focus());
     }
   }
 );

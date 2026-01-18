@@ -28,7 +28,7 @@ export function useAuth() {
 
   function logout() {
     clearUser();
-    router.push('/login');
+    void router.push('/login');
   }
 
   return {

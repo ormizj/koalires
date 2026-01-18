@@ -36,5 +36,22 @@ export default withNuxt(
       '@typescript-eslint/no-unsafe-return': 'warn',
     },
   },
+  // Type-aware linting for client Vue files
+  {
+    files: ['client/**/*.vue', 'client/**/*.ts'],
+    ignores: ['client/app/modules/**/*.ts'], // Nuxt modules not in tsconfig
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      // Type-aware rules for promise/async handling
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-misused-promises': 'error',
+      '@typescript-eslint/await-thenable': 'error',
+    },
+  },
   eslintPluginPrettier // Enforces Prettier formatting as ESLint errors
 );

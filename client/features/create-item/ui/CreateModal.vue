@@ -17,7 +17,7 @@ watch(
   (isShown) => {
     if (isShown) {
       name.value = '';
-      nextTick(() => inputRef.value?.focus());
+      void nextTick(() => inputRef.value?.focus());
     }
   }
 );

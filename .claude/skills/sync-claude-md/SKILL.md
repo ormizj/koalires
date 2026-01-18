@@ -21,14 +21,14 @@ Update and maintain the CLAUDE.md project instructions file while preserving str
 
 The CLAUDE.md file has the following standard sections in order:
 
-| Section                      | Purpose                                            |
-| ---------------------------- | -------------------------------------------------- |
-| `## Project Overview`        | High-level description of the project              |
-| `## Commands`                | npm/build commands with descriptions               |
-| `## Architecture`            | Directory structure and key files                  |
-| `## Key Conventions`         | Auto-imports, routing, TypeScript settings         |
-| `## Implementation Rules`    | Agent delegation rules (managed by `sync-agents`)  |
-| `## Available Agents`        | Agent table (managed by `sync-agents`)             |
+| Section                         | Purpose                                            |
+| ------------------------------- | -------------------------------------------------- |
+| `## Project Overview`           | High-level description of the project              |
+| `## Commands`                   | npm/build commands with descriptions               |
+| `## Architecture`               | Directory structure and key files                  |
+| `## Key Conventions`            | Auto-imports, routing, TypeScript settings         |
+| `## Implementation Rules`       | Agent delegation rules (managed by `sync-agents`)  |
+| `## Available Agents`           | Agent table (managed by `sync-agents`)             |
 | `## Agent Selection Guidelines` | When to use which agent (managed by `sync-agents`) |
 
 **Important:** The last three sections (Implementation Rules, Available Agents, Agent Selection Guidelines) are managed by the `sync-agents` skill. Do not modify these sections with this skill.
@@ -49,12 +49,12 @@ Understand the current structure and content of each section.
 
 Based on the user's request, determine which section needs updating:
 
-| Change Type               | Target Section         |
-| ------------------------- | ---------------------- |
-| Project description       | `## Project Overview`  |
-| npm scripts, build tools  | `## Commands`          |
-| Directory structure       | `## Architecture`      |
-| Auto-imports, conventions | `## Key Conventions`   |
+| Change Type               | Target Section        |
+| ------------------------- | --------------------- |
+| Project description       | `## Project Overview` |
+| npm scripts, build tools  | `## Commands`         |
+| Directory structure       | `## Architecture`     |
+| Auto-imports, conventions | `## Key Conventions`  |
 
 ### Step 3: Validate the Change
 
@@ -123,6 +123,7 @@ CLAUDE.md has been updated successfully
 - Mention the project name (Koalires)
 
 Example format:
+
 ```markdown
 ## Project Overview
 
@@ -137,14 +138,18 @@ Koalires is a Nuxt 4 application built with Vue 3 and TypeScript.
 - Standard commands: install, dev, build, preview, generate
 
 Example format:
+
 ```markdown
 ## Commands
 
 \`\`\`bash
+
 # Install dependencies
+
 npm install
 
 # Start development server (http://localhost:3000)
+
 npm run dev
 \`\`\`
 ```
@@ -157,6 +162,7 @@ npm run dev
 - Include purpose for each directory/file
 
 Example format:
+
 ```markdown
 ## Architecture
 
@@ -173,6 +179,7 @@ This is a Nuxt 4 project using the `app/` directory structure:
 - Focus on things Claude needs to know when working with code
 
 Example format:
+
 ```markdown
 ## Key Conventions
 

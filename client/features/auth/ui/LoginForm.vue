@@ -12,7 +12,7 @@ const loading = ref(false);
 onMounted(() => {
   initFromStorage();
   if (isAuthenticated.value) {
-    router.replace('/files');
+    void router.replace('/files');
   }
 });
 
@@ -22,7 +22,7 @@ async function handleSubmit() {
 
   try {
     await login(email.value, password.value);
-    router.push('/files');
+    void router.push('/files');
   } catch (e: unknown) {
     const err = e as { data?: { message?: string } };
     error.value = err.data?.message || 'Login failed. Please try again.';

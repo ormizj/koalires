@@ -12,9 +12,9 @@ onMounted(async () => {
   }
 
   if (isAuthenticated.value) {
-    router.replace('/files');
+    void router.replace('/files');
   } else {
-    router.replace('/login');
+    void router.replace('/login');
   }
 });
 </script>

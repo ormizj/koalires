@@ -34,19 +34,19 @@ onMounted(async () => {
   initFromStorage();
 
   if (!isAuthenticated.value) {
-    router.replace('/login');
+    void router.replace('/login');
     return;
   }
 
   try {
     await fetchUser();
     if (!isAuthenticated.value) {
-      router.replace('/login');
+      void router.replace('/login');
       return;
     }
     await Promise.all([loadContents(null), loadAllFolders()]);
   } catch {
-    router.replace('/login');
+    void router.replace('/login');
   }
 });
 
