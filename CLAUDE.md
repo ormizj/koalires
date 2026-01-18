@@ -112,6 +112,7 @@ This is a Nuxt 4 project using Feature-Sliced Design (FSD) with `client/` as the
   - Creating CLAUDE skills → `claude-skill-creator`
   - Multi-agent team assembly → `agent-organizer`
   - Complex workflow orchestration → `multi-agent-coordinator`
+  - Change impact analysis → `change-impact-analyzer`
   - Do NOT implement code directly. Only use Edit/Write for trivial single-line fixes.
 
 ## Available Agents
@@ -129,6 +130,7 @@ This is a Nuxt 4 project using Feature-Sliced Design (FSD) with `client/` as the
 | `agent-organizer`           | Multi-agent team assembly, task decomposition, workflow optimization, agent selection            |
 | `multi-agent-coordinator`   | Complex workflow orchestration, inter-agent communication, parallel execution, fault tolerance   |
 | `claude-skill-creator`      | Creating CLAUDE skills, SKILL.md files, skill documentation structure                            |
+| `change-impact-analyzer`    | Ripple effect analysis, dependency tracing, breaking change detection, code change impact        |
 
 ## Agent Selection Guidelines
 
@@ -144,4 +146,5 @@ This is a Nuxt 4 project using Feature-Sliced Design (FSD) with `client/` as the
 10. **For updating this file**: Use `context-documenter`
 11. **For creating CLAUDE skills**: Use `claude-skill-creator`
 12. **For coordinating multiple agents**: Use `agent-organizer` or `multi-agent-coordinator`
-13. **When uncertain**: Ask the user for clarification
+13. **For analyzing code change impact**: Use `change-impact-analyzer`
+14. **When uncertain**: Ask the user for clarification
