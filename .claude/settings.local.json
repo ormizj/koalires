@@ -24,7 +24,8 @@
       "Bash(git push:*)",
       "Bash(dir:*)",
       "Bash(timeout 20 sh:*)",
-      "Bash(powershell -ExecutionPolicy Bypass -File:*)"
+      "Bash(powershell -ExecutionPolicy Bypass -File:*)",
+      "Bash(env)"
     ]
   }
 }
