@@ -23,7 +23,8 @@
       "mcp__ide__getDiagnostics",
       "Bash(git push:*)",
       "Bash(dir:*)",
-      "Bash(timeout 20 sh:*)"
+      "Bash(timeout 20 sh:*)",
+      "Bash(powershell -ExecutionPolicy Bypass -File:*)"
     ]
   }
 }
