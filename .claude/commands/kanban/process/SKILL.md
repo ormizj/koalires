@@ -107,8 +107,8 @@ If no pending tasks remain:
 
 Run the PowerShell dispatcher script:
 
-```powershell
-pwsh .claude/commands/kanban/process/scripts/parallel-dispatch.ps1
+```bash
+powershell -ExecutionPolicy Bypass -File ".claude/commands/kanban/process/scripts/parallel-dispatch.ps1"
 ```
 
 **Optional Parameters**:
@@ -120,15 +120,15 @@ pwsh .claude/commands/kanban/process/scripts/parallel-dispatch.ps1
 
 **Examples**:
 
-```powershell
+```bash
 # Default: 3 parallel workers
-pwsh .claude/commands/kanban/process/scripts/parallel-dispatch.ps1
+powershell -ExecutionPolicy Bypass -File ".claude/commands/kanban/process/scripts/parallel-dispatch.ps1"
 
 # Run 5 tasks at once
-pwsh .claude/commands/kanban/process/scripts/parallel-dispatch.ps1 -Parallel 5
+powershell -ExecutionPolicy Bypass -File ".claude/commands/kanban/process/scripts/parallel-dispatch.ps1" -Parallel 5
 
 # Preview without executing
-pwsh .claude/commands/kanban/process/scripts/parallel-dispatch.ps1 -DryRun
+powershell -ExecutionPolicy Bypass -File ".claude/commands/kanban/process/scripts/parallel-dispatch.ps1" -DryRun
 ```
 
 ### Phase 3: Monitor and Handle Failures
@@ -218,7 +218,7 @@ If a worker completes without creating a status file:
 
 If the PowerShell script fails to start:
 
-1. Verify `pwsh` is installed and in PATH
+1. Verify PowerShell is available (Windows has it built-in)
 2. Check script permissions
 3. Run with `-DryRun` to validate setup
 
@@ -255,3 +255,5 @@ The dispatcher automatically determines which tasks need processing based on cur
 - Workers operate independently and may run concurrently
 - Each worker has full access to project files and CLAUDE.md context
 - Worker logs are preserved in `.kanban/logs/` for debugging
+- **Workers run with `--dangerously-skip-permissions`** to enable autonomous execution without permission prompts
+- Workers update `kanban-progress.json` (not their own status files) for work tracking

@@ -1,6 +1,6 @@
 {
-  "project": "User Profile Page with Avatar Upload and Settings",
-  "created": "2026-01-19T12:00:00Z",
+  "project": "User Profile Page with Avatar Upload",
+  "created": "2026-01-19T15:00:00Z",
   "projectType": "nuxt",
   "tasks": [
     {
@@ -16,7 +16,7 @@
         "Run npm run db:push in terminal",
         "Verify database schema updates without errors"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "name": "update-user-types",
@@ -29,11 +29,11 @@
         "Run npm run typecheck in terminal",
         "Verify TypeScript compiles without errors"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "name": "user-repository-updates",
-      "description": "## Update User Repository\n\nAdd functions to the user repository for profile operations.\n\n### Implementation\n- Add `getUserById(id: number)` function\n- Add `updateUser(id: number, data: { displayName?, avatarUrl? })` function\n- Follow existing repository patterns from `server/database/repositories/users.ts`\n\n### Files to Modify\n- `server/database/repositories/users.ts`",
+      "description": "## Update User Repository\n\nAdd functions to the user repository for profile operations.\n\n### Implementation\n- Add `getUserById(id: number)` function to fetch user by ID\n- Add `updateUser(id: number, data: { displayName?, avatarUrl? })` function to update profile\n- Follow existing repository patterns from `server/database/repositories/users.ts`\n\n### Files to Modify\n- `server/database/repositories/users.ts`",
       "category": "api",
       "steps": [
         "Open server/database/repositories/users.ts",
@@ -42,7 +42,7 @@
         "Verify updateUser can update displayName and avatarUrl fields",
         "Run npm run typecheck to verify no TypeScript errors"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "name": "create-uploads-directory",
@@ -56,11 +56,11 @@
         "Verify uploads/.gitignore exists with rules to ignore uploaded files",
         "Run git status and verify .gitkeep is trackable"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "name": "update-me-endpoint",
-      "description": "## Update /api/auth/me Endpoint\n\nExtend the existing me endpoint to return full profile data including avatar and display name.\n\n### Implementation\n- Update `server/api/auth/me.get.ts`\n- Fetch full user data from database using getUserById\n- Include displayName and avatarUrl in response\n\n### Response Format\n```json\n{\n  \"id\": 1,\n  \"email\": \"user@example.com\",\n  \"displayName\": \"John Doe\",\n  \"avatarUrl\": \"/uploads/avatars/user-1.jpg\"\n}\n```",
+      "description": "## Update /api/auth/me Endpoint\n\nExtend the existing me endpoint to return full profile data including avatar and display name.\n\n### Implementation\n- Update `server/api/auth/me.get.ts`\n- Fetch full user data from database using getUserById\n- Include displayName and avatarUrl in response\n\n### Current Implementation\nReturns only `{ id, email }` from `event.context.user`\n\n### Target Response Format\n```json\n{\n  \"id\": 1,\n  \"email\": \"user@example.com\",\n  \"displayName\": \"John Doe\",\n  \"avatarUrl\": \"/uploads/avatars/user-1.jpg\"\n}\n```",
       "category": "api",
       "steps": [
         "Start the development server with npm run dev",
@@ -71,11 +71,11 @@
         "Verify response includes displayName field (can be null)",
         "Verify response includes avatarUrl field (can be null)"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "name": "profile-update-api",
-      "description": "## Create PUT Profile API Endpoint\n\nCreate an API endpoint to update the authenticated user's profile.\n\n### Implementation\n- Create `server/api/users/profile.put.ts`\n- Accept `displayName` in request body\n- Update user in database using updateUser repository function\n- Return updated user data\n- Require authentication (check `event.context.user`)\n\n### Request Body\n```json\n{\n  \"displayName\": \"New Name\"\n}\n```",
+      "description": "## Create PUT Profile API Endpoint\n\nCreate an API endpoint to update the authenticated user's profile.\n\n### Implementation\n- Create `server/api/users/profile.put.ts`\n- Accept `displayName` in request body\n- Update user in database using updateUser repository function\n- Return updated user data\n- Require authentication (check `event.context.user`)\n\n### Request Body\n```json\n{\n  \"displayName\": \"New Name\"\n}\n```\n\n### Response\n```json\n{\n  \"id\": 1,\n  \"email\": \"user@example.com\",\n  \"displayName\": \"New Name\",\n  \"avatarUrl\": null\n}\n```",
       "category": "api",
       "steps": [
         "Start the development server with npm run dev",
@@ -131,7 +131,7 @@
     },
     {
       "name": "profile-api-client",
-      "description": "## Create Profile API Client Methods\n\nAdd profile API methods to the frontend user API.\n\n### Implementation\n- Add `updateProfile(data: { displayName?: string })` method to userApi\n- Add `uploadAvatar(file: File)` method to userApi (using FormData)\n- Add `deleteAvatar()` method to userApi\n- Use existing apiClient patterns from `shared/api`\n\n### Files to Modify\n- `client/entities/user/api/userApi.ts`",
+      "description": "## Create Profile API Client Methods\n\nAdd profile API methods to the frontend user API.\n\n### Implementation\n- Add `updateProfile(data: { displayName?: string })` method to userApi\n- Add `uploadAvatar(file: File)` method to userApi (using FormData)\n- Add `deleteAvatar()` method to userApi\n- Use existing apiClient patterns from `shared/api`\n\n### Notes\n- For uploadAvatar, use FormData and skip JSON Content-Type header\n- Use $fetch directly for multipart form data uploads\n\n### Files to Modify\n- `client/entities/user/api/userApi.ts`",
       "category": "integration",
       "steps": [
         "Open client/entities/user/api/userApi.ts",
@@ -145,7 +145,7 @@
     },
     {
       "name": "profile-feature-composable",
-      "description": "## Create Profile Feature Composable\n\nCreate a composable for managing user profile state and operations in the profile feature.\n\n### Implementation\n- Create `client/features/profile/model/useProfile.ts`\n- Expose `loading` and `error` reactive states\n- Expose `updateProfile(displayName)` method\n- Expose `uploadAvatar(file)` method\n- Expose `deleteAvatar()` method\n- Integrate with useUser composable to refresh user data after updates\n\n### Files to Create\n- `client/features/profile/model/useProfile.ts`",
+      "description": "## Create Profile Feature Composable\n\nCreate a composable for managing user profile state and operations in the profile feature.\n\n### Implementation\n- Create `client/features/profile/model/useProfile.ts`\n- Expose `loading` and `error` reactive states\n- Expose `updateProfile(displayName)` method\n- Expose `uploadAvatar(file)` method\n- Expose `deleteAvatar()` method\n- Integrate with useAuth composable to refresh user data after updates\n\n### Files to Create\n- `client/features/profile/model/useProfile.ts`",
       "category": "integration",
       "steps": [
         "Open client/features/profile/model/useProfile.ts",
@@ -162,7 +162,7 @@
     },
     {
       "name": "avatar-upload-component",
-      "description": "## Create Avatar Upload Component\n\nCreate a reusable avatar upload component with preview and interaction.\n\n### Implementation\n- Create `client/features/profile/ui/AvatarUpload.vue`\n- Show current avatar image or default placeholder icon\n- Click to trigger hidden file input for selection\n- Show loading spinner during upload\n- Include delete button when avatar exists\n- Emit `upload` event with File when file selected\n- Emit `delete` event when delete clicked\n\n### Props\n- `avatarUrl?: string` - Current avatar URL\n- `loading?: boolean` - Upload in progress\n\n### Events\n- `@upload(file: File)` - File selected for upload\n- `@delete` - Delete current avatar",
+      "description": "## Create Avatar Upload Component\n\nCreate a reusable avatar upload component with preview and interaction.\n\n### Implementation\n- Create `client/features/profile/ui/AvatarUpload.vue`\n- Show current avatar image or default placeholder icon\n- Click to trigger hidden file input for selection\n- Show loading spinner during upload\n- Include delete button when avatar exists\n- Emit `upload` event with File when file selected\n- Emit `delete` event when delete clicked\n\n### Props\n- `avatarUrl?: string` - Current avatar URL\n- `loading?: boolean` - Upload in progress\n\n### Events\n- `@upload(file: File)` - File selected for upload\n- `@delete` - Delete current avatar\n\n### Styling\n- Use Tailwind CSS classes\n- Support dark mode\n- Circular avatar with hover effect",
       "category": "ui",
       "steps": [
         "Start the development server with npm run dev",
@@ -184,7 +184,7 @@
     },
     {
       "name": "profile-form-component",
-      "description": "## Create Profile Form Component\n\nCreate a form component for editing user profile settings.\n\n### Implementation\n- Create `client/features/profile/ui/ProfileForm.vue`\n- Include AvatarUpload component at top\n- Display name input field with v-model\n- Email display (read-only, styled differently)\n- Save button with loading state\n- Form validation (displayName max 50 chars)\n\n### Props\n- `user: User` - Current user data\n- `loading?: boolean` - Save in progress\n\n### Events\n- `@save(data: { displayName: string })` - Form submitted\n- `@upload-avatar(file: File)` - Avatar upload requested\n- `@delete-avatar` - Avatar delete requested",
+      "description": "## Create Profile Form Component\n\nCreate a form component for editing user profile settings.\n\n### Implementation\n- Create `client/features/profile/ui/ProfileForm.vue`\n- Include AvatarUpload component at top\n- Display name input field with v-model\n- Email display (read-only, styled differently)\n- Save button with loading state\n- Form validation (displayName max 50 chars)\n\n### Props\n- `user: User` - Current user data\n- `loading?: boolean` - Save in progress\n\n### Events\n- `@save(data: { displayName: string })` - Form submitted\n- `@upload-avatar(file: File)` - Avatar upload requested\n- `@delete-avatar` - Avatar delete requested\n\n### Styling\n- Consistent with existing form styles (LoginForm, RegisterForm)\n- Use Tailwind CSS\n- Support dark mode",
       "category": "ui",
       "steps": [
         "Start the development server with npm run dev",
@@ -242,7 +242,7 @@
     },
     {
       "name": "header-profile-link",
-      "description": "## Add Profile Link to Header\n\nUpdate the app header to include a link to the profile page with avatar thumbnail.\n\n### Implementation\n- Modify `client/widgets/app-header/ui/AppHeader.vue`\n- Add clickable profile area next to logout button\n- Show user avatar thumbnail if available (small circular image)\n- Show user icon placeholder if no avatar\n- Link/navigate to /profile on click\n- Maintain existing header layout and styling\n\n### Files to Modify\n- `client/widgets/app-header/ui/AppHeader.vue`",
+      "description": "## Add Profile Link to Header\n\nUpdate the app header to include a link to the profile page with avatar thumbnail.\n\n### Implementation\n- Modify `client/widgets/app-header/ui/AppHeader.vue`\n- Add clickable profile area next to logout button\n- Show user avatar thumbnail if available (small circular image)\n- Show user icon placeholder if no avatar\n- Link/navigate to /profile on click\n- Maintain existing header layout and styling\n\n### Current Header Layout\n- Logo on left\n- Theme toggle, user email, logout button on right\n\n### Target Layout\n- Logo on left\n- Theme toggle, avatar/profile link, user email, logout button on right\n\n### Files to Modify\n- `client/widgets/app-header/ui/AppHeader.vue`",
       "category": "ui",
       "steps": [
         "Start the development server with npm run dev",

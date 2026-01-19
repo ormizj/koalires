@@ -144,24 +144,24 @@ Complete these steps in order to verify your implementation:
 Create `.kanban/workers/{task.name}.status.json`:
 
 On Success:
-```json
+``json
 {
   "status": "success",
   "log": "Brief description of what was done",
   "affectedFiles": ["path/to/file1.ts", "path/to/file2.ts"],
   "agents": ["{agent-name}"]
 }
-```
+``
 
 On Failure:
-```json
+``json
 {
   "status": "failure",
   "error": "Description of what went wrong",
   "affectedFiles": [],
   "agents": ["{agent-name}"]
 }
-```
+``
 "@
     }
 
@@ -268,8 +268,8 @@ function Start-WorkerJob {
         try {
             Set-Location $ProjectRoot
 
-            # Run claude -p and capture output
-            $output = & claude -p $Prompt 2>&1
+            # Run claude -p with permissions skipped for autonomous worker execution
+            $output = & claude -p --dangerously-skip-permissions $Prompt 2>&1
 
             # Write output to log file
             $output | Out-File -FilePath $LogPath -Encoding UTF8
@@ -364,7 +364,8 @@ function Show-BatchResults {
         $taskName = $result.Task.name
         $status = $result.Status
 
-        if ($status.status -eq "success") {
+        # Accept both "success" and "completed" as valid success states
+        if ($status.status -eq "success" -or $status.status -eq "completed") {
             Write-Host "[PASS] " -ForegroundColor Green -NoNewline
             Write-Host "$taskName" -ForegroundColor White
             if ($status.summary) {
@@ -391,7 +392,7 @@ function Show-BatchResults {
     return @{
         SuccessCount = $successCount
         FailureCount = $failureCount
-        FailedTasks = $Results | Where-Object { $_.Status.status -ne "success" }
+        FailedTasks = $Results | Where-Object { $_.Status.status -ne "success" -and $_.Status.status -ne "completed" }
     }
 }
 
@@ -535,14 +536,16 @@ function Main {
             continue
         }
 
-        # Process tasks in batches
-        $taskQueue = [System.Collections.ArrayList]::new($waveTasks)
+        # Process tasks in batches - use standard array instead of ArrayList
+        $taskQueue = @($waveTasks)
+        $queueIndex = 0
 
-        while ($taskQueue.Count -gt 0) {
+        while ($queueIndex -lt $taskQueue.Count) {
             # Get batch of tasks
-            $batchSize = [Math]::Min($Parallel, $taskQueue.Count)
-            $batch = $taskQueue.GetRange(0, $batchSize)
-            $taskQueue.RemoveRange(0, $batchSize)
+            $remainingCount = $taskQueue.Count - $queueIndex
+            $batchSize = [Math]::Min($Parallel, $remainingCount)
+            $batch = $taskQueue[$queueIndex..($queueIndex + $batchSize - 1)]
+            $queueIndex += $batchSize
 
             Write-SubHeader "Processing Batch ($batchSize tasks)"
 
@@ -574,10 +577,14 @@ function Main {
                 $retryTasks = Handle-FailedTasks -FailedResults $summary.FailedTasks
 
                 if ($retryTasks.Count -gt 0) {
-                    # Add retry tasks back to queue
-                    foreach ($task in $retryTasks) {
-                        $taskQueue.Insert(0, $task)
+                    # Add retry tasks to queue by rebuilding array with retries at current position
+                    $newQueue = @()
+                    $newQueue += $retryTasks
+                    if ($queueIndex -lt $taskQueue.Count) {
+                        $newQueue += $taskQueue[$queueIndex..($taskQueue.Count - 1)]
                     }
+                    $taskQueue = $newQueue
+                    $queueIndex = 0
                 }
             }
         }
