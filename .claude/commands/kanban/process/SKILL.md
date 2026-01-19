@@ -1,133 +1,93 @@
 ---
 name: kanban:process
-description: Process kanban-board.json by delegating tasks to specialized agents in priority/dependency order. Use after kanban:create to execute planned work.
-allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Task
+description: Process kanban-board.json by dispatching tasks to parallel claude -p workers. Tasks execute in dependency waves. Use after kanban:create to execute planned work.
+allowed-tools: Bash, Read, Write
 ---
 
 # Process Kanban Skill
 
-Process the kanban board by delegating tasks to specialized agents. Based on Anthropic's "Effective harnesses for long-running agents" approach with human-in-the-loop confirmation at each step.
+Process the kanban board by dispatching tasks to parallel `claude -p` worker processes. Workers execute independently and self-update kanban files on completion.
+
+## Overview
+
+This skill orchestrates parallel task execution using a wave-based system:
+
+1. Tasks are grouped into waves by category dependencies
+2. Each wave runs up to N tasks in parallel via `claude -p` workers
+3. Workers self-update kanban files and write status files
+4. The dispatcher monitors status files and reports results
+5. Failed tasks can be retried, skipped, or halt execution
 
 ## Prerequisites
 
 - `.kanban/kanban-board.json` must exist (created by `kanban:create`)
 - `.kanban/kanban-progress.json` must exist (created by `kanban:create`)
-- User has reviewed and approved the task list
+- `claude` CLI must be available in PATH
 
 ## File Locations
 
 All kanban files are in the `.kanban/` directory:
 
-- `.kanban/kanban-board.json` - The task definitions
-- `.kanban/kanban-progress.json` - Tracks which tasks are in-progress or code-review
-
-## Task Structure
-
-Each task in `kanban-board.json` has this structure:
-
-```typescript
-{
-  "name": string,        // Short name describing the task
-  "description": string, // Extended information in markdown format
-  "category": string,    // Category: data, api, ui, integration, config, testing
-  "steps": string[],     // Sequential test steps (like manual QA) to verify the task
-  "passes": boolean      // Whether the task verification passed
-}
-```
+| Path | Purpose |
+|------|---------|
+| `.kanban/kanban-board.json` | Task definitions with passes field |
+| `.kanban/kanban-progress.json` | Work logs, affected files, agents |
+| `.kanban/workers/` | Worker status files (created by workers) |
+| `.kanban/logs/` | Worker output logs (created by dispatcher) |
 
 ## Task Status Logic
 
-Task status is derived from: `passes` field in kanban-board.json, presence in kanban-progress.json, and `committed` field:
+Task status is derived from the `passes` field, presence in progress.json, and `committed` field:
 
-| passes  | In progress.json | committed | Status          |
-| ------- | ---------------- | --------- | --------------- |
-| `false` | No               | -         | **pending**     |
-| `false` | Yes              | `false`   | **in-progress** |
-| `true`  | Yes              | `false`   | **code-review** |
-| `true`  | Yes              | `true`    | **completed**   |
-| `true`  | No               | -         | **completed**   |
+| passes | In progress.json | committed | Status |
+|--------|------------------|-----------|--------|
+| `false` | No | - | **pending** |
+| `false` | Yes | `false` | **in-progress** |
+| `true` | Yes | `false` | **code-review** |
+| `true` | Yes | `true` | **completed** |
+| `true` | No | - | **completed** |
 
-Note: `passes: false` + `committed: true` is an invalid state and should not occur.
+## Wave System
 
-### kanban-progress.json Structure
+Tasks are processed in waves based on category dependencies:
 
-```json
-{
-  "user-profile-api": {
-    "log": "Created GET endpoint, added auth middleware. Verified all test steps pass.",
-    "committed": false,
-    "affectedFiles": [
-      "server/api/users/profile.get.ts",
-      "server/middleware/auth.ts"
-    ],
-    "agents": [
-      "backend-developer",
-      "change-impact-analyzer"
-    ]
-  }
-}
-```
+| Wave | Categories | Depends On |
+|------|------------|------------|
+| 1 | data, config | None |
+| 2 | api | Wave 1 |
+| 3 | integration | Wave 2 |
+| 4 | ui | Wave 3 |
+| 5 | testing | Wave 4 |
 
-- `log` - Narrative of work done, useful for resuming context across sessions
-- `committed` - Whether this work has been committed to git
-- `affectedFiles` - Array of file paths that were created, modified, or deleted during this task
-- `agents` - Array of agent names that worked on this task (in order of invocation)
+Each wave completes before the next begins, ensuring dependent tasks have their prerequisites ready.
 
 ## Agent Mapping
 
-The agents available depend on the project's `CLAUDE.md` configuration. Common agents include:
+Workers are assigned agents based on task category:
 
-| Agent                 | Domain                                                    |
-| --------------------- | --------------------------------------------------------- |
-| `backend-developer`   | API routes, server logic, database operations             |
-| `vue-expert`          | Frontend Vue/Nuxt work, components, pages, composables    |
-| `ui-designer`         | Visual design, styling, UI components, accessibility      |
-| `websocket-engineer`  | Real-time features, WebSocket connections, live updates   |
+| Category | Agent |
+|----------|-------|
+| data | backend-developer |
+| config | backend-developer |
+| api | backend-developer |
+| integration | backend-developer |
+| ui | vue-expert |
+| testing | backend-developer |
 
-**Note**: Always check the project's `CLAUDE.md` for the complete list of available agents.
+---
 
 ## Workflow
 
-### Step 1: Read and Validate Kanban Files
+### Phase 1: Initialization
 
-Read both kanban files:
+Read and validate kanban files, then display progress summary.
 
 ```
 Read: .kanban/kanban-board.json
 Read: .kanban/kanban-progress.json
 ```
 
-Validate:
-
-1. Both files exist and are valid JSON
-2. Each task has required fields: name, description, category, steps, passes
-3. Progress file is a valid JSON object (keys are task names)
-
-If validation fails, report errors and stop.
-
-### Step 2: Calculate Status and Find Next Task
-
-For each task, derive its status:
-
-```javascript
-function getTaskStatus(task, progress) {
-  const entry = progress[task.name];
-
-  if (task.passes === true) {
-    if (entry && entry.committed === false) {
-      return 'code-review';
-    }
-    return 'completed';
-  } else {
-    if (entry) {
-      return 'in-progress';
-    }
-    return 'pending';
-  }
-}
-```
-
-Display progress summary:
+Calculate status for each task and display:
 
 ```
 KANBAN PROGRESS
@@ -139,346 +99,128 @@ Code Review: X
 Completed: X
 ```
 
-Find the next task to work on:
+If no pending tasks remain:
+- If code-review tasks exist, direct user to run `kanban:code-review`
+- Otherwise, report completion
 
-1. First, check for tasks in-progress (resume those)
-2. Then, select the first pending task
+### Phase 2: Dispatch
 
-If no pending or in-progress tasks remain, check for code-review tasks or report completion.
+Run the PowerShell dispatcher script:
 
-### Step 3: Display Task and Request Confirmation
+```powershell
+pwsh .claude/commands/kanban/process/scripts/parallel-dispatch.ps1
+```
 
-Present the task to the user:
+**Optional Parameters**:
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `-Parallel N` | Maximum concurrent workers | 3 |
+| `-DryRun` | Show what would run without executing | false |
+
+**Examples**:
+
+```powershell
+# Default: 3 parallel workers
+pwsh .claude/commands/kanban/process/scripts/parallel-dispatch.ps1
+
+# Run 5 tasks at once
+pwsh .claude/commands/kanban/process/scripts/parallel-dispatch.ps1 -Parallel 5
+
+# Preview without executing
+pwsh .claude/commands/kanban/process/scripts/parallel-dispatch.ps1 -DryRun
+```
+
+### Phase 3: Monitor and Handle Failures
+
+The dispatcher script handles monitoring automatically:
+
+1. Displays live progress as workers complete
+2. Shows pass/fail status for each task
+3. On failure, prompts user:
+   - **[R]etry** - Retry failed tasks
+   - **[S]kip** - Skip and continue to next wave
+   - **[Q]uit** - Stop all processing
+
+### Phase 4: Completion
+
+When all waves complete, the dispatcher shows final summary:
 
 ```
 ============================================
-NEXT TASK
+EXECUTION COMPLETE
 ============================================
+Total Passed:  X
+Total Failed:  X
 
-Name: create-user-schema
-Status: pending → in-progress
-Category: data
-
-Description:
-## User Schema
-
-Create the Prisma schema for user data...
-
-Verification Steps:
-1. Schema file exists
-2. Migration runs successfully
-3. User model is accessible
-
-============================================
-Proceed with this task? (yes/no/skip/stop)
-============================================
+Run 'kanban:code-review' to review and commit completed tasks.
 ```
 
-Wait for user response:
+---
 
-- **yes**: Proceed to Step 4
-- **no** or **skip**: Mark task as skipped, return to Step 2
-- **stop**: Save progress and exit
+## Worker Details
 
-### Step 4: Start Task (Update Progress)
+Each worker is a `claude -p` process that:
 
-Add an entry for the task to progress.json:
+1. Receives a task prompt with full context
+2. Implements the task following project patterns
+3. Runs verification steps
+4. Updates kanban files directly:
+   - Sets `passes: true` in kanban-board.json (if verification passes)
+   - Adds entry to kanban-progress.json with log, affected files, agents
+   - Writes status file to `.kanban/workers/{task-name}.status.json`
+
+**Worker Prompt Template**: `.claude/commands/kanban/process/prompts/worker-task.md`
+
+### Status File Format
+
+Workers write status files for the dispatcher to monitor:
 
 ```json
 {
-  "task-name": {
-    "log": "",
-    "committed": false,
-    "affectedFiles": [],
-    "agents": []
-  }
+  "status": "success",
+  "startedAt": "2026-01-19T12:00:00.000Z",
+  "completedAt": "2026-01-19T12:15:00.000Z",
+  "log": "Brief summary of work done",
+  "affectedFiles": ["path/to/file1.ts", "path/to/file2.ts"],
+  "agents": ["backend-developer"]
 }
 ```
 
-Write updated `.kanban/kanban-progress.json`.
-
-### Step 5: Delegate to Agent
-
-Determine the appropriate agent based on category:
-
-| Category      | Typical Agent        |
-| ------------- | -------------------- |
-| `data`        | `backend-developer`  |
-| `api`         | `backend-developer`  |
-| `ui`          | `vue-expert`         |
-| `integration` | `backend-developer`  |
-| `config`      | `backend-developer`  |
-| `testing`     | `backend-developer`  |
-
-Delegate the task using the Task tool:
-
-```
-Task: <agent-name>
-Prompt: |
-  ## Task Assignment
-
-  **Name**: <task.name>
-  **Category**: <task.category>
-
-  ## Description
-  <task.description>
-
-  ## Verification Steps
-  When complete, ensure these pass:
-  <task.steps> (numbered list)
-
-  ## Requirements
-  - Follow the project's existing patterns and conventions
-  - Ensure code passes any configured linting/type checks
-  - Follow the project's architecture guidelines (see CLAUDE.md)
-
-  ## When Complete
-  Provide a summary of changes made AND list all files that were created, modified, or deleted in a clearly labeled section:
-
-  ### Affected Files
-  - path/to/file1.ts (created)
-  - path/to/file2.ts (modified)
-  - path/to/file3.ts (deleted)
-```
-
-### Step 5.5: Record Agent and Affected Files
-
-After the agent completes, update progress with agent name and affected files:
-
-1. Add the agent name to the `agents` array (if not already present)
-2. Parse the "Affected Files" section from the agent's response
-3. Extract file paths (ignore the action type in parentheses for storage)
-4. Update the task entry in kanban-progress.json
-
-```json
-{
-  "task-name": {
-    "log": "",
-    "committed": false,
-    "affectedFiles": [
-      "path/to/file1.ts",
-      "path/to/file2.ts",
-      "path/to/file3.ts"
-    ],
-    "agents": ["backend-developer"]
-  }
-}
-```
-
-**Note**: Each time an agent works on the task, add its name to the `agents` array. This tracks all agents involved, even if multiple agents contribute (e.g., primary implementation + change-impact-analyzer + fix agents).
-
-**Fallback**: If the agent doesn't provide a clear "Affected Files" section, use `git status --porcelain` to detect changed files and populate the array.
-
-### Step 6: Run Change Impact Analysis
-
-After the agent completes, invoke the change-impact-analyzer:
-
-```
-Task: change-impact-analyzer
-Prompt: |
-  Analyze the changes made for task <task.name>
-
-  Check for:
-  - Breaking changes to other files
-  - Missing imports or exports
-  - Architecture/layer violations
-  - Type errors or lint issues
-
-  Report any files that need updates.
-```
-
-If the analyzer finds issues:
-
-1. Address each issue (delegate to appropriate agent if needed)
-2. Run change-impact-analyzer again
-3. Repeat until no issues are found
-
-### Step 7: Execute E2E Verification Steps
-
-Before marking the task as passing, execute the sequential test steps defined in the task to verify the implementation works end-to-end:
-
-1. Read the `steps` array from the task
-2. Execute each step in order (these are manual QA-style steps)
-3. Document results as you go
-
-```
-============================================
-E2E VERIFICATION: task-name
-============================================
-
-Step 1: Navigate to the login page
-→ PASS: Login page loads at /login
-
-Step 2: Enter valid email and password
-→ PASS: Form accepts input
-
-Step 3: Click the 'Sign In' button
-→ PASS: Button triggers submission
-
-Step 4: Verify redirect to dashboard
-→ PASS: Redirected to /dashboard
-
-All verification steps passed!
-============================================
-```
-
-If any step fails:
-1. Report the failure to the user
-2. Delegate fixes to the appropriate agent
-3. Re-run verification from the beginning
-4. Repeat until all steps pass (max 3 attempts)
-
-### Step 8: Mark Task as Passing
-
-After E2E verification succeeds, update the task in `kanban-board.json`:
-
-```json
-{
-  "name": "task-name",
-  "description": "...",
-  "category": "...",
-  "steps": ["..."],
-  "passes": true
-}
-```
-
-Update the log in `kanban-progress.json` with work summary:
-
-```json
-{
-  "task-name": {
-    "log": "Implemented feature X. Created Y component. Added Z endpoint. All verification steps pass.",
-    "committed": false
-  }
-}
-```
-
-Note: The task now has status **code-review** (passes: true, committed: false).
-
-### Step 9: Code Review
-
-First, display affected files and verify their status:
-
-```
-============================================
-FILES CHANGED IN THIS TASK
-============================================
-
-1. server/api/users/profile.get.ts
-2. server/middleware/auth.ts
-
-Checking for uncommitted changes...
-→ All affected files are staged/clean
-
-Ready for code review.
-============================================
-```
-
-**Verification logic**:
-1. Read the `affectedFiles` array from progress.json for this task
-2. Run `git status --porcelain` on those specific files
-3. If any affected files have uncommitted changes, warn the user
-4. Only allow commit when all affected files are staged or have no changes
-
-Ask user if they want to review now or continue:
-
-```
-Task "task-name" is ready for code review.
-- review: Review and complete this task now
-- continue: Move to next task, review later
-- stop: Save progress and exit
-```
-
-If **review**:
-- Present the changes made (show git diff or file summaries)
-- Ask for approval
-- If approved, proceed to Step 10 (commit)
-- If rejected:
-  - Set `passes: false` in kanban-board.json
-  - Update log with rejection reason
-  - Return to Step 5 to address issues
-
-If **continue**:
-- Leave task in code-review status
-- Proceed to Step 11 (next task)
-
-### Step 10: Create Git Commit
-
-Create a git commit for the approved task:
-
-```bash
-git add -A
-git commit -m "feat(<category>): <task.name>
-
-<brief description from task.description>
-
-Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
-```
-
-After successful commit, update `kanban-progress.json`:
-
-```json
-{
-  "task-name": {
-    "log": "Implemented feature X. Created Y component. Added Z endpoint. All verification steps pass.",
-    "committed": true
-  }
-}
-```
-
-Note: The task now has status **completed** (passes: true, committed: true).
-
-### Step 11: Loop or Complete
-
-Return to Step 2 to process the next task.
-
-When all tasks are complete (no pending, in-progress, or code-review):
-
-```
-============================================
-KANBAN BOARD COMPLETE
-============================================
-
-All tasks have been processed successfully.
-
-Summary:
-- Total Tasks: X
-- Completed: X
-- Commits Created: X
-
-============================================
-```
+**Status Values**:
+- `running` - Task in progress
+- `success` - All verification steps passed
+- `failure` - Verification failed
+- `error` - Execution error occurred
 
 ---
 
 ## Error Handling
 
-### Agent Failure
+### Worker Failure
 
-If an agent reports failure:
+When a worker reports failure or error:
 
-1. Keep `passes: false`
-2. Keep task entry in progress.json
-3. Update log with error details
-4. Ask user: retry, skip, or stop
+1. Status file contains error details
+2. Full output available in `.kanban/logs/{task-name}.log`
+3. User prompted for action (retry/skip/quit)
+4. Task remains in pending state until successfully completed
 
-### E2E Verification Failure
+### No Status File
 
-If verification steps fail after 3 fix attempts:
+If a worker completes without creating a status file:
 
-1. Keep `passes: false`
-2. Update log with failure details
-3. Notify user of the issue
-4. Offer to skip or stop
+1. Dispatcher creates a default status with `status: "unknown"`
+2. Check the log file for worker output
+3. Task may need manual investigation
 
-### Validation Errors
+### Script Execution Errors
 
-If change-impact-analyzer finds critical issues after 3 attempts:
+If the PowerShell script fails to start:
 
-1. Keep `passes: false`
-2. Update log with issues found
-3. Notify user of the issue
-4. Offer to skip or stop
+1. Verify `pwsh` is installed and in PATH
+2. Check script permissions
+3. Run with `-DryRun` to validate setup
 
 ---
 
@@ -486,33 +228,30 @@ If change-impact-analyzer finds critical issues after 3 attempts:
 
 This skill supports resuming interrupted sessions:
 
-1. On start, read both `.kanban/` files
-2. Check progress.json for existing task entries
-3. Tasks with entry but `passes: false` → **in-progress** (resume work)
-4. Tasks with entry, `passes: true`, `committed: false` → **code-review** (offer review)
-5. Tasks with entry, `passes: true`, `committed: true` → **completed** (skip)
-6. Tasks without entry → **pending** (not started)
+1. **Pending tasks**: Not started, will be processed
+2. **In-progress tasks**: Have progress entry but `passes: false`, treated as pending for retry
+3. **Code-review tasks**: Passed but not committed, skip processing
+4. **Completed tasks**: Already committed, skip entirely
 
-When resuming an in-progress task:
-- Read the `log` field to understand previous work done
-- Read the `affectedFiles` array to see which files were touched
-- Read the `agents` array to see which agents have already worked on this task
+The dispatcher automatically determines which tasks need processing based on current state.
 
 ---
 
 ## Execution Summary
 
-1. **Read** `.kanban/kanban-board.json` and `.kanban/kanban-progress.json`
-2. **Calculate** status for each task
-3. **Find** next pending or in-progress task
-4. **Confirm** with user before starting
-5. **Add** task entry to progress.json
-6. **Delegate** to appropriate agent
-7. **Record** affected files from agent response
-8. **Run** change-impact-analyzer (repeat until clean)
-9. **Execute** E2E verification steps (repeat until all pass)
-10. **Set** `passes: true` and update log
-11. **Verify** affected files status before code review
-12. **Offer** code review or continue
-13. **Commit** and set `committed: true`
-14. **Loop** until all tasks complete
+1. **Read** kanban files and calculate task statuses
+2. **Display** progress summary to user
+3. **Run** `parallel-dispatch.ps1` script with optional parameters
+4. **Monitor** worker completion via status files
+5. **Handle** failures with retry/skip/quit options
+6. **Report** final summary when all waves complete
+7. **Direct** user to `kanban:code-review` for commits
+
+---
+
+## Notes
+
+- Code review and git commits are handled by the separate `kanban:code-review` skill
+- Workers operate independently and may run concurrently
+- Each worker has full access to project files and CLAUDE.md context
+- Worker logs are preserved in `.kanban/logs/` for debugging

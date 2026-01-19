@@ -321,6 +321,32 @@
             font-family: monospace;
         }
 
+        .task-log {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #30363d;
+        }
+
+        .task-log-label {
+            font-size: 0.7rem;
+            color: #3fb950;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .task-log-content {
+            font-size: 0.8rem;
+            color: #8b949e;
+            line-height: 1.5;
+            background: #161b22;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #238636;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
         .refresh-indicator {
             position: fixed;
             bottom: 20px;
@@ -573,6 +599,14 @@
         </div>
       ` : '';
 
+        const log = progressEntry?.log || '';
+        const logHtml = log ? `
+        <div class="task-log">
+          <div class="task-log-label">Work Log:</div>
+          <div class="task-log-content">${parseMarkdown(log)}</div>
+        </div>
+      ` : '';
+
         const completedClass = status === 'completed' ? 'completed' : '';
 
         return `
@@ -582,6 +616,7 @@
             <span class="task-category category-${task.category}">${escapeHtml(task.category)}</span>
           </div>
           <div class="task-description">${parseMarkdown(task.description || '')}</div>
+          ${logHtml}
           ${stepsHtml}
           ${affectedFilesHtml}
           ${agentsHtml}
@@ -591,11 +626,7 @@
 
     function renderBoard(boardData, progressData) {
         const tasks = boardData.tasks || [];
-        // Normalize progress data to object format
-        // If array format (legacy), convert to object with empty metadata
-        const progressObj = Array.isArray(progressData)
-            ? progressData.reduce((acc, name) => ({ ...acc, [name]: { log: '', committed: false } }), {})
-            : (progressData || {});
+        const progressObj = progressData || {};
 
         // Categorize tasks by status
         const pending = [];
@@ -683,7 +714,7 @@
             }
 
             const boardData = await boardResponse.json();
-            let progressData = [];
+            let progressData = {};
 
             if (progressResponse.ok) {
                 progressData = await progressResponse.json();
