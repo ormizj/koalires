@@ -30,30 +30,38 @@ Each task in `kanban-board.json` has this structure:
   "name": string,        // Short name describing the task
   "description": string, // Extended information in markdown format
   "category": string,    // Category: data, api, ui, integration, config, testing
-  "steps": string[],     // Verification steps to ensure task works
-  "passes": boolean      // Whether the task is done
+  "steps": string[],     // Sequential test steps (like manual QA) to verify the task
+  "passes": boolean      // Whether the task verification passed
 }
 ```
 
 ## Task Status Logic
 
-Task status is derived from two factors: the `passes` field and presence in `kanban-progress.json`:
+Task status is derived from: `passes` field in kanban-board.json, presence in kanban-progress.json, and `committed` field:
 
-| passes  | In kanban-progress.json | Status          | Description                    |
-| ------- | ----------------------- | --------------- | ------------------------------ |
-| `false` | No                      | **pending**     | Task not started               |
-| `false` | Yes (inProgress)        | **in-progress** | Task being worked on           |
-| `true`  | Yes (codeReview)        | **code-review** | Task done, awaiting review     |
-| `true`  | No                      | **completed**   | Task fully done and reviewed   |
+| passes  | In progress.json | committed | Status          |
+| ------- | ---------------- | --------- | --------------- |
+| `false` | No               | -         | **pending**     |
+| `false` | Yes              | `false`   | **in-progress** |
+| `true`  | Yes              | `false`   | **code-review** |
+| `true`  | Yes              | `true`    | **completed**   |
+| `true`  | No               | -         | **completed**   |
+
+Note: `passes: false` + `committed: true` is an invalid state and should not occur.
 
 ### kanban-progress.json Structure
 
 ```json
 {
-  "inProgress": ["task-name-1"],
-  "codeReview": ["task-name-2"]
+  "user-profile-api": {
+    "log": "Created GET endpoint, added auth middleware. Verified all test steps pass.",
+    "committed": false
+  }
 }
 ```
+
+- `log` - Narrative of work done, useful for resuming context across sessions
+- `committed` - Whether this work has been committed to git
 
 ## Agent Mapping
 
@@ -83,7 +91,7 @@ Validate:
 
 1. Both files exist and are valid JSON
 2. Each task has required fields: name, description, category, steps, passes
-3. Progress file has inProgress and codeReview arrays
+3. Progress file is a valid JSON object (keys are task names)
 
 If validation fails, report errors and stop.
 
@@ -93,13 +101,15 @@ For each task, derive its status:
 
 ```javascript
 function getTaskStatus(task, progress) {
+  const entry = progress[task.name];
+
   if (task.passes === true) {
-    if (progress.codeReview.includes(task.name)) {
+    if (entry && entry.committed === false) {
       return 'code-review';
     }
     return 'completed';
   } else {
-    if (progress.inProgress.includes(task.name)) {
+    if (entry) {
       return 'in-progress';
     }
     return 'pending';
@@ -162,12 +172,14 @@ Wait for user response:
 
 ### Step 4: Start Task (Update Progress)
 
-Add the task to inProgress:
+Add an entry for the task to progress.json:
 
 ```json
 {
-  "inProgress": ["task-name"],
-  "codeReview": []
+  "task-name": {
+    "log": "",
+    "committed": false
+  }
 }
 ```
 
@@ -236,9 +248,44 @@ If the analyzer finds issues:
 2. Run change-impact-analyzer again
 3. Repeat until no issues are found
 
-### Step 7: Mark Task as Passing
+### Step 7: Execute E2E Verification Steps
 
-Update the task in `kanban-board.json`:
+Before marking the task as passing, execute the sequential test steps defined in the task to verify the implementation works end-to-end:
+
+1. Read the `steps` array from the task
+2. Execute each step in order (these are manual QA-style steps)
+3. Document results as you go
+
+```
+============================================
+E2E VERIFICATION: task-name
+============================================
+
+Step 1: Navigate to the login page
+→ PASS: Login page loads at /login
+
+Step 2: Enter valid email and password
+→ PASS: Form accepts input
+
+Step 3: Click the 'Sign In' button
+→ PASS: Button triggers submission
+
+Step 4: Verify redirect to dashboard
+→ PASS: Redirected to /dashboard
+
+All verification steps passed!
+============================================
+```
+
+If any step fails:
+1. Report the failure to the user
+2. Delegate fixes to the appropriate agent
+3. Re-run verification from the beginning
+4. Repeat until all steps pass (max 3 attempts)
+
+### Step 8: Mark Task as Passing
+
+After E2E verification succeeds, update the task in `kanban-board.json`:
 
 ```json
 {
@@ -250,16 +297,20 @@ Update the task in `kanban-board.json`:
 }
 ```
 
-### Step 8: Move to Code Review
-
-Update `kanban-progress.json`:
+Update the log in `kanban-progress.json` with work summary:
 
 ```json
 {
-  "inProgress": [],
-  "codeReview": ["task-name"]
+  "task-name": {
+    "log": "Implemented feature X. Created Y component. Added Z endpoint. All verification steps pass.",
+    "committed": false
+  }
 }
 ```
+
+Note: The task now has status **code-review** (passes: true, committed: false).
+
+### Step 9: Code Review
 
 Ask user if they want to review now or continue:
 
@@ -271,14 +322,21 @@ Task "task-name" is ready for code review.
 ```
 
 If **review**:
-- Present the changes made
+- Present the changes made (show git diff or file summaries)
 - Ask for approval
-- If approved, remove from codeReview (task becomes completed)
-- If rejected, set passes back to false, move back to inProgress
+- If approved, proceed to Step 10 (commit)
+- If rejected:
+  - Set `passes: false` in kanban-board.json
+  - Update log with rejection reason
+  - Return to Step 5 to address issues
 
-### Step 9: Create Git Commit
+If **continue**:
+- Leave task in code-review status
+- Proceed to Step 11 (next task)
 
-Create a git commit for the completed task:
+### Step 10: Create Git Commit
+
+Create a git commit for the approved task:
 
 ```bash
 git add -A
@@ -289,7 +347,20 @@ git commit -m "feat(<category>): <task.name>
 Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ```
 
-### Step 10: Loop or Complete
+After successful commit, update `kanban-progress.json`:
+
+```json
+{
+  "task-name": {
+    "log": "Implemented feature X. Created Y component. Added Z endpoint. All verification steps pass.",
+    "committed": true
+  }
+}
+```
+
+Note: The task now has status **completed** (passes: true, committed: true).
+
+### Step 11: Loop or Complete
 
 Return to Step 2 to process the next task.
 
@@ -319,16 +390,25 @@ Summary:
 If an agent reports failure:
 
 1. Keep `passes: false`
-2. Keep task in `inProgress`
-3. Log the error
+2. Keep task entry in progress.json
+3. Update log with error details
 4. Ask user: retry, skip, or stop
+
+### E2E Verification Failure
+
+If verification steps fail after 3 fix attempts:
+
+1. Keep `passes: false`
+2. Update log with failure details
+3. Notify user of the issue
+4. Offer to skip or stop
 
 ### Validation Errors
 
 If change-impact-analyzer finds critical issues after 3 attempts:
 
-1. Keep task in inProgress
-2. Set `passes: false`
+1. Keep `passes: false`
+2. Update log with issues found
 3. Notify user of the issue
 4. Offer to skip or stop
 
@@ -339,9 +419,13 @@ If change-impact-analyzer finds critical issues after 3 attempts:
 This skill supports resuming interrupted sessions:
 
 1. On start, read both `.kanban/` files
-2. Tasks in `inProgress` are offered for retry/continue
-3. Tasks in `codeReview` can be reviewed
-4. Tasks with `passes: true` and not in progress/review are skipped (completed)
+2. Check progress.json for existing task entries
+3. Tasks with entry but `passes: false` → **in-progress** (resume work)
+4. Tasks with entry, `passes: true`, `committed: false` → **code-review** (offer review)
+5. Tasks with entry, `passes: true`, `committed: true` → **completed** (skip)
+6. Tasks without entry → **pending** (not started)
+
+When resuming an in-progress task, read the `log` field to understand previous work done.
 
 ---
 
@@ -351,11 +435,11 @@ This skill supports resuming interrupted sessions:
 2. **Calculate** status for each task
 3. **Find** next pending or in-progress task
 4. **Confirm** with user before starting
-5. **Add** task to inProgress
+5. **Add** task entry to progress.json
 6. **Delegate** to appropriate agent
 7. **Run** change-impact-analyzer (repeat until clean)
-8. **Set** `passes: true` in kanban-board.json
-9. **Move** task to codeReview in progress.json
+8. **Execute** E2E verification steps (repeat until all pass)
+9. **Set** `passes: true` and update log
 10. **Offer** code review or continue
-11. **Commit** changes
+11. **Commit** and set `committed: true`
 12. **Loop** until all tasks complete

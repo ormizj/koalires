@@ -48,24 +48,26 @@ IF args is empty or only whitespace:
 
 3. **Analyze existing tasks**
    - Count tasks where `passes: false` (incomplete tasks)
-   - Check if `kanban-progress.json` has any items in `inProgress` or `codeReview` arrays
+   - Count tasks in `kanban-progress.json` (tasks with active work)
+   - Separate tasks by status: in-progress (`committed: false`) vs code-review (`passes: true && committed: false`)
 
 4. **Warn if incomplete work exists**
 
 ```
 IF kanban-board.json exists:
   incomplete_count = count tasks where passes == false
-  in_progress = kanban-progress.json.inProgress (or empty array)
-  in_review = kanban-progress.json.codeReview (or empty array)
+  progress_entries = Object.keys(kanban-progress.json)
+  in_progress_count = count entries where committed == false
+  in_review_count = count entries where task.passes == true && committed == false
 
-  IF incomplete_count > 0 OR in_progress.length > 0 OR in_review.length > 0:
+  IF incomplete_count > 0 OR progress_entries.length > 0:
     THEN:
       - Output: "⚠️ WARNING: Existing kanban board detected with incomplete work!"
       - Output: ""
       - Output: "Current board: [project name from existing board]"
       - Output: "- Incomplete tasks: [incomplete_count]"
-      - Output: "- Tasks in progress: [in_progress.length]"
-      - Output: "- Tasks in code review: [in_review.length]"
+      - Output: "- Tasks in progress: [in_progress_count]"
+      - Output: "- Tasks in code review: [in_review_count]"
       - Output: ""
       - Output: "Creating a new kanban board will OVERWRITE these files:"
       - Output: "  - .kanban/kanban-board.json"
@@ -98,21 +100,54 @@ Each task follows this simplified structure:
   "name": string,        // Short name describing the task
   "description": string, // Extended information in markdown format
   "category": string,    // Category of the task (data, api, ui, etc.)
-  "steps": string[],     // How to verify the task works correctly
+  "steps": string[],     // Sequential test steps (like manual QA) to verify the task
   "passes": boolean      // Whether the task is done (completed)
 }
 ```
 
+### Steps Field - Sequential Test Steps
+
+The `steps` array must contain **sequential test steps** that describe the exact flow a tester would follow to verify the feature works. Think of these as manual QA test scripts that Claude can execute in order.
+
+**Good steps** (sequential, actionable):
+```json
+"steps": [
+  "Navigate to the login page",
+  "Enter valid email and password",
+  "Click the 'Sign In' button",
+  "Verify redirect to dashboard",
+  "Check that user name appears in header"
+]
+```
+
+**Bad steps** (assertions, not sequential):
+```json
+"steps": [
+  "Login works correctly",
+  "User is authenticated",
+  "Dashboard shows user data"
+]
+```
+
+Each step should be:
+1. **Actionable** - Describes a specific action to take
+2. **Sequential** - Builds on the previous step
+3. **Verifiable** - Has a clear pass/fail outcome
+4. **Specific** - Names exact UI elements, endpoints, or data
+
 ## Task Status Logic
 
-Task status is derived from two factors: the `passes` field and presence in `kanban-progress.json`:
+Task status is derived from: `passes` field in kanban-board.json, presence in kanban-progress.json, and `committed` field:
 
-| passes  | In kanban-progress.json | Status        |
-| ------- | ----------------------- | ------------- |
-| `false` | No                      | **pending**   |
-| `false` | Yes                     | **in-progress** |
-| `true`  | Yes                     | **code-review** |
-| `true`  | No                      | **completed** |
+| passes  | In progress.json | committed | Status          |
+| ------- | ---------------- | --------- | --------------- |
+| `false` | No               | -         | **pending**     |
+| `false` | Yes              | `false`   | **in-progress** |
+| `true`  | Yes              | `false`   | **code-review** |
+| `true`  | Yes              | `true`    | **completed**   |
+| `true`  | No               | -         | **completed**   |
+
+Note: `passes: false` + `committed: true` is an invalid state and should not occur.
 
 ## Workflow
 
@@ -209,14 +244,33 @@ Use descriptive, kebab-case names:
 - `setup-database-config`
 - `user-api-tests`
 
-#### Steps Field
+#### Steps Field - Sequential Test Steps
 
-The `steps` array should contain verification steps - how to ensure the feature works:
+The `steps` array must contain **sequential test steps** describing the exact flow to verify the feature. These are like manual QA test scripts:
 
-- "User can see their profile information"
-- "API returns 200 on valid request"
-- "Form validation prevents invalid input"
-- "Database migration runs without errors"
+**For API tasks:**
+```json
+"steps": [
+  "Start the development server",
+  "Open API testing tool (curl, Postman, or browser)",
+  "Send GET request to /api/users/profile without auth header",
+  "Verify response is 401 Unauthorized",
+  "Send GET request with valid auth token",
+  "Verify response is 200 with user data (name, email, avatar)"
+]
+```
+
+**For UI tasks:**
+```json
+"steps": [
+  "Navigate to /profile in the browser",
+  "Verify the page loads without console errors",
+  "Check that user avatar is displayed and centered",
+  "Check that user name and email are visible",
+  "Click the 'Edit Profile' button",
+  "Verify edit form or modal appears"
+]
+```
 
 ### Step 5: Write kanban-board.json
 
@@ -244,13 +298,27 @@ Ensure `.kanban/` directory exists, then write the task board:
 Create an empty progress tracker:
 
 ```json
+{}
+```
+
+**Structure (keyed by task name):**
+```json
 {
-  "inProgress": [],
-  "codeReview": []
+  "user-profile-api": {
+    "log": "Created GET endpoint, added auth middleware. Need to add error handling next session.",
+    "committed": false
+  },
+  "profile-page-ui": {
+    "log": "Completed Vue page with avatar, name, email display. Edit button opens modal. Ready for review.",
+    "committed": true
+  }
 }
 ```
 
-The `inProgress` and `codeReview` arrays will contain task names when tasks are being worked on or reviewed.
+- `log` - Narrative of work done, useful for resuming context across sessions
+- `committed` - Whether this work has been committed to git
+
+The log field serves as a narrative history that helps agents understand context when resuming work (following Anthropic's "claude-progress.txt" pattern for cross-session context).
 
 ## Example Task Breakdown
 
@@ -269,9 +337,14 @@ For a "create user profile page" feature:
       "description": "## User Profile API Endpoint\n\nCreate a GET endpoint at `/api/users/profile` that returns the authenticated user's profile data.\n\n### Requirements\n- Return user data (name, email, avatar URL)\n- Require authentication\n- Handle user not found case",
       "category": "api",
       "steps": [
-        "GET /api/users/profile returns 200 with user data",
-        "Returns 401 if not authenticated",
-        "Returns correct user fields"
+        "Start the development server with npm run dev",
+        "Open a terminal or API testing tool",
+        "Send GET request to http://localhost:3000/api/users/profile without auth header",
+        "Verify response status is 401 Unauthorized",
+        "Log in to get a valid auth token",
+        "Send GET request to /api/users/profile with Authorization header",
+        "Verify response status is 200",
+        "Verify response body contains name, email, and avatarUrl fields"
       ],
       "passes": false
     },
@@ -280,9 +353,17 @@ For a "create user profile page" feature:
       "description": "## Profile Page Component\n\nCreate a Vue page at `client/pages/profile.vue` displaying user information.\n\n### Layout\n- User avatar (large, centered)\n- User name and email\n- Edit profile button",
       "category": "ui",
       "steps": [
-        "Page renders without errors",
-        "User data displays correctly",
-        "Edit button is visible and clickable"
+        "Start the development server with npm run dev",
+        "Log in to the application",
+        "Navigate to /profile in the browser",
+        "Open browser DevTools and check for console errors",
+        "Verify the page loads without JavaScript errors",
+        "Check that user avatar image is displayed and centered",
+        "Check that user name is displayed below the avatar",
+        "Check that user email is displayed",
+        "Locate the 'Edit Profile' button",
+        "Click the 'Edit Profile' button",
+        "Verify an edit form or modal appears"
       ],
       "passes": false
     },
@@ -291,9 +372,11 @@ For a "create user profile page" feature:
       "description": "## Profile Feature Tests\n\nWrite tests for the profile API and page component.",
       "category": "testing",
       "steps": [
-        "All API tests pass",
-        "Component renders in test environment",
-        "Edge cases are covered"
+        "Run npm run test to execute the test suite",
+        "Verify all profile API tests pass",
+        "Verify profile component tests pass",
+        "Check test coverage report for profile-related files",
+        "Verify edge cases are tested (no user, network error, etc.)"
       ],
       "passes": false
     }

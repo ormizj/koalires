@@ -32,13 +32,25 @@ Read the template file from this skill directory and write it to the project:
 Create an empty progress tracker at `.kanban/kanban-progress.json` **only if it doesn't exist**:
 
 ```json
-[]
+{}
 ```
 
-This is just an array of task names that have been started. Status is derived from:
-- `passes === true` in kanban-board.json → completed
-- Task name in progress array but `passes !== true` → in progress
-- Task name not in progress array → pending
+This is an object where keys are task names and values contain progress data:
+
+```json
+{
+  "task-name": {
+    "log": "Narrative of work done, useful for resuming context across sessions",
+    "committed": false
+  }
+}
+```
+
+Task status is derived from:
+- `passes: true` + `committed: true` in progress.json → completed
+- `passes: true` + `committed: false` in progress.json → code-review
+- `passes: false` + entry exists in progress.json → in-progress
+- No entry in progress.json → pending
 
 Skip this step if the file already exists to preserve progress state.
 
