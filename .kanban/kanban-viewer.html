@@ -238,7 +238,8 @@
         .task-step {
             font-size: 0.75rem;
             color: #8b949e;
-            padding: 4px 0 4px 16px;
+            padding: 4px 0;
+            padding-left: 16px;
             position: relative;
         }
 
@@ -268,6 +269,26 @@
             border-radius: 8px;
             font-size: 0.8rem;
             color: #8b949e;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-circle {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #8b949e;
+            transition: background-color 0.3s ease;
+            flex-shrink: 0;
+        }
+
+        .status-circle.connected {
+            background: #58a6ff;
+        }
+
+        .status-circle.disconnected {
+            background: #f85149;
         }
 
         .empty-column {
@@ -335,7 +356,7 @@
         </div>
     </div>
     <div class="progress-bar">
-        <div class="progress-fill" id="progress-fill" style="width: 0"></div>
+        <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
     </div>
 </div>
 
@@ -373,8 +394,9 @@
     </div>
 </div>
 
-<div class="refresh-indicator" id="refresh-indicator">
-    Auto-refresh: 1s
+<div class="refresh-indicator">
+    <span>Status:</span>
+    <div class="status-circle" id="status-circle"></div>
 </div>
 
 <script>
@@ -421,7 +443,7 @@
         html = html.replace(/(<li[^>]*>.*<\/li>\n?)+/g, '<ul style="margin:4px 0;padding-left:8px;">$&</ul>');
 
         // Links
-        html = html.replace(/\[([^\]]+)]\(([^)]+)\)/g, '<a href="$2" style="color:#58a6ff;text-decoration:none;" target="_blank">$1</a>');
+        html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" style="color:#58a6ff;text-decoration:none;" target="_blank">$1</a>');
 
         // Horizontal rules
         html = html.replace(/^[-*_]{3,}$/gm, '<hr style="border:none;border-top:1px solid #30363d;margin:10px 0;">');
@@ -508,29 +530,24 @@
 
         // Update header
         document.getElementById('project-title').textContent = boardData.project || 'Kanban Board';
-        const projectTypeEl = document.getElementById('project-type');
-        if (boardData.projectType) {
-            projectTypeEl.textContent = 'Project Type: ' + boardData.projectType;
-        } else {
-            projectTypeEl.textContent = '';
-        }
+        document.getElementById('project-type').textContent = boardData.projectType ? `Project Type: ${boardData.projectType}` : '';
 
         // Update stats
-        document.getElementById('stat-pending').textContent = String(pending.length);
-        document.getElementById('stat-progress').textContent = String(inProgress.length);
-        document.getElementById('stat-review').textContent = String(codeReview.length);
-        document.getElementById('stat-completed').textContent = String(completed.length);
+        document.getElementById('stat-pending').textContent = pending.length;
+        document.getElementById('stat-progress').textContent = inProgress.length;
+        document.getElementById('stat-review').textContent = codeReview.length;
+        document.getElementById('stat-completed').textContent = completed.length;
 
         // Update counts
-        document.getElementById('count-pending').textContent = String(pending.length);
-        document.getElementById('count-progress').textContent = String(inProgress.length);
-        document.getElementById('count-review').textContent = String(codeReview.length);
-        document.getElementById('count-completed').textContent = String(completed.length);
+        document.getElementById('count-pending').textContent = pending.length;
+        document.getElementById('count-progress').textContent = inProgress.length;
+        document.getElementById('count-review').textContent = codeReview.length;
+        document.getElementById('count-completed').textContent = completed.length;
 
         // Update progress bar
         const total = tasks.length;
         const progressPercent = total > 0 ? (completed.length / total) * 100 : 0;
-        document.getElementById('progress-fill').style.width = progressPercent + '%';
+        document.getElementById('progress-fill').style.width = `${progressPercent}%`;
 
         // Render tasks
         document.getElementById('tasks-pending').innerHTML =
@@ -554,12 +571,14 @@
                 : '<div class="empty-column">No completed tasks</div>';
     }
 
+    function setStatus(connected) {
+        const circle = document.getElementById('status-circle');
+        circle.classList.remove('connected', 'disconnected');
+        circle.classList.add(connected ? 'connected' : 'disconnected');
+    }
+
     async function fetchAndRender() {
-        const indicator = document.getElementById('refresh-indicator');
-
         try {
-            indicator.textContent = 'Updating...';
-
             // Fetch both files
             const [boardResponse, progressResponse] = await Promise.all([
                 fetch('/.kanban/kanban-board.json?' + Date.now()),
@@ -586,9 +605,9 @@
                 renderBoard(boardData, progressData);
             }
 
-            indicator.textContent = 'Auto-refresh: 1s';
+            setStatus(true);
         } catch (err) {
-            indicator.textContent = 'Error loading data';
+            setStatus(false);
             console.error('Fetch error:', err);
 
             // Show error in board

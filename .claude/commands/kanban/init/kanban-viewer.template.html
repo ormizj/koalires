@@ -269,10 +269,26 @@
             border-radius: 8px;
             font-size: 0.8rem;
             color: #8b949e;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
-        .refresh-indicator.updating {
-            color: #58a6ff;
+        .status-circle {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #8b949e;
+            transition: background-color 0.3s ease;
+            flex-shrink: 0;
+        }
+
+        .status-circle.connected {
+            background: #58a6ff;
+        }
+
+        .status-circle.disconnected {
+            background: #f85149;
         }
 
         .empty-column {
@@ -378,8 +394,9 @@
     </div>
 </div>
 
-<div class="refresh-indicator" id="refresh-indicator">
-    Auto-refresh: 1s
+<div class="refresh-indicator">
+    <span>Status:</span>
+    <div class="status-circle" id="status-circle"></div>
 </div>
 
 <script>
@@ -554,13 +571,14 @@
                 : '<div class="empty-column">No completed tasks</div>';
     }
 
+    function setStatus(connected) {
+        const circle = document.getElementById('status-circle');
+        circle.classList.remove('connected', 'disconnected');
+        circle.classList.add(connected ? 'connected' : 'disconnected');
+    }
+
     async function fetchAndRender() {
-        const indicator = document.getElementById('refresh-indicator');
-
         try {
-            indicator.classList.add('updating');
-            indicator.textContent = 'Updating...';
-
             // Fetch both files
             const [boardResponse, progressResponse] = await Promise.all([
                 fetch('/.kanban/kanban-board.json?' + Date.now()),
@@ -587,11 +605,9 @@
                 renderBoard(boardData, progressData);
             }
 
-            indicator.classList.remove('updating');
-            indicator.textContent = 'Auto-refresh: 1s';
+            setStatus(true);
         } catch (err) {
-            indicator.classList.remove('updating');
-            indicator.textContent = 'Error loading data';
+            setStatus(false);
             console.error('Fetch error:', err);
 
             // Show error in board
