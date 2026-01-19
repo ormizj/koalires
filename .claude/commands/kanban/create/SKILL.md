@@ -306,17 +306,34 @@ Create an empty progress tracker:
 {
   "user-profile-api": {
     "log": "Created GET endpoint, added auth middleware. Need to add error handling next session.",
-    "committed": false
+    "committed": false,
+    "affectedFiles": [
+      "server/api/users/profile.get.ts",
+      "server/middleware/auth.ts"
+    ],
+    "agents": [
+      "backend-developer",
+      "change-impact-analyzer"
+    ]
   },
   "profile-page-ui": {
     "log": "Completed Vue page with avatar, name, email display. Edit button opens modal. Ready for review.",
-    "committed": true
+    "committed": true,
+    "affectedFiles": [
+      "client/pages/profile.vue",
+      "client/components/Avatar.vue"
+    ],
+    "agents": [
+      "vue-expert"
+    ]
   }
 }
 ```
 
 - `log` - Narrative of work done, useful for resuming context across sessions
 - `committed` - Whether this work has been committed to git
+- `affectedFiles` - Array of file paths that were created, modified, or deleted during this task
+- `agents` - Array of agent names that worked on this task (in order of invocation)
 
 The log field serves as a narrative history that helps agents understand context when resuming work (following Anthropic's "claude-progress.txt" pattern for cross-session context).
 

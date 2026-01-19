@@ -41,7 +41,9 @@ This is an object where keys are task names and values contain progress data:
 {
   "task-name": {
     "log": "Narrative of work done, useful for resuming context across sessions",
-    "committed": false
+    "committed": false,
+    "affectedFiles": ["path/to/file1.ts", "path/to/file2.ts"],
+    "agents": ["backend-developer", "change-impact-analyzer"]
   }
 }
 ```

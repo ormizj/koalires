@@ -55,13 +55,23 @@ Note: `passes: false` + `committed: true` is an invalid state and should not occ
 {
   "user-profile-api": {
     "log": "Created GET endpoint, added auth middleware. Verified all test steps pass.",
-    "committed": false
+    "committed": false,
+    "affectedFiles": [
+      "server/api/users/profile.get.ts",
+      "server/middleware/auth.ts"
+    ],
+    "agents": [
+      "backend-developer",
+      "change-impact-analyzer"
+    ]
   }
 }
 ```
 
 - `log` - Narrative of work done, useful for resuming context across sessions
 - `committed` - Whether this work has been committed to git
+- `affectedFiles` - Array of file paths that were created, modified, or deleted during this task
+- `agents` - Array of agent names that worked on this task (in order of invocation)
 
 ## Agent Mapping
 
@@ -178,7 +188,9 @@ Add an entry for the task to progress.json:
 {
   "task-name": {
     "log": "",
-    "committed": false
+    "committed": false,
+    "affectedFiles": [],
+    "agents": []
   }
 }
 ```
@@ -221,8 +233,41 @@ Prompt: |
   - Follow the project's architecture guidelines (see CLAUDE.md)
 
   ## When Complete
-  Provide a summary of changes made.
+  Provide a summary of changes made AND list all files that were created, modified, or deleted in a clearly labeled section:
+
+  ### Affected Files
+  - path/to/file1.ts (created)
+  - path/to/file2.ts (modified)
+  - path/to/file3.ts (deleted)
 ```
+
+### Step 5.5: Record Agent and Affected Files
+
+After the agent completes, update progress with agent name and affected files:
+
+1. Add the agent name to the `agents` array (if not already present)
+2. Parse the "Affected Files" section from the agent's response
+3. Extract file paths (ignore the action type in parentheses for storage)
+4. Update the task entry in kanban-progress.json
+
+```json
+{
+  "task-name": {
+    "log": "",
+    "committed": false,
+    "affectedFiles": [
+      "path/to/file1.ts",
+      "path/to/file2.ts",
+      "path/to/file3.ts"
+    ],
+    "agents": ["backend-developer"]
+  }
+}
+```
+
+**Note**: Each time an agent works on the task, add its name to the `agents` array. This tracks all agents involved, even if multiple agents contribute (e.g., primary implementation + change-impact-analyzer + fix agents).
+
+**Fallback**: If the agent doesn't provide a clear "Affected Files" section, use `git status --porcelain` to detect changed files and populate the array.
 
 ### Step 6: Run Change Impact Analysis
 
@@ -311,6 +356,29 @@ Update the log in `kanban-progress.json` with work summary:
 Note: The task now has status **code-review** (passes: true, committed: false).
 
 ### Step 9: Code Review
+
+First, display affected files and verify their status:
+
+```
+============================================
+FILES CHANGED IN THIS TASK
+============================================
+
+1. server/api/users/profile.get.ts
+2. server/middleware/auth.ts
+
+Checking for uncommitted changes...
+→ All affected files are staged/clean
+
+Ready for code review.
+============================================
+```
+
+**Verification logic**:
+1. Read the `affectedFiles` array from progress.json for this task
+2. Run `git status --porcelain` on those specific files
+3. If any affected files have uncommitted changes, warn the user
+4. Only allow commit when all affected files are staged or have no changes
 
 Ask user if they want to review now or continue:
 
@@ -425,7 +493,10 @@ This skill supports resuming interrupted sessions:
 5. Tasks with entry, `passes: true`, `committed: true` → **completed** (skip)
 6. Tasks without entry → **pending** (not started)
 
-When resuming an in-progress task, read the `log` field to understand previous work done.
+When resuming an in-progress task:
+- Read the `log` field to understand previous work done
+- Read the `affectedFiles` array to see which files were touched
+- Read the `agents` array to see which agents have already worked on this task
 
 ---
 
@@ -437,9 +508,11 @@ When resuming an in-progress task, read the `log` field to understand previous w
 4. **Confirm** with user before starting
 5. **Add** task entry to progress.json
 6. **Delegate** to appropriate agent
-7. **Run** change-impact-analyzer (repeat until clean)
-8. **Execute** E2E verification steps (repeat until all pass)
-9. **Set** `passes: true` and update log
-10. **Offer** code review or continue
-11. **Commit** and set `committed: true`
-12. **Loop** until all tasks complete
+7. **Record** affected files from agent response
+8. **Run** change-impact-analyzer (repeat until clean)
+9. **Execute** E2E verification steps (repeat until all pass)
+10. **Set** `passes: true` and update log
+11. **Verify** affected files status before code review
+12. **Offer** code review or continue
+13. **Commit** and set `committed: true`
+14. **Loop** until all tasks complete

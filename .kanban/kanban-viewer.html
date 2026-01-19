@@ -259,6 +259,68 @@
             border-color: #3fb950;
         }
 
+        .task-affected-files {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #30363d;
+        }
+
+        .task-affected-files-label {
+            font-size: 0.7rem;
+            color: #6e7681;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+        }
+
+        .task-affected-file {
+            font-size: 0.75rem;
+            color: #58a6ff;
+            padding: 3px 0;
+            padding-left: 16px;
+            position: relative;
+            font-family: monospace;
+            word-break: break-all;
+        }
+
+        .task-affected-file::before {
+            content: '';
+            position: absolute;
+            left: 2px;
+            top: 8px;
+            width: 6px;
+            height: 6px;
+            background: #58a6ff;
+            border-radius: 50%;
+        }
+
+        .task-agents {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #30363d;
+        }
+
+        .task-agents-label {
+            font-size: 0.7rem;
+            color: #6e7681;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+        }
+
+        .task-agents-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .task-agent {
+            font-size: 0.7rem;
+            color: #f0883e;
+            background: rgba(240, 136, 62, 0.15);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+
         .refresh-indicator {
             position: fixed;
             bottom: 20px;
@@ -460,28 +522,54 @@
     }
 
     // Status logic:
-    // - passes === true → completed
-    // - status === 'code-review' → code-review
-    // - In started list but passes !== true → in-progress
-    // - Not in started list → pending
-    function getTaskStatus(task, startedTasks) {
-        if (task.passes === true) {
+    // - passes === true AND committed === true → completed
+    // - passes === true AND committed === false → code-review (awaiting commit)
+    // - In progress file but passes !== true → in-progress
+    // - Not in progress file → pending
+    function getTaskStatus(task, progressData) {
+        const progress = progressData[task.name];
+        const isStarted = !!progress;
+        const isPassed = task.passes === true;
+        const isCommitted = progress?.committed === true;
+
+        if (isPassed && isCommitted) {
             return 'completed';
+        }
+        if (isPassed && !isCommitted) {
+            return 'code-review';
         }
         if (task.status === 'code-review') {
             return 'code-review';
         }
-        if (startedTasks.includes(task.name)) {
+        if (isStarted) {
             return 'in-progress';
         }
         return 'pending';
     }
 
-    function createTaskCard(task, status) {
+    function createTaskCard(task, status, progressEntry) {
         const stepsHtml = task.steps && task.steps.length > 0 ? `
         <div class="task-steps">
           <div class="task-steps-label">Verification Steps:</div>
           ${task.steps.map(s => `<div class="task-step">${escapeHtml(s)}</div>`).join('')}
+        </div>
+      ` : '';
+
+        const affectedFiles = progressEntry?.affectedFiles || [];
+        const affectedFilesHtml = affectedFiles.length > 0 ? `
+        <div class="task-affected-files">
+          <div class="task-affected-files-label">Affected Files (${affectedFiles.length}):</div>
+          ${affectedFiles.map(f => `<div class="task-affected-file">${escapeHtml(f)}</div>`).join('')}
+        </div>
+      ` : '';
+
+        const agents = progressEntry?.agents || [];
+        const agentsHtml = agents.length > 0 ? `
+        <div class="task-agents">
+          <div class="task-agents-label">Agents (${agents.length}):</div>
+          <div class="task-agents-list">
+            ${agents.map(a => `<span class="task-agent">${escapeHtml(a)}</span>`).join('')}
+          </div>
         </div>
       ` : '';
 
@@ -495,14 +583,19 @@
           </div>
           <div class="task-description">${parseMarkdown(task.description || '')}</div>
           ${stepsHtml}
+          ${affectedFilesHtml}
+          ${agentsHtml}
         </div>
       `;
     }
 
     function renderBoard(boardData, progressData) {
         const tasks = boardData.tasks || [];
-        // Progress is just an array of started task names
-        const startedTasks = Array.isArray(progressData) ? progressData : [];
+        // Normalize progress data to object format
+        // If array format (legacy), convert to object with empty metadata
+        const progressObj = Array.isArray(progressData)
+            ? progressData.reduce((acc, name) => ({ ...acc, [name]: { log: '', committed: false } }), {})
+            : (progressData || {});
 
         // Categorize tasks by status
         const pending = [];
@@ -511,7 +604,7 @@
         const completed = [];
 
         tasks.forEach(task => {
-            const status = getTaskStatus(task, startedTasks);
+            const status = getTaskStatus(task, progressObj);
             switch (status) {
                 case 'pending':
                     pending.push(task);
@@ -552,22 +645,22 @@
         // Render tasks
         document.getElementById('tasks-pending').innerHTML =
             pending.length > 0
-                ? pending.map(t => createTaskCard(t, 'pending')).join('')
+                ? pending.map(t => createTaskCard(t, 'pending', progressObj[t.name])).join('')
                 : '<div class="empty-column">No pending tasks</div>';
 
         document.getElementById('tasks-progress').innerHTML =
             inProgress.length > 0
-                ? inProgress.map(t => createTaskCard(t, 'in-progress')).join('')
+                ? inProgress.map(t => createTaskCard(t, 'in-progress', progressObj[t.name])).join('')
                 : '<div class="empty-column">No tasks in progress</div>';
 
         document.getElementById('tasks-review').innerHTML =
             codeReview.length > 0
-                ? codeReview.map(t => createTaskCard(t, 'code-review')).join('')
+                ? codeReview.map(t => createTaskCard(t, 'code-review', progressObj[t.name])).join('')
                 : '<div class="empty-column">No tasks in review</div>';
 
         document.getElementById('tasks-completed').innerHTML =
             completed.length > 0
-                ? completed.map(t => createTaskCard(t, 'completed')).join('')
+                ? completed.map(t => createTaskCard(t, 'completed', progressObj[t.name])).join('')
                 : '<div class="empty-column">No completed tasks</div>';
     }
 
