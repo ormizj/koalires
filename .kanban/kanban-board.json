@@ -1,0 +1,198 @@
+{
+  "project": "User Profile Page with Avatar Upload",
+  "created": "2026-01-19T10:00:00Z",
+  "projectType": "nuxt",
+  "tasks": [
+    {
+      "name": "extend-user-schema-avatar",
+      "description": "## Extend User Schema with Avatar Fields\n\nAdd avatar-related fields to the User model in Prisma schema.\n\n### Implementation\n- Add `avatarUrl` field (optional String) to store the avatar URL/path\n- Add `displayName` field (optional String) for user display name\n- Run `npm run db:generate` and `npm run db:push` to apply changes\n\n### Files to Modify\n- `server/database/schemas/user.prisma`",
+      "category": "data",
+      "steps": [
+        "User schema includes avatarUrl field",
+        "User schema includes displayName field",
+        "Prisma client regenerated successfully",
+        "Database schema updated without errors"
+      ],
+      "passes": false
+    },
+    {
+      "name": "update-user-types-frontend",
+      "description": "## Update User Types in Frontend\n\nExtend the User interface in the frontend to include new profile fields.\n\n### Implementation\n- Add `avatarUrl?: string` to User interface\n- Add `displayName?: string` to User interface\n\n### Files to Modify\n- `client/entities/user/model/types.ts`",
+      "category": "data",
+      "steps": [
+        "User interface includes avatarUrl optional field",
+        "User interface includes displayName optional field",
+        "TypeScript compiles without errors"
+      ],
+      "passes": false
+    },
+    {
+      "name": "user-profile-api-get",
+      "description": "## Create GET Profile API Endpoint\n\nCreate an API endpoint to fetch the authenticated user's full profile.\n\n### Implementation\n- Create `server/api/users/profile.get.ts`\n- Return user data including id, email, displayName, avatarUrl\n- Require authentication (check `event.context.user`)\n- Use existing user repository pattern\n\n### Response Format\n```json\n{\n  \"id\": 1,\n  \"email\": \"user@example.com\",\n  \"displayName\": \"John Doe\",\n  \"avatarUrl\": \"/uploads/avatars/user-1.jpg\"\n}\n```",
+      "category": "api",
+      "steps": [
+        "GET /api/users/profile returns 200 with user data",
+        "Returns 401 if not authenticated",
+        "Response includes all profile fields"
+      ],
+      "passes": false
+    },
+    {
+      "name": "user-profile-api-update",
+      "description": "## Create PUT Profile API Endpoint\n\nCreate an API endpoint to update the authenticated user's profile.\n\n### Implementation\n- Create `server/api/users/profile.put.ts`\n- Accept `displayName` in request body\n- Update user in database using Prisma\n- Return updated user data\n- Require authentication\n\n### Request Body\n```json\n{\n  \"displayName\": \"New Name\"\n}\n```",
+      "category": "api",
+      "steps": [
+        "PUT /api/users/profile updates displayName",
+        "Returns 401 if not authenticated",
+        "Returns updated user data on success"
+      ],
+      "passes": false
+    },
+    {
+      "name": "avatar-upload-api",
+      "description": "## Create Avatar Upload API Endpoint\n\nCreate an API endpoint to handle avatar file uploads.\n\n### Implementation\n- Create `server/api/users/avatar.post.ts`\n- Accept multipart form data with image file\n- Validate file type (jpeg, png, gif, webp)\n- Validate file size (max 5MB)\n- Save file to `public/uploads/avatars/` directory\n- Update user's avatarUrl in database\n- Return the new avatar URL\n\n### Response Format\n```json\n{\n  \"avatarUrl\": \"/uploads/avatars/user-1-1705xxx.jpg\"\n}\n```",
+      "category": "api",
+      "steps": [
+        "POST /api/users/avatar accepts image upload",
+        "Validates file type (rejects non-images)",
+        "Validates file size (rejects > 5MB)",
+        "Saves file to public/uploads/avatars/",
+        "Updates user avatarUrl in database",
+        "Returns new avatar URL"
+      ],
+      "passes": false
+    },
+    {
+      "name": "avatar-delete-api",
+      "description": "## Create Avatar Delete API Endpoint\n\nCreate an API endpoint to delete the user's avatar.\n\n### Implementation\n- Create `server/api/users/avatar.delete.ts`\n- Delete the avatar file from disk\n- Set user's avatarUrl to null in database\n- Require authentication\n\n### Response\n```json\n{\n  \"success\": true\n}\n```",
+      "category": "api",
+      "steps": [
+        "DELETE /api/users/avatar removes avatar",
+        "Deletes file from disk",
+        "Sets avatarUrl to null in database",
+        "Returns 401 if not authenticated"
+      ],
+      "passes": false
+    },
+    {
+      "name": "user-repository-updates",
+      "description": "## Update User Repository\n\nAdd functions to the user repository for profile operations.\n\n### Implementation\n- Add `getUserById(id: number)` function\n- Add `updateUser(id: number, data: { displayName?, avatarUrl? })` function\n- Follow existing repository patterns\n\n### Files to Modify\n- `server/database/repositories/users.ts`",
+      "category": "api",
+      "steps": [
+        "getUserById function returns user by ID",
+        "updateUser function updates user fields",
+        "Functions follow existing error handling patterns"
+      ],
+      "passes": false
+    },
+    {
+      "name": "profile-api-client",
+      "description": "## Create Profile API Client\n\nAdd profile API methods to the frontend user API.\n\n### Implementation\n- Add `getProfile()` method to userApi\n- Add `updateProfile(data: { displayName?: string })` method\n- Add `uploadAvatar(file: File)` method\n- Add `deleteAvatar()` method\n- Use existing apiClient patterns from `shared/api`\n\n### Files to Modify\n- `client/entities/user/api/userApi.ts`",
+      "category": "integration",
+      "steps": [
+        "userApi.getProfile() fetches profile data",
+        "userApi.updateProfile() updates profile",
+        "userApi.uploadAvatar() handles file upload",
+        "userApi.deleteAvatar() removes avatar"
+      ],
+      "passes": false
+    },
+    {
+      "name": "profile-composable",
+      "description": "## Create Profile Composable\n\nCreate a composable for managing user profile state and operations.\n\n### Implementation\n- Create `client/features/profile/model/useProfile.ts`\n- Expose `profile` reactive state\n- Expose `loading` and `error` states\n- Expose `loadProfile()`, `updateProfile()`, `uploadAvatar()`, `deleteAvatar()` methods\n- Integrate with useUser composable\n\n### Files to Create\n- `client/features/profile/model/useProfile.ts`\n- `client/features/profile/index.ts` (public API)",
+      "category": "integration",
+      "steps": [
+        "useProfile composable exposes profile state",
+        "loadProfile fetches and sets profile data",
+        "updateProfile updates profile via API",
+        "uploadAvatar uploads file and updates avatar",
+        "deleteAvatar removes avatar"
+      ],
+      "passes": false
+    },
+    {
+      "name": "avatar-upload-component",
+      "description": "## Create Avatar Upload Component\n\nCreate a reusable avatar upload component with preview.\n\n### Implementation\n- Create `client/features/profile/ui/AvatarUpload.vue`\n- Show current avatar or placeholder\n- Click to select file or drag-and-drop\n- Show upload progress\n- Emit `upload` event with File\n- Emit `delete` event for removal\n- Support preview before upload\n\n### Props\n- `avatarUrl?: string` - Current avatar URL\n- `loading?: boolean` - Upload in progress\n\n### Events\n- `@upload(file: File)` - File selected for upload\n- `@delete` - Delete current avatar",
+      "category": "ui",
+      "steps": [
+        "Component renders current avatar or placeholder",
+        "Click triggers file selection",
+        "File selection emits upload event",
+        "Delete button emits delete event",
+        "Shows loading state during upload"
+      ],
+      "passes": false
+    },
+    {
+      "name": "profile-form-component",
+      "description": "## Create Profile Form Component\n\nCreate a form component for editing user profile.\n\n### Implementation\n- Create `client/features/profile/ui/ProfileForm.vue`\n- Include AvatarUpload component\n- Display name input field\n- Email display (read-only)\n- Save button with loading state\n- Form validation (displayName max 50 chars)\n\n### Props\n- `profile: User` - Current user profile\n- `loading?: boolean` - Save in progress\n\n### Events\n- `@save(data: { displayName: string })` - Form submitted\n- `@upload-avatar(file: File)` - Avatar upload requested\n- `@delete-avatar` - Avatar delete requested",
+      "category": "ui",
+      "steps": [
+        "Form displays current profile data",
+        "Display name field is editable",
+        "Email field is read-only",
+        "Save button triggers save event",
+        "Form validates displayName length"
+      ],
+      "passes": false
+    },
+    {
+      "name": "profile-page",
+      "description": "## Create Profile Page\n\nCreate the main profile page at `/profile`.\n\n### Implementation\n- Create `client/pages/profile.vue`\n- Use useProfile composable\n- Include ProfileForm component\n- Handle avatar upload/delete\n- Handle profile save\n- Show success/error toast notifications\n- Redirect to login if not authenticated\n- Page layout consistent with files.vue\n\n### Features\n- Load profile on mount\n- Save profile changes\n- Upload new avatar\n- Delete avatar\n- Success/error feedback",
+      "category": "ui",
+      "steps": [
+        "Page accessible at /profile route",
+        "Redirects to login if not authenticated",
+        "Displays user profile form",
+        "Avatar upload works correctly",
+        "Profile save works correctly",
+        "Success/error feedback shown"
+      ],
+      "passes": false
+    },
+    {
+      "name": "header-profile-link",
+      "description": "## Add Profile Link to Header\n\nUpdate the app header to include a link to the profile page.\n\n### Implementation\n- Find the app header widget\n- Add profile link/button next to logout\n- Show user avatar thumbnail if available\n- Link to /profile page\n\n### Files to Modify\n- Header widget component (likely in `client/widgets/` or `client/app/`)",
+      "category": "ui",
+      "steps": [
+        "Profile link visible in header when authenticated",
+        "Clicking profile link navigates to /profile",
+        "User avatar thumbnail shown if available"
+      ],
+      "passes": false
+    },
+    {
+      "name": "update-me-endpoint",
+      "description": "## Update /api/auth/me Endpoint\n\nExtend the existing me endpoint to return full profile data.\n\n### Implementation\n- Update `server/api/auth/me.get.ts`\n- Include displayName and avatarUrl in response\n- Fetch full user data from database\n\n### Files to Modify\n- `server/api/auth/me.get.ts`",
+      "category": "api",
+      "steps": [
+        "GET /api/auth/me returns displayName",
+        "GET /api/auth/me returns avatarUrl",
+        "Existing functionality unchanged"
+      ],
+      "passes": false
+    },
+    {
+      "name": "create-uploads-directory",
+      "description": "## Create Uploads Directory Structure\n\nSet up the directory structure for avatar uploads.\n\n### Implementation\n- Create `public/uploads/avatars/` directory\n- Add `.gitkeep` to preserve directory in git\n- Add `public/uploads/.gitignore` to ignore uploaded files\n\n### Directory Structure\n```\npublic/\n  uploads/\n    .gitignore\n    avatars/\n      .gitkeep\n```",
+      "category": "config",
+      "steps": [
+        "public/uploads/avatars/ directory exists",
+        "Directory preserved in git via .gitkeep",
+        "Uploaded files ignored in git"
+      ],
+      "passes": false
+    },
+    {
+      "name": "export-profile-feature",
+      "description": "## Export Profile Feature Public API\n\nSet up the public API exports for the profile feature.\n\n### Implementation\n- Update `client/features/profile/index.ts` to export:\n  - useProfile composable\n  - ProfileForm component\n  - AvatarUpload component\n\n### FSD Pattern\nExports should be from the feature's public API only",
+      "category": "config",
+      "steps": [
+        "useProfile exported from features/profile",
+        "ProfileForm exported from features/profile",
+        "AvatarUpload exported from features/profile"
+      ],
+      "passes": false
+    }
+  ]
+}
