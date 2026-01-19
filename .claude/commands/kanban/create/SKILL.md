@@ -1,7 +1,7 @@
 ---
 name: kanban:create
 description: Generate a kanban board of tasks from a feature description. Use when planning new features or breaking down complex requirements into actionable tasks.
-allowed-tools: Read, Write, Glob, Grep, Bash
+allowed-tools: Read, Write, Glob, Grep, Bash, AskUserQuestion
 ---
 
 # Create Kanban Skill
@@ -29,6 +29,57 @@ IF args is empty or only whitespace:
     - Output: "Usage: /kanban:create <feature description>"
     - Output: "Example: /kanban:create Add user profile page with avatar upload"
     - STOP execution - do not proceed further
+```
+
+## Existing Board Safety Check
+
+**After validating the feature description**, check for existing kanban board data that would be overwritten:
+
+### Check Steps
+
+1. **Check if `.kanban/kanban-board.json` exists**
+   - Use Glob to check for `.kanban/kanban-board.json`
+   - If file does NOT exist → proceed to workflow (no warning needed)
+   - If file exists → continue to step 2
+
+2. **Read existing board and progress files**
+   - Read `.kanban/kanban-board.json`
+   - Read `.kanban/kanban-progress.json` (if exists)
+
+3. **Analyze existing tasks**
+   - Count tasks where `passes: false` (incomplete tasks)
+   - Check if `kanban-progress.json` has any items in `inProgress` or `codeReview` arrays
+
+4. **Warn if incomplete work exists**
+
+```
+IF kanban-board.json exists:
+  incomplete_count = count tasks where passes == false
+  in_progress = kanban-progress.json.inProgress (or empty array)
+  in_review = kanban-progress.json.codeReview (or empty array)
+
+  IF incomplete_count > 0 OR in_progress.length > 0 OR in_review.length > 0:
+    THEN:
+      - Output: "⚠️ WARNING: Existing kanban board detected with incomplete work!"
+      - Output: ""
+      - Output: "Current board: [project name from existing board]"
+      - Output: "- Incomplete tasks: [incomplete_count]"
+      - Output: "- Tasks in progress: [in_progress.length]"
+      - Output: "- Tasks in code review: [in_review.length]"
+      - Output: ""
+      - Output: "Creating a new kanban board will OVERWRITE these files:"
+      - Output: "  - .kanban/kanban-board.json"
+      - Output: "  - .kanban/kanban-progress.json"
+      - Output: ""
+      - Use AskUserQuestion tool to ask:
+        Question: "Do you want to overwrite the existing kanban board?"
+        Options:
+          - "Yes, overwrite" - Proceed with creating new board
+          - "No, cancel" - Stop execution
+
+      IF user selects "No, cancel":
+        - Output: "Cancelled. Existing kanban board preserved."
+        - STOP execution - do not proceed further
 ```
 
 ## Output Files
