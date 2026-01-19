@@ -16,7 +16,7 @@
         "Run npm run db:push in terminal",
         "Verify database schema updates without errors"
       ],
-      "passes": true
+      "passes": false
     },
     {
       "name": "update-user-types",
