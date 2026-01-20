@@ -548,6 +548,132 @@
             font-size: 1rem;
         }
 
+        .project-created {
+            font-size: 0.8rem;
+            color: #6e7681;
+            margin-top: 0.25rem;
+        }
+
+        .task-timestamps {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            font-size: 0.7rem;
+            color: #6e7681;
+        }
+
+        .task-timestamp {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.125rem 0.5rem;
+            background: #161b22;
+            border-radius: 4px;
+            border: 1px solid #30363d;
+        }
+
+        .task-timestamp-icon {
+            width: 0.75rem;
+            height: 0.75rem;
+        }
+
+        .task-timestamp.started {
+            color: #f0883e;
+            border-color: rgba(240, 136, 62, 0.3);
+        }
+
+        .task-timestamp.completed {
+            color: #3fb950;
+            border-color: rgba(63, 185, 80, 0.3);
+        }
+
+        .task-timestamp.duration {
+            color: #a371f7;
+            border-color: rgba(163, 113, 247, 0.3);
+        }
+
+        .task-files-section {
+            margin-top: 0.625rem;
+            padding-top: 0.625rem;
+            border-top: 1px solid #30363d;
+        }
+
+        .task-files-label {
+            font-size: 0.7rem;
+            color: #6e7681;
+            margin-bottom: 0.375rem;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+        }
+
+        .task-files-label.created {
+            color: #3fb950;
+        }
+
+        .task-files-label.modified {
+            color: #f0883e;
+        }
+
+        .task-file {
+            font-size: 0.75rem;
+            padding: 0.1875rem 0;
+            padding-left: 1rem;
+            position: relative;
+            font-family: monospace;
+            word-break: break-all;
+        }
+
+        .task-file.created {
+            color: #3fb950;
+        }
+
+        .task-file.created::before {
+            content: '+';
+            position: absolute;
+            left: 2px;
+            top: 3px;
+            font-weight: bold;
+            font-size: 0.8rem;
+        }
+
+        .task-file.modified {
+            color: #f0883e;
+        }
+
+        .task-file.modified::before {
+            content: '~';
+            position: absolute;
+            left: 2px;
+            top: 3px;
+            font-weight: bold;
+            font-size: 0.8rem;
+        }
+
+        .task-log-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .task-log-item {
+            padding: 0.375rem 0;
+            border-bottom: 1px solid #21262d;
+            line-height: 1.4;
+        }
+
+        .task-log-item:last-child {
+            border-bottom: none;
+        }
+
+        .task-log-item::before {
+            content: '•';
+            color: #3fb950;
+            margin-right: 0.5rem;
+        }
+
         @media (max-width: 1400px) {
             .board {
                 grid-template-columns: repeat(3, 1fr);
@@ -571,6 +697,7 @@
 <div class="header">
     <h1 id="project-title">Loading...</h1>
     <p id="project-type"></p>
+    <p class="project-created" id="project-created"></p>
     <div class="stats">
         <div class="stat stat-pending">
             <div class="stat-value" id="stat-pending">0</div>
@@ -911,6 +1038,49 @@
         return html;
     }
 
+    function formatDate(dateString) {
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+
+    function formatRelativeTime(dateString) {
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMins / 60);
+        const diffDays = Math.floor(diffHours / 24);
+
+        if (diffMins < 1) return 'just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffHours < 24) return `${diffHours}h ago`;
+        if (diffDays < 7) return `${diffDays}d ago`;
+        return formatDate(dateString);
+    }
+
+    function calculateDuration(startedAt, completedAt) {
+        if (!startedAt || !completedAt) return null;
+        const start = new Date(startedAt);
+        const end = new Date(completedAt);
+        const diffMs = end - start;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMins / 60);
+        const remainingMins = diffMins % 60;
+
+        if (diffHours > 0) {
+            return `${diffHours}h ${remainingMins}m`;
+        }
+        return `${diffMins}m`;
+    }
+
     // Status logic:
     // - passes === true AND committed === true → completed
     // - passes === true AND committed === false → code-review (awaiting commit)
@@ -949,13 +1119,27 @@
         </div>
       ` : '';
 
-        const affectedFiles = progressEntry?.affectedFiles || [];
-        const affectedFilesHtml = affectedFiles.length > 0 ? `
-        <div class="task-affected-files">
-          <div class="task-affected-files-label">Affected Files (${affectedFiles.length}):</div>
-          ${affectedFiles.map(f => `<div class="task-affected-file">${escapeHtml(f)}</div>`).join('')}
-        </div>
-      ` : '';
+        // Handle filesCreated and filesModified separately
+        const filesCreated = progressEntry?.filesCreated || [];
+        const filesModified = progressEntry?.filesModified || [];
+
+        let filesHtml = '';
+        if (filesCreated.length > 0) {
+            filesHtml += `
+            <div class="task-files-section">
+              <div class="task-files-label created">Files Created (${filesCreated.length}):</div>
+              ${filesCreated.map(f => `<div class="task-file created">${escapeHtml(f)}</div>`).join('')}
+            </div>
+          `;
+        }
+        if (filesModified.length > 0) {
+            filesHtml += `
+            <div class="task-files-section">
+              <div class="task-files-label modified">Files Modified (${filesModified.length}):</div>
+              ${filesModified.map(f => `<div class="task-file modified">${escapeHtml(f)}</div>`).join('')}
+            </div>
+          `;
+        }
 
         const agents = progressEntry?.agents || [];
         const agentsHtml = agents.length > 0 ? `
@@ -967,13 +1151,63 @@
         </div>
       ` : '';
 
-        const log = progressEntry?.log || '';
-        const logHtml = log ? `
+        // Handle workLog as array
+        const workLog = progressEntry?.workLog || [];
+        const logHtml = workLog.length > 0 ? `
         <div class="task-log">
-          <div class="task-log-label">Work Log:</div>
-          <div class="task-log-content">${parseMarkdown(log)}</div>
+          <div class="task-log-label">Work Log (${workLog.length} entries):</div>
+          <div class="task-log-content">
+            <ul class="task-log-list">
+              ${workLog.map(entry => `<li class="task-log-item">${escapeHtml(entry)}</li>`).join('')}
+            </ul>
+          </div>
         </div>
       ` : '';
+
+        // Handle timestamps
+        const startedAt = progressEntry?.startedAt;
+        const completedAt = progressEntry?.completedAt;
+        const duration = calculateDuration(startedAt, completedAt);
+
+        let timestampsHtml = '';
+        if (startedAt || completedAt) {
+            timestampsHtml = '<div class="task-timestamps">';
+            if (startedAt) {
+                timestampsHtml += `
+                <div class="task-timestamp started" title="Started: ${formatDate(startedAt)}">
+                  <svg class="task-timestamp-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="12,6 12,12 16,14"/>
+                  </svg>
+                  Started ${formatRelativeTime(startedAt)}
+                </div>
+              `;
+            }
+            if (completedAt) {
+                timestampsHtml += `
+                <div class="task-timestamp completed" title="Completed: ${formatDate(completedAt)}">
+                  <svg class="task-timestamp-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                    <polyline points="22,4 12,14.01 9,11.01"/>
+                  </svg>
+                  Completed ${formatRelativeTime(completedAt)}
+                </div>
+              `;
+            }
+            if (duration) {
+                timestampsHtml += `
+                <div class="task-timestamp duration" title="Duration">
+                  <svg class="task-timestamp-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="12,6 12,12 12,12"/>
+                    <line x1="12" y1="12" x2="16" y2="12"/>
+                  </svg>
+                  ${duration}
+                </div>
+              `;
+            }
+            timestampsHtml += '</div>';
+        }
 
         const completedClass = status === 'completed' ? 'completed' : '';
 
@@ -983,10 +1217,11 @@
             <span class="task-name">${escapeHtml(task.name)}</span>
             <span class="task-category category-${task.category}">${escapeHtml(task.category)}</span>
           </div>
+          ${timestampsHtml}
           <div class="task-description">${parseMarkdown(task.description || '')}</div>
           ${logHtml}
           ${stepsHtml}
-          ${affectedFilesHtml}
+          ${filesHtml}
           ${agentsHtml}
         </div>
       `;
@@ -1027,6 +1262,7 @@
         // Update header
         document.getElementById('project-title').textContent = boardData.project || 'Kanban Board';
         document.getElementById('project-type').textContent = boardData.projectType ? `Project Type: ${boardData.projectType}` : '';
+        document.getElementById('project-created').textContent = boardData.created ? `Created: ${formatDate(boardData.created)}` : '';
 
         // Update stats
         document.getElementById('stat-pending').textContent = pending.length;
