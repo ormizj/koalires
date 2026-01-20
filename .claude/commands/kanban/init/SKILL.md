@@ -45,7 +45,21 @@ Read the template file from this skill directory and write it to the project:
 
 **Always overwrite** the existing file to ensure the latest template is used.
 
-### 3. Initialize Empty Progress File (Skip if Exists)
+### 3. Initialize Empty Board File (Skip if Exists)
+
+Create an initial kanban board at `.kanban/kanban-board.json` **only if it doesn't exist**:
+
+```json
+{
+  "project": "Project Name",
+  "projectType": "unknown",
+  "tasks": []
+}
+```
+
+This file will be populated by `/kanban:create`. Skip this step if the file already exists.
+
+### 4. Initialize Empty Progress File (Skip if Exists)
 
 Create an empty progress tracker at `.kanban/kanban-progress.json` **only if it doesn't exist**:
 
@@ -74,7 +88,7 @@ Task status is derived from:
 
 Skip this step if the file already exists to preserve progress state.
 
-### 4. Add NPM Script
+### 5. Add NPM Script
 
 Read `package.json`, add the following script to the `scripts` object:
 
@@ -91,6 +105,7 @@ After completing all steps, report:
 - Created `.kanban/logs/` directory
 - Created `.kanban/.gitignore`
 - Created `.kanban/kanban-viewer.html`
+- Created `.kanban/kanban-board.json`
 - Created `.kanban/kanban-progress.json`
 - Added `kanban` script to package.json
 
