@@ -1,0 +1,225 @@
+{
+  "project": "File Sharing with Permission Controls",
+  "created": "2026-01-20T12:00:00Z",
+  "projectType": "nuxt-fsd",
+  "tasks": [
+    {
+      "name": "share-permission-schema",
+      "description": "## File Share Permission Schema\n\nCreate a Prisma schema for file/folder sharing with permission controls.\n\n### Requirements\n- Create `FileShare` model to track shared files\n- Create `FolderShare` model to track shared folders\n- Support permission levels: `view`, `edit`\n- Track share creator (owner) and recipient user\n- Include share token for link-based sharing\n- Add expiration date support for temporary shares\n- Add cascade delete when file/folder is deleted",
+      "category": "data",
+      "steps": [
+        "Open server/database/schemas/ directory",
+        "Create new share.prisma file",
+        "Define FileShare model with id, fileId, sharedByUserId, sharedWithUserId (nullable for link shares), permission enum, shareToken, expiresAt, createdAt fields",
+        "Define FolderShare model with similar fields for folders",
+        "Add relations to File, Folder, and User models",
+        "Run npm run db:generate to generate Prisma client",
+        "Run npm run db:push to apply schema changes",
+        "Verify tables created in database with npm run db:studio"
+      ],
+      "passes": false
+    },
+    {
+      "name": "share-repository",
+      "description": "## Share Repository Layer\n\nCreate repository functions for share CRUD operations.\n\n### Requirements\n- Create share repository in server/database/repositories/\n- Implement createFileShare, createFolderShare functions\n- Implement getSharesByFile, getSharesByFolder functions\n- Implement getSharesForUser (files/folders shared with user)\n- Implement getShareByToken for link-based access\n- Implement updateSharePermission function\n- Implement deleteShare function\n- Implement checkUserHasAccess utility function",
+      "category": "data",
+      "steps": [
+        "Create server/database/repositories/share.repository.ts",
+        "Import Prisma client from composables",
+        "Implement createFileShare function that creates a share record",
+        "Implement createFolderShare function that creates a folder share record",
+        "Implement getSharesByFileId returning all shares for a file",
+        "Implement getSharesByFolderId returning all shares for a folder",
+        "Implement getSharedWithUser returning files/folders shared with a specific user",
+        "Implement getShareByToken for public link access",
+        "Implement updateSharePermission to change permission level",
+        "Implement deleteShare to remove a share",
+        "Implement checkUserHasFileAccess checking ownership or share permission",
+        "Implement checkUserHasFolderAccess for folders",
+        "Export all functions from repository"
+      ],
+      "passes": false
+    },
+    {
+      "name": "share-api-endpoints",
+      "description": "## File/Folder Share API Endpoints\n\nCreate API endpoints for managing file and folder shares.\n\n### Endpoints\n- POST /api/shares/files - Create file share\n- POST /api/shares/folders - Create folder share\n- GET /api/shares/files/[id] - Get shares for a file\n- GET /api/shares/folders/[id] - Get shares for a folder\n- GET /api/shares/shared-with-me - Get items shared with current user\n- GET /api/shares/token/[token] - Access shared item by token\n- PUT /api/shares/[id] - Update share permission\n- DELETE /api/shares/[id] - Remove share",
+      "category": "api",
+      "steps": [
+        "Create server/api/shares/ directory",
+        "Create files.post.ts for creating file shares",
+        "Send POST /api/shares/files with fileId, sharedWithUserId or generateLink, permission",
+        "Verify share created and returns share object with token if link share",
+        "Create folders.post.ts for creating folder shares",
+        "Send POST /api/shares/folders with folderId and permissions",
+        "Verify folder share created correctly",
+        "Create files/[id].get.ts to get shares for a file",
+        "Send GET /api/shares/files/1 and verify list of shares returned",
+        "Create folders/[id].get.ts to get shares for a folder",
+        "Create shared-with-me.get.ts to list items shared with user",
+        "Send GET /api/shares/shared-with-me and verify shared files/folders listed",
+        "Create token/[token].get.ts for public link access",
+        "Send GET /api/shares/token/abc123 and verify file content returned",
+        "Create [id].put.ts to update share permission",
+        "Send PUT /api/shares/1 with new permission and verify updated",
+        "Create [id].delete.ts to remove share",
+        "Send DELETE /api/shares/1 and verify share removed"
+      ],
+      "passes": false
+    },
+    {
+      "name": "update-file-access-checks",
+      "description": "## Update File/Folder API Access Checks\n\nModify existing file and folder endpoints to respect share permissions.\n\n### Requirements\n- Update GET /api/files/[id] to allow access if user has view/edit share\n- Update PUT /api/files/[id] to allow edit if user has edit share\n- Update GET /api/folders/[id] to respect folder shares\n- Update folder contents to show shared folder contents\n- Keep delete restricted to owner only",
+      "category": "api",
+      "steps": [
+        "Open server/api/files/[id].get.ts",
+        "Import checkUserHasFileAccess from share repository",
+        "Update access check to allow if owner OR has share permission",
+        "Test GET /api/files/[id] with owner - verify works",
+        "Test GET /api/files/[id] with user who has view share - verify works",
+        "Test GET /api/files/[id] with user without share - verify 403",
+        "Open server/api/files/[id].put.ts",
+        "Update to allow edit if owner OR has edit share",
+        "Test PUT /api/files/[id] with owner - verify works",
+        "Test PUT /api/files/[id] with user who has edit share - verify works",
+        "Test PUT /api/files/[id] with user who has view share only - verify 403",
+        "Update server/api/folders/[id].get.ts similarly for folder access",
+        "Update server/api/folders/index.get.ts to include shared folders",
+        "Test folder listing includes folders shared with user"
+      ],
+      "passes": false
+    },
+    {
+      "name": "share-composable",
+      "description": "## Share Feature Composable\n\nCreate a composable for managing shares in the frontend.\n\n### Requirements\n- Create useShare composable in client/features/share/\n- Implement shareFile function\n- Implement shareFolder function\n- Implement getSharesForFile function\n- Implement getSharesForFolder function\n- Implement getSharedWithMe function\n- Implement updateShare function\n- Implement removeShare function\n- Implement copyShareLink function",
+      "category": "ui",
+      "steps": [
+        "Create client/features/share/ directory structure",
+        "Create client/features/share/model/useShare.ts composable",
+        "Define reactive state for shares, sharedWithMe, loading, error",
+        "Implement shareFile(fileId, options) calling POST /api/shares/files",
+        "Implement shareFolder(folderId, options) calling POST /api/shares/folders",
+        "Implement fetchSharesForFile(fileId) calling GET /api/shares/files/[id]",
+        "Implement fetchSharesForFolder(folderId)",
+        "Implement fetchSharedWithMe() calling GET /api/shares/shared-with-me",
+        "Implement updateShare(shareId, permission) calling PUT",
+        "Implement removeShare(shareId) calling DELETE",
+        "Implement copyShareLink(token) using navigator.clipboard",
+        "Create client/features/share/index.ts exporting useShare",
+        "Test composable functions return expected data"
+      ],
+      "passes": false
+    },
+    {
+      "name": "share-modal-component",
+      "description": "## Share Modal Component\n\nCreate a modal for sharing files and folders with other users.\n\n### Requirements\n- Create ShareModal component in client/features/share/ui/\n- Show current shares for the item\n- Allow adding new share by email\n- Allow generating shareable link\n- Permission dropdown (view/edit)\n- Option to set expiration date\n- Remove share button\n- Copy link to clipboard button",
+      "category": "ui",
+      "steps": [
+        "Create client/features/share/ui/ShareModal.vue",
+        "Define props: show, itemType (file/folder), itemId, itemName",
+        "Use BaseModal as wrapper component",
+        "Add email input field for sharing with specific user",
+        "Add permission select dropdown with view/edit options",
+        "Add optional expiration date input",
+        "Add 'Share' button that calls shareFile/shareFolder",
+        "Display list of existing shares with user email and permission",
+        "Add remove button for each share that calls removeShare",
+        "Add 'Generate Link' button for link-based sharing",
+        "Display share link with copy button when link generated",
+        "Style using Tailwind matching existing modal patterns",
+        "Open share modal on a file and verify it displays",
+        "Add a share by email and verify share appears in list",
+        "Generate a link and verify copy button works",
+        "Remove a share and verify it disappears from list"
+      ],
+      "passes": false
+    },
+    {
+      "name": "share-button-integration",
+      "description": "## Integrate Share Button in File List\n\nAdd share functionality to the file/folder list UI.\n\n### Requirements\n- Add share button/icon to FileList component items\n- Add share option to file/folder context menu\n- Wire up share button to open ShareModal\n- Pass selected item to ShareModal",
+      "category": "ui",
+      "steps": [
+        "Open client/widgets/file-list/ui/FileList.vue",
+        "Add share icon button to each file row",
+        "Add share icon button to each folder row",
+        "Emit 'share-file' event with file data when clicked",
+        "Emit 'share-folder' event with folder data when clicked",
+        "Open client/pages/files.vue",
+        "Import ShareModal component",
+        "Add showShareModal ref and shareTarget ref",
+        "Add handler for share-file event opening modal",
+        "Add handler for share-folder event opening modal",
+        "Add ShareModal to template with proper props",
+        "Navigate to /files page in browser",
+        "Click share button on a file",
+        "Verify ShareModal opens with correct file info",
+        "Click share button on a folder",
+        "Verify ShareModal opens with correct folder info"
+      ],
+      "passes": false
+    },
+    {
+      "name": "shared-with-me-page",
+      "description": "## Shared With Me Page\n\nCreate a page to view files and folders shared with the current user.\n\n### Requirements\n- Create /shared page showing items shared with user\n- Display file/folder name, owner, permission level, shared date\n- Allow opening shared files for viewing/editing based on permission\n- Add navigation link to shared page in sidebar",
+      "category": "ui",
+      "steps": [
+        "Create client/pages/shared.vue page",
+        "Import useShare composable",
+        "Call fetchSharedWithMe on mount",
+        "Display loading state while fetching",
+        "Display list of shared files with name, owner email, permission badge",
+        "Display list of shared folders similarly",
+        "Add click handler to open shared file (navigate to view/edit)",
+        "Add click handler to navigate into shared folder",
+        "Add link to /shared in sidebar navigation (AppHeader or FileTree)",
+        "Navigate to /shared in browser",
+        "Verify page loads without errors",
+        "Verify shared items are displayed",
+        "Click on a shared file and verify it opens",
+        "Click on a shared folder and verify navigation works"
+      ],
+      "passes": false
+    },
+    {
+      "name": "public-share-link-page",
+      "description": "## Public Share Link Page\n\nCreate a page for accessing files via share link (no auth required).\n\n### Requirements\n- Create /share/[token] dynamic route\n- Fetch shared content using token\n- Display file content in read-only or editable mode based on permission\n- Show appropriate error for expired or invalid links\n- No authentication required for view access",
+      "category": "ui",
+      "steps": [
+        "Create client/pages/share/[token].vue page",
+        "Extract token from route params",
+        "Fetch share data from GET /api/shares/token/[token]",
+        "Handle loading state with spinner",
+        "Handle error state (invalid token, expired)",
+        "Display file content using FileEditor in read-only mode if view permission",
+        "Display file content in editable mode if edit permission",
+        "Display folder contents if folder share",
+        "Style error messages appropriately",
+        "Open /share/valid-token in browser (logged out)",
+        "Verify file content displays correctly",
+        "Open /share/invalid-token and verify error message",
+        "Open /share/expired-token and verify expiration message"
+      ],
+      "passes": false
+    },
+    {
+      "name": "share-notifications-badges",
+      "description": "## Share Indicators and Badges\n\nAdd visual indicators for shared status on files and folders.\n\n### Requirements\n- Show share icon on files/folders that are shared\n- Show badge indicating permission level on shared items\n- Different styling for items shared by user vs shared with user\n- Tooltip showing share details on hover",
+      "category": "ui",
+      "steps": [
+        "Update File type to include isShared, shareCount optional fields",
+        "Update Folder type similarly",
+        "Modify GET /api/files to include share info",
+        "Modify GET /api/folders to include share info",
+        "Open client/widgets/file-list/ui/FileList.vue",
+        "Add share icon next to files where isShared is true",
+        "Add share count badge if shareCount > 0",
+        "Add different icon/color for items shared with current user",
+        "Add tooltip on hover showing share details",
+        "Navigate to /files page",
+        "Verify shared files show share icon",
+        "Verify share count badge displays correctly",
+        "Hover over shared file and verify tooltip appears"
+      ],
+      "passes": false
+    }
+  ]
+}
