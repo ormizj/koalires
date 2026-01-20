@@ -16,7 +16,7 @@
         "Run npm run db:push in terminal",
         "Verify database schema updates without errors"
       ],
-      "passes": true
+      "passes": false
     },
     {
       "name": "update-user-types",
@@ -29,7 +29,7 @@
         "Run npm run typecheck in terminal",
         "Verify TypeScript compiles without errors"
       ],
-      "passes": true
+      "passes": false
     },
     {
       "name": "user-repository-updates",
@@ -42,7 +42,7 @@
         "Verify updateUser can update displayName and avatarUrl fields",
         "Run npm run typecheck to verify no TypeScript errors"
       ],
-      "passes": true
+      "passes": false
     },
     {
       "name": "create-uploads-directory",
@@ -56,7 +56,7 @@
         "Verify uploads/.gitignore exists with rules to ignore uploaded files",
         "Run git status and verify .gitkeep is trackable"
       ],
-      "passes": true
+      "passes": false
     },
     {
       "name": "update-me-endpoint",
@@ -71,7 +71,7 @@
         "Verify response includes displayName field (can be null)",
         "Verify response includes avatarUrl field (can be null)"
       ],
-      "passes": true
+      "passes": false
     },
     {
       "name": "profile-update-api",
