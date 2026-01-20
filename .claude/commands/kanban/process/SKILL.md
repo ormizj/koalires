@@ -38,15 +38,15 @@ All kanban files are in the `.kanban/` directory:
 
 Task status is derived from the `passes` field (kanban-board.json) and `status` field (kanban-progress.json):
 
-| passes  | progress.json status | Derived Status  |
-| ------- | -------------------- | --------------- |
-| `false` | (no entry)           | **pending**     |
-| `false` | `running`            | **in-progress** |
-| `false` | `completed` / `error`| **in-progress** |
-| `false` | `blocked`            | **blocked**     |
-| `true`  | NOT `completed`      | **code-review** |
-| `true`  | `completed`          | **completed**   |
-| `true`  | (no entry)           | **completed**   |
+| passes  | progress.json status  | Derived Status  |
+| ------- | --------------------- | --------------- |
+| `false` | (no entry)            | **pending**     |
+| `false` | `running`             | **in-progress** |
+| `false` | `completed` / `error` | **in-progress** |
+| `false` | `blocked`             | **blocked**     |
+| `true`  | NOT `completed`       | **code-review** |
+| `true`  | `completed`           | **completed**   |
+| `true`  | (no entry)            | **completed**   |
 
 ## Wave System
 

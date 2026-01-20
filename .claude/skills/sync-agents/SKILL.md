@@ -43,14 +43,14 @@ Extract the following for each agent:
 
 Group agents into categories based on their specialization:
 
-| Category           | Agent Types                              |
-| ------------------ | ---------------------------------------- |
-| **Frontend**       | Vue/Nuxt, UI design, FSD architecture    |
-| **Backend**        | APIs, databases, server-side logic       |
-| **Real-time**      | WebSocket, live communication            |
-| **Coordination**   | Multi-agent orchestration, organization  |
-| **Documentation**  | Context management, documenting patterns |
-| **Quality**        | Linting, architecture validation         |
+| Category              | Agent Types                                  |
+| --------------------- | -------------------------------------------- |
+| **Frontend**          | Vue/Nuxt, UI design, FSD architecture        |
+| **Backend**           | APIs, databases, server-side logic           |
+| **Real-time**         | WebSocket, live communication                |
+| **Coordination**      | Multi-agent orchestration, organization      |
+| **Documentation**     | Context management, documenting patterns     |
+| **Quality**           | Linting, architecture validation             |
 | **Skills & Commands** | Creating/managing CLAUDE skills and commands |
 
 ### Step 4: Read Current CLAUDE.md
@@ -187,20 +187,20 @@ CLAUDE.md is now in sync with agent definitions
 
 Use this reference to generate appropriate delegation mappings:
 
-| Agent Name                  | Delegation Mapping               |
-| --------------------------- | -------------------------------- |
-| `vue-expert`                | Frontend Vue/Nuxt work           |
-| `backend-developer`         | Backend API/server work          |
-| `ui-designer`               | UI/visual design work            |
-| `websocket-engineer`        | WebSocket/real-time features     |
-| `fsd-architecture-guardian` | FSD architecture validation      |
-| `eslint-guardian`           | ESLint/linting verification      |
-| `context-manager`           | Context storage/retrieval        |
-| `context-documenter`        | Updating CLAUDE.md documentation |
-| `agent-organizer`           | Multi-agent team assembly        |
-| `multi-agent-coordinator`   | Complex workflow orchestration   |
+| Agent Name                     | Delegation Mapping                           |
+| ------------------------------ | -------------------------------------------- |
+| `vue-expert`                   | Frontend Vue/Nuxt work                       |
+| `backend-developer`            | Backend API/server work                      |
+| `ui-designer`                  | UI/visual design work                        |
+| `websocket-engineer`           | WebSocket/real-time features                 |
+| `fsd-architecture-guardian`    | FSD architecture validation                  |
+| `eslint-guardian`              | ESLint/linting verification                  |
+| `context-manager`              | Context storage/retrieval                    |
+| `context-documenter`           | Updating CLAUDE.md documentation             |
+| `agent-organizer`              | Multi-agent team assembly                    |
+| `multi-agent-coordinator`      | Complex workflow orchestration               |
 | `claude-skill-command-manager` | Creating/managing CLAUDE skills and commands |
-| `change-impact-analyzer`    | Change impact analysis           |
+| `change-impact-analyzer`       | Change impact analysis                       |
 
 For agents not in this table, infer the mapping from their description field.
 

@@ -170,11 +170,12 @@ type TaskStatus = 'running' | 'completed' | 'error' | 'blocked';
 | `status`        | enum   | Yes      | One of: `running`, `completed`, `error`, `blocked` |
 | `startedAt`     | string | Yes      | ISO 8601 format with milliseconds                  |
 | `agents`        | array  | Yes      | At least 1 agent name string                       |
-| `completedAt`   | string | No*      | ISO 8601 format, set when status != `running`      |
-| `log`           | string | No*      | Markdown format with `\n` for newlines             |
-| `affectedFiles` | array  | No*      | Relative file paths from project root              |
+| `completedAt`   | string | No\*     | ISO 8601 format, set when status != `running`      |
+| `log`           | string | No\*     | Markdown format with `\n` for newlines             |
+| `affectedFiles` | array  | No\*     | Relative file paths from project root              |
 
 **\*Worker Protocol Requirements**: While these fields are technically optional in the JSON schema, the worker protocol expects them to be populated:
+
 - `completedAt`, `log`, and `affectedFiles` are **expected** for `completed` entries
 - `completedAt` and `log` are **expected** for `error` and `blocked` entries
 - The dispatcher validates entries and displays warnings for missing/empty fields
@@ -223,18 +224,19 @@ Tasks execute in waves based on category dependencies. Each wave completes befor
 
 The UI/viewer derives task status from `passes` (kanban-board.json) and `status` (kanban-progress.json):
 
-| `passes` | Progress Entry | `status`    | **Derived Status** |
-| -------- | -------------- | ----------- | ------------------ |
-| `false`  | None           | -           | **pending**        |
-| `false`  | Exists         | `running`   | **in-progress**    |
-| `false`  | Exists         | `completed` | **in-progress**    |
-| `false`  | Exists         | `error`     | **in-progress**    |
-| `false`  | Exists         | `blocked`   | **blocked**        |
-| `true`   | Exists         | NOT `completed` | **code-review** |
-| `true`   | Exists         | `completed` | **completed**      |
-| `true`   | None           | -           | **completed**      |
+| `passes` | Progress Entry | `status`        | **Derived Status** |
+| -------- | -------------- | --------------- | ------------------ |
+| `false`  | None           | -               | **pending**        |
+| `false`  | Exists         | `running`       | **in-progress**    |
+| `false`  | Exists         | `completed`     | **in-progress**    |
+| `false`  | Exists         | `error`         | **in-progress**    |
+| `false`  | Exists         | `blocked`       | **blocked**        |
+| `true`   | Exists         | NOT `completed` | **code-review**    |
+| `true`   | Exists         | `completed`     | **completed**      |
+| `true`   | None           | -               | **completed**      |
 
 **Key insights**:
+
 - `passes: true` + `status: "completed"` = task is finished AND committed
 - `passes: false` + `status: "blocked"` = task has unmet dependencies (gets own red column in viewer)
 - `passes: false` with any other status = in-progress (worker hasn't passed verification yet)

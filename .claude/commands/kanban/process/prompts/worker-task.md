@@ -26,14 +26,15 @@ Complete these steps in order to verify your implementation:
 
 **⚠️ YOUR TASK IS NOT COMPLETE UNTIL YOU UPDATE BOTH FILES:**
 
-| File | What to Update | When |
-|------|----------------|------|
-| `.kanban/kanban-progress.json` | Set `status: "completed"` with work log | After finishing work |
-| `.kanban/kanban-board.json` | Set `passes: true` for your task | After verification passes |
+| File                           | What to Update                          | When                      |
+| ------------------------------ | --------------------------------------- | ------------------------- |
+| `.kanban/kanban-progress.json` | Set `status: "completed"` with work log | After finishing work      |
+| `.kanban/kanban-board.json`    | Set `passes: true` for your task        | After verification passes |
 
 **FAILURE TO UPDATE BOTH FILES = TASK REMAINS STUCK IN "IN-PROGRESS" FOREVER**
 
 The dispatcher derives task status from BOTH files:
+
 - `passes: false` + `status: "completed"` → **in-progress** (stuck!)
 - `passes: true` + `status: "completed"` → **completed** (correct!)
 
@@ -66,6 +67,7 @@ The dispatcher derives task status from BOTH files:
 ```
 
 **Requirements:**
+
 - `status`: MUST be `"running"` - this signals to the dispatcher that work has begun
 - `startedAt`: Use current ISO 8601 timestamp (e.g., `"2026-01-20T10:30:00.000Z"`)
 - `agents`: Array with your agent name
@@ -81,6 +83,7 @@ The dispatcher derives task status from BOTH files:
 ### How to Track Files
 
 As you work, maintain a mental or explicit list of every file you:
+
 - **CREATE** → add path to your tracking list
 - **MODIFY** → add path to your tracking list
 - **DELETE** → add path to your tracking list
@@ -88,6 +91,7 @@ As you work, maintain a mental or explicit list of every file you:
 ### Tracking Reminders
 
 After EVERY file operation, ask yourself:
+
 > "Did I add this file to my affected files list?"
 
 ### affectedFiles Requirements
@@ -157,14 +161,14 @@ Result: PASS/FAIL - <details>
 
 **Field Requirements:**
 
-| Field | Requirement |
-|-------|-------------|
-| `status` | `"completed"` on success, `"error"` on failure, `"blocked"` if dependencies not met |
-| `startedAt` | **PRESERVE** the original timestamp from your initial entry |
-| `completedAt` | Current ISO 8601 timestamp when work finished |
-| `log` | Markdown-formatted summary (use `\n` for newlines in JSON) |
-| `affectedFiles` | **MANDATORY** - Array of ALL file paths created/modified/deleted |
-| `agents` | Array containing your agent name |
+| Field           | Requirement                                                                         |
+| --------------- | ----------------------------------------------------------------------------------- |
+| `status`        | `"completed"` on success, `"error"` on failure, `"blocked"` if dependencies not met |
+| `startedAt`     | **PRESERVE** the original timestamp from your initial entry                         |
+| `completedAt`   | Current ISO 8601 timestamp when work finished                                       |
+| `log`           | Markdown-formatted summary (use `\n` for newlines in JSON)                          |
+| `affectedFiles` | **MANDATORY** - Array of ALL file paths created/modified/deleted                    |
+| `agents`        | Array containing your agent name                                                    |
 
 ---
 
@@ -173,6 +177,7 @@ Result: PASS/FAIL - <details>
 **⚠️ BEFORE FINISHING, verify EACH item:**
 
 ### Progress File Checklist
+
 ```
 □ Progress.json has entry for "{task.name}"
 □ Entry has status = "completed" (or "error"/"blocked")
@@ -184,6 +189,7 @@ Result: PASS/FAIL - <details>
 ```
 
 ### 🚨 BOARD FILE CHECKLIST (CRITICAL - DO NOT SKIP)
+
 ```
 □ READ kanban-board.json and found task "{task.name}"
 □ SET passes: true for this task (if verification succeeded)
@@ -192,6 +198,7 @@ Result: PASS/FAIL - <details>
 ```
 
 **⛔ STOP! Have you updated BOTH files?**
+
 - `.kanban/kanban-progress.json` → status: "completed"
 - `.kanban/kanban-board.json` → passes: true
 
