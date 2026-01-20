@@ -51,7 +51,7 @@ Group agents into categories based on their specialization:
 | **Coordination**   | Multi-agent orchestration, organization  |
 | **Documentation**  | Context management, documenting patterns |
 | **Quality**        | Linting, architecture validation         |
-| **Skill Creation** | Creating new CLAUDE skills               |
+| **Skills & Commands** | Creating/managing CLAUDE skills and commands |
 
 ### Step 4: Read Current CLAUDE.md
 
@@ -113,6 +113,10 @@ Rules for the table:
 3. Keep descriptions under 100 characters when possible
 4. Group by category (Frontend, Backend, Coordination, etc.) but present as single flat table
 5. Include ALL agents discovered in Step 1
+6. **CRITICAL - Agent Name Keyword Preservation**: If the agent name contains multiple words (e.g., `claude-skill-command-manager`), the table description MUST include ALL key terms from the name. Parse the agent name by splitting on hyphens, then ensure each meaningful term appears in the description:
+   - `claude-skill-command-manager` → description must mention both "skill" AND "command"
+   - `change-impact-analyzer` → description must mention "change", "impact", or "analyzer"
+   - `fsd-architecture-guardian` → description must mention "FSD" and "architecture"
 
 #### Agent Selection Guidelines
 
@@ -188,7 +192,8 @@ Use this reference to generate appropriate delegation mappings:
 | `context-documenter`        | Updating CLAUDE.md documentation |
 | `agent-organizer`           | Multi-agent team assembly        |
 | `multi-agent-coordinator`   | Complex workflow orchestration   |
-| `claude-skill-creator`      | Creating CLAUDE skills           |
+| `claude-skill-command-manager` | Creating/managing CLAUDE skills and commands |
+| `change-impact-analyzer`    | Change impact analysis           |
 
 For agents not in this table, infer the mapping from their description field.
 
@@ -232,6 +237,7 @@ After updating, verify:
 - [ ] Agent Selection Guidelines covers all primary use cases
 - [ ] No duplicate entries in any section
 - [ ] Formatting is consistent (backticks, arrow notation, etc.)
+- [ ] **Agent name keywords preserved**: For each agent, split the name by hyphens and verify ALL meaningful terms appear in the table description (e.g., `skill-command-manager` description must contain "skill" AND "command")
 
 ---
 

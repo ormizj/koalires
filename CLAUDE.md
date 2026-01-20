@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Koalires is a file management application built with Nuxt 4, Vue 3, and TypeScript. It uses Feature-Sliced Design (FSD) architecture for the frontend, Prisma ORM with libSQL for the database, JWT-based authentication, and Tailwind CSS for styling.
+Koalires is a file management application built with Nuxt 4, Vue 3, and TypeScript. It uses Feature-Sliced Design (FSD)
+architecture for the frontend, Prisma ORM with libSQL for the database, JWT-based authentication, and Tailwind CSS for
+styling.
 
 ## Commands
 
@@ -87,12 +89,16 @@ This is a Nuxt 4 project using Feature-Sliced Design (FSD) with `client/` as the
 
 ## Key Conventions
 
-- **Feature-Sliced Design (FSD)**: Frontend uses FSD layers - app → pages → widgets → features → entities → shared. Modules can only import from layers below them.
-- **FSD Auto-imports**: Components from `shared/ui`, `entities/**/ui`, `features/**/ui`, `widgets/**/ui` are auto-imported. Composables from `shared/lib`, `shared/api`, `shared/config`, `shared/stores`, and layer model/api folders are auto-imported.
+- **Feature-Sliced Design (FSD)**: Frontend uses FSD layers - app → pages → widgets → features → entities → shared.
+  Modules can only import from layers below them.
+- **FSD Auto-imports**: Components from `shared/ui`, `entities/**/ui`, `features/**/ui`, `widgets/**/ui` are
+  auto-imported. Composables from `shared/lib`, `shared/api`, `shared/config`, `shared/stores`, and layer model/api
+  folders are auto-imported.
 - **Path Aliases**: Use `@app`, `@shared`, `@entities`, `@features`, `@widgets` for clean imports across FSD layers.
 - **File-based routing**: Files in `client/pages/` automatically become routes.
 - **Pinia Stores**: Global state managed in `shared/stores/` using Pinia with `@pinia/nuxt`.
-- **Prisma ORM**: Database access via Prisma client. Schemas in `server/database/schemas/`. Repositories in `server/database/repositories/`.
+- **Prisma ORM**: Database access via Prisma client. Schemas in `server/database/schemas/`. Repositories in
+  `server/database/repositories/`.
 - **JWT Authentication**: Server-side JWT auth with refresh tokens. Auth middleware in `server/middleware/auth.ts`.
 - **TypeScript**: Full TypeScript support enabled with strict mode in ESLint.
 - **Tailwind CSS**: Utility-first CSS with dark mode support via class strategy.
@@ -101,44 +107,45 @@ This is a Nuxt 4 project using Feature-Sliced Design (FSD) with `client/` as the
 ## Implementation Rules
 
 - **MANDATORY**: All implementation tasks MUST be delegated to specialized subagents:
-  - Frontend Vue/Nuxt work → `vue-expert`
-  - Backend API/server work → `backend-developer`
-  - UI/visual design work → `ui-designer`
-  - WebSocket/real-time features → `websocket-engineer`
-  - FSD architecture validation → `fsd-architecture-guardian`
-  - ESLint/linting verification → `eslint-guardian`
-  - Context storage/retrieval → `context-manager`
-  - Updating CLAUDE.md → `context-documenter`
-  - Creating CLAUDE skills → `claude-skill-creator`
-  - Multi-agent team assembly → `agent-organizer`
-  - Complex workflow orchestration → `multi-agent-coordinator`
-  - Change impact analysis → `change-impact-analyzer`
-  - Do NOT implement code directly. Only use Edit/Write for trivial single-line fixes.
+    - Frontend Vue/Nuxt work → `vue-expert`
+    - Backend API/server work → `backend-developer`
+    - UI/visual design work → `ui-designer`
+    - WebSocket/real-time features → `websocket-engineer`
+    - FSD architecture validation → `fsd-architecture-guardian`
+    - ESLint/linting verification → `eslint-guardian`
+    - Context storage/retrieval → `context-manager`
+    - Updating CLAUDE.md → `context-documenter`
+    - Creating/managing CLAUDE skills and commands → `claude-skill-command-manager`
+    - Multi-agent team assembly → `agent-organizer`
+    - Complex workflow orchestration → `multi-agent-coordinator`
+    - Change impact analysis → `change-impact-analyzer`
+    - Do NOT implement code directly. Only use Edit/Write for trivial single-line fixes.
 
 - **MANDATORY POST-CHANGE ANALYSIS**: After ANY code change (file creation, edit, or deletion), you MUST:
-  1. Invoke `change-impact-analyzer` to detect ripple effects
-  2. If the analyzer identifies files that need updates, make those updates
-  3. After making those updates, invoke `change-impact-analyzer` AGAIN recursively
-  4. Continue this loop until the analyzer reports NO breaking changes or warnings
-  5. This rule applies to ALL changes including: new files, edited files, new skills, new agents, config changes
-  6. The only exceptions are: pure documentation updates (README, comments-only changes) and this CLAUDE.md file itself
+    1. Invoke `change-impact-analyzer` to detect ripple effects
+    2. If the analyzer identifies files that need updates, make those updates
+    3. After making those updates, invoke `change-impact-analyzer` AGAIN recursively
+    4. Continue this loop until the analyzer reports NO breaking changes or warnings
+    5. This rule applies to ALL changes including: new files, edited files, new skills, new agents, config changes
+    6. The only exceptions are: pure documentation updates (README, comments-only changes) and this CLAUDE.md file
+       itself
 
 ## Available Agents
 
-| Agent                       | When to Use                                                                                      |
-| --------------------------- | ------------------------------------------------------------------------------------------------ |
-| `vue-expert`                | Vue 3 components, Composition API, Nuxt 3/4 pages, composables, Pinia stores, TypeScript in Vue  |
-| `backend-developer`         | Server-side APIs, Node.js/Python/Go services, database operations, microservices, authentication |
-| `ui-designer`               | Visual design, UI components, design systems, accessibility, dark mode, responsive layouts       |
-| `websocket-engineer`        | Real-time communication, WebSocket connections, Socket.IO, bidirectional messaging, presence     |
-| `fsd-architecture-guardian` | FSD architecture validation, layer dependencies, slice/segment organization, public API exports  |
-| `eslint-guardian`           | ESLint configuration verification, lint rule testing, code quality tooling validation            |
-| `context-manager`           | Information storage/retrieval, state synchronization, data lifecycle, caching strategies         |
-| `context-documenter`        | Updating CLAUDE.md, documenting new patterns, adding agents, validating instructions             |
-| `agent-organizer`           | Multi-agent team assembly, task decomposition, workflow optimization, agent selection            |
-| `multi-agent-coordinator`   | Complex workflow orchestration, inter-agent communication, parallel execution, fault tolerance   |
-| `claude-skill-creator`      | Creating CLAUDE skills, SKILL.md files, skill documentation structure                            |
-| `change-impact-analyzer`    | Ripple effect analysis, dependency tracing, breaking change detection, code change impact        |
+| Agent                         | When to Use                                                                                        |
+|-------------------------------|---------------------------------------------------------------------------------------------------|
+| `vue-expert`                  | Vue 3 components, Composition API, Nuxt 3/4 pages, composables, Pinia stores, TypeScript in Vue   |
+| `backend-developer`           | Server-side APIs, Node.js/Python/Go services, database operations, microservices, authentication  |
+| `ui-designer`                 | Visual design, UI components, design systems, accessibility, dark mode, responsive layouts        |
+| `websocket-engineer`          | Real-time communication, WebSocket connections, Socket.IO, bidirectional messaging, presence      |
+| `fsd-architecture-guardian`   | FSD architecture validation, layer dependencies, slice/segment organization, public API exports   |
+| `eslint-guardian`             | ESLint configuration verification, lint rule testing, code quality tooling validation             |
+| `context-manager`             | Information storage/retrieval, state synchronization, data lifecycle, caching strategies          |
+| `context-documenter`          | Updating CLAUDE.md, documenting new patterns, adding agents, validating instructions              |
+| `claude-skill-command-manager`| Creating/managing CLAUDE skills and commands, SKILL.md files, allowed-tools config                |
+| `agent-organizer`             | Multi-agent team assembly, task decomposition, workflow optimization, agent selection             |
+| `multi-agent-coordinator`     | Complex workflow orchestration, inter-agent communication, parallel execution, fault tolerance    |
+| `change-impact-analyzer`      | Ripple effect analysis, dependency tracing, breaking change detection, code change impact         |
 
 ## Agent Selection Guidelines
 
@@ -152,7 +159,7 @@ This is a Nuxt 4 project using Feature-Sliced Design (FSD) with `client/` as the
 8. **For codebase exploration**: Use `Explore` agent (built-in)
 9. **For planning complex features**: Use `Plan` agent (built-in) before implementation
 10. **For updating this file**: Use `context-documenter`
-11. **For creating CLAUDE skills**: Use `claude-skill-creator`
+11. **For creating/managing CLAUDE skills and commands**: Use `claude-skill-command-manager`
 12. **For coordinating multiple agents**: Use `agent-organizer` or `multi-agent-coordinator`
 13. **⚠️ AFTER ANY CODE CHANGE**: Use `change-impact-analyzer` (MANDATORY - run recursively until no issues)
 14. **When uncertain**: Ask the user for clarification
