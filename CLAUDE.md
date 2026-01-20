@@ -107,52 +107,52 @@ This is a Nuxt 4 project using Feature-Sliced Design (FSD) with `client/` as the
 ## Implementation Rules
 
 - **MANDATORY**: All implementation tasks MUST be delegated to specialized subagents:
-    - Frontend Vue/Nuxt work → `vue-expert`
-    - Backend API/server work → `backend-developer`
-    - UI/visual design work → `ui-designer`
-    - WebSocket/real-time features → `websocket-engineer`
-    - FSD architecture validation → `fsd-architecture-guardian`
-    - ESLint/linting verification → `eslint-guardian`
-    - Context storage/retrieval → `context-manager`
-    - Updating CLAUDE.md documentation → `context-documenter`
-    - Creating/managing CLAUDE skills and commands → `claude-skill-command-manager`
-    - Multi-agent team assembly → `agent-organizer`
-    - Complex workflow orchestration → `multi-agent-coordinator`
-    - Change impact analysis → `change-impact-analyzer`
-    - Do NOT implement code directly. Only use Edit/Write for trivial single-line fixes.
+  - Frontend Vue/Nuxt work → `vue-expert`
+  - Backend API/server work → `backend-developer`
+  - UI/visual design work → `ui-designer`
+  - WebSocket/real-time features → `websocket-engineer`
+  - FSD architecture validation → `fsd-architecture-guardian`
+  - ESLint/linting verification → `eslint-guardian`
+  - Context storage/retrieval → `context-manager`
+  - Updating CLAUDE.md documentation → `context-documenter`
+  - Creating/managing CLAUDE skills and commands → `claude-skill-command-manager`
+  - Multi-agent team assembly → `agent-organizer`
+  - Complex workflow orchestration → `multi-agent-coordinator`
+  - Change impact analysis → `change-impact-analyzer`
+  - Do NOT implement code directly. Only use Edit/Write for trivial single-line fixes.
 
 - **NO MATCHING AGENT**: If no suitable agent exists for a task:
-    - **DO NOT** make Edit/Write decisions autonomously
-    - **MUST** prompt the user to either:
-        1. Select an existing agent to handle the task
-        2. Confirm Claude should perform the task directly
-    - Under **NO CIRCUMSTANCE** edit/write code based on your own decision when no agent matches
+  - **DO NOT** make Edit/Write decisions autonomously
+  - **MUST** prompt the user to either:
+    1. Select an existing agent to handle the task
+    2. Confirm Claude should perform the task directly
+  - Under **NO CIRCUMSTANCE** edit/write code based on your own decision when no agent matches
 
 - **MANDATORY POST-CHANGE ANALYSIS**: After ANY code change (file creation, edit, or deletion), you MUST:
-    1. Invoke `change-impact-analyzer` to detect ripple effects
-    2. If the analyzer identifies files that need updates, make those updates
-    3. After making those updates, invoke `change-impact-analyzer` AGAIN recursively
-    4. Continue this loop until the analyzer reports NO breaking changes or warnings
-    5. This rule applies to ALL changes including: new files, edited files, new skills, new agents, config changes
-    6. The only exceptions are: pure documentation updates (README, comments-only changes) and this CLAUDE.md file
-       itself
+  1. Invoke `change-impact-analyzer` to detect ripple effects
+  2. If the analyzer identifies files that need updates, make those updates
+  3. After making those updates, invoke `change-impact-analyzer` AGAIN recursively
+  4. Continue this loop until the analyzer reports NO breaking changes or warnings
+  5. This rule applies to ALL changes including: new files, edited files, new skills, new agents, config changes
+  6. The only exceptions are: pure documentation updates (README, comments-only changes) and this CLAUDE.md file
+     itself
 
 ## Available Agents
 
-| Agent                         | When to Use                                                                                        |
-|-------------------------------|---------------------------------------------------------------------------------------------------|
-| `vue-expert`                  | Vue 3 components, Composition API, Nuxt 3/4 pages, composables, Pinia stores, TypeScript in Vue   |
-| `backend-developer`           | Server-side APIs, Node.js/Python/Go services, database operations, microservices, authentication  |
-| `ui-designer`                 | Visual design, UI components, design systems, accessibility, dark mode, responsive layouts        |
-| `websocket-engineer`          | Real-time communication, WebSocket connections, Socket.IO, bidirectional messaging, presence      |
-| `fsd-architecture-guardian`   | FSD architecture validation, layer dependencies, slice/segment organization, public API exports   |
-| `eslint-guardian`             | ESLint configuration verification, lint rule testing, code quality tooling validation             |
-| `context-manager`             | Information storage/retrieval, state synchronization, data lifecycle, caching strategies          |
-| `context-documenter`          | Updating CLAUDE.md, documenting new patterns, adding agents, validating instructions              |
-| `claude-skill-command-manager`| Creating/managing CLAUDE skills and commands, SKILL.md files, allowed-tools config                |
-| `agent-organizer`             | Multi-agent team assembly, task decomposition, workflow optimization, agent selection             |
-| `multi-agent-coordinator`     | Complex workflow orchestration, inter-agent communication, parallel execution, fault tolerance    |
-| `change-impact-analyzer`      | Ripple effect analysis, dependency tracing, breaking change detection, code change impact         |
+| Agent                          | When to Use                                                                                      |
+| ------------------------------ | ------------------------------------------------------------------------------------------------ |
+| `vue-expert`                   | Vue 3 components, Composition API, Nuxt 3/4 pages, composables, Pinia stores, TypeScript in Vue  |
+| `backend-developer`            | Server-side APIs, Node.js/Python/Go services, database operations, microservices, authentication |
+| `ui-designer`                  | Visual design, UI components, design systems, accessibility, dark mode, responsive layouts       |
+| `websocket-engineer`           | Real-time communication, WebSocket connections, Socket.IO, bidirectional messaging, presence     |
+| `fsd-architecture-guardian`    | FSD architecture validation, layer dependencies, slice/segment organization, public API exports  |
+| `eslint-guardian`              | ESLint configuration verification, lint rule testing, code quality tooling validation            |
+| `context-manager`              | Information storage/retrieval, state synchronization, data lifecycle, caching strategies         |
+| `context-documenter`           | Updating CLAUDE.md, documenting new patterns, adding agents, validating instructions             |
+| `claude-skill-command-manager` | Creating/managing CLAUDE skills and commands, SKILL.md files, allowed-tools config               |
+| `agent-organizer`              | Multi-agent team assembly, task decomposition, workflow optimization, agent selection            |
+| `multi-agent-coordinator`      | Complex workflow orchestration, inter-agent communication, parallel execution, fault tolerance   |
+| `change-impact-analyzer`       | Ripple effect analysis, dependency tracing, breaking change detection, code change impact        |
 
 ## Agent Selection Guidelines
 
