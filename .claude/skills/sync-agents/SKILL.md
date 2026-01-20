@@ -85,6 +85,13 @@ Generate the updated Implementation Rules section using this exact format:
   - ESLint/linting issues -> `eslint-guardian`
   - [Additional mappings for any new agents...]
   - Do NOT implement code directly. Only use Edit/Write for trivial single-line fixes.
+
+- **NO MATCHING AGENT**: If no suitable agent exists for a task:
+  - **DO NOT** make Edit/Write decisions autonomously
+  - **MUST** prompt the user to either:
+    1. Select an existing agent to handle the task
+    2. Confirm Claude should perform the task directly
+  - Under **NO CIRCUMSTANCE** edit/write code based on your own decision when no agent matches
 ```
 
 Rules for generating mappings:

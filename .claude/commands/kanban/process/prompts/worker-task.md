@@ -22,6 +22,152 @@ Complete these steps in order to verify your implementation:
 
 ---
 
+## ⚠️ CRITICAL: Progress Update Protocol
+
+**READ THIS SECTION FIRST - These are MANDATORY requirements.**
+
+### Your FIRST Action - Mark Task Running
+
+**IMMEDIATELY** before doing ANY implementation work, you MUST:
+
+1. Read `.kanban/kanban-progress.json`
+2. Add your task entry with `status: "running"`
+3. Write the updated file
+
+**Initial Entry Template (COPY EXACTLY):**
+
+```json
+{
+  "{task.name}": {
+    "status": "running",
+    "startedAt": "YYYY-MM-DDTHH:MM:SS.000Z",
+    "agents": ["{agent-name}"]
+  }
+}
+```
+
+**Requirements:**
+- `status`: MUST be `"running"` - this signals to the dispatcher that work has begun
+- `startedAt`: Use current ISO 8601 timestamp (e.g., `"2026-01-20T10:30:00.000Z"`)
+- `agents`: Array with your agent name
+
+**⛔ DO NOT start implementation until you have written this initial entry.**
+
+---
+
+## File Tracking Protocol
+
+**MANDATORY**: Track ALL files you touch during implementation.
+
+### How to Track Files
+
+As you work, maintain a mental or explicit list of every file you:
+- **CREATE** → add path to your tracking list
+- **MODIFY** → add path to your tracking list
+- **DELETE** → add path to your tracking list
+
+### Tracking Reminders
+
+After EVERY file operation, ask yourself:
+> "Did I add this file to my affected files list?"
+
+### affectedFiles Requirements
+
+- This array MUST NOT be empty if you made any file changes
+- Include the FULL relative path from project root (e.g., `"client/features/auth/ui/LoginForm.vue"`)
+- Include ALL files: created, modified, AND deleted
+- Empty `affectedFiles: []` is ONLY acceptable if truly NO files were touched
+
+---
+
+## Execution Workflow
+
+### Phase 1: Mark In-Progress (FIRST ACTION)
+
+1. Read existing `.kanban/kanban-progress.json`
+2. Add initial entry with `status: "running"`, `startedAt`, and `agents`
+3. Write updated progress file
+4. **Verify**: Confirm the file was written successfully before proceeding
+
+### Phase 2: Implementation
+
+1. Analyze the task description and understand requirements
+2. Identify existing patterns in the codebase to follow
+3. Implement the changes following project conventions
+4. **TRACK**: Add each file you touch to your affected files list
+
+### Phase 3: Verification
+
+Execute each verification step and document results:
+
+```
+Step 1: <step description>
+Result: PASS/FAIL - <details>
+
+Step 2: <step description>
+Result: PASS/FAIL - <details>
+...
+```
+
+### Phase 4: Completion (FINAL ACTION)
+
+1. Run the Pre-Completion Validation Checklist (see below)
+2. Update `.kanban/kanban-progress.json` with final entry
+3. If all steps passed: Set `passes: true` in `.kanban/kanban-board.json`
+
+---
+
+## Final Entry Requirements
+
+**After completing work**, update your progress entry with ALL fields:
+
+**Final Entry Template (COPY EXACTLY):**
+
+```json
+{
+  "{task.name}": {
+    "status": "completed",
+    "startedAt": "PRESERVE-FROM-INITIAL-ENTRY",
+    "completedAt": "YYYY-MM-DDTHH:MM:SS.000Z",
+    "log": "## Work Summary\n\n<Brief description of what was implemented>\n\n### Changes Made\n- <Bullet point for each change>\n\n### Verification\n<Results of verification steps>",
+    "affectedFiles": ["path/to/file1.ts", "path/to/file2.ts"],
+    "agents": ["{agent-name}"]
+  }
+}
+```
+
+**Field Requirements:**
+
+| Field | Requirement |
+|-------|-------------|
+| `status` | `"completed"` on success, `"error"` on failure, `"blocked"` if dependencies not met |
+| `startedAt` | **PRESERVE** the original timestamp from your initial entry |
+| `completedAt` | Current ISO 8601 timestamp when work finished |
+| `log` | Markdown-formatted summary (use `\n` for newlines in JSON) |
+| `affectedFiles` | **MANDATORY** - Array of ALL file paths created/modified/deleted |
+| `agents` | Array containing your agent name |
+
+---
+
+## Pre-Completion Validation Checklist
+
+**⚠️ BEFORE FINISHING, verify EACH item:**
+
+```
+□ Progress.json has entry for "{task.name}"
+□ Entry has status = "completed" (or "error"/"blocked")
+□ Entry has startedAt timestamp (PRESERVED from initial entry)
+□ Entry has completedAt timestamp (current time)
+□ Entry has log with work summary (not empty)
+□ Entry has affectedFiles array (NOT EMPTY if any files were changed)
+□ Entry has agents array with "{agent-name}"
+□ If verification passed: kanban-board.json has passes: true for this task
+```
+
+**If any checkbox fails, FIX IT before finishing.**
+
+---
+
 ## Project Context
 
 This is a **{projectType}** project using Feature-Sliced Design (FSD) architecture.
@@ -39,146 +185,6 @@ This is a **{projectType}** project using Feature-Sliced Design (FSD) architectu
 - Use existing patterns from similar files in the codebase
 - Maintain TypeScript types and interfaces
 - Follow the project's linting and formatting rules
-
----
-
-## Worker Responsibilities
-
-1. **Mark Task In-Progress**
-   - Immediately update `.kanban/kanban-progress.json` with `status: "running"`
-   - This signals to the dispatcher that work has begun
-
-2. **Implement the Task**
-   - Follow the description and any implementation details provided
-   - Use existing project patterns and conventions
-   - Ensure code is properly typed (TypeScript)
-
-3. **Verify All Steps**
-   - Execute each verification step in order
-   - Document the result of each step
-   - All steps must pass before marking complete
-
-4. **Update Kanban Files on Completion**
-   - Update `.kanban/kanban-progress.json` with final status and work log
-   - Update `.kanban/kanban-board.json` to set `passes: true` if verification succeeds
-
----
-
-## File Update Instructions
-
-### 1. Progress File - Initial Entry (`.kanban/kanban-progress.json`)
-
-**IMMEDIATELY at the start of work**, add an initial entry to mark the task as running:
-
-```json
-{
-  "{task.name}": {
-    "status": "running",
-    "startedAt": "2026-01-19T12:00:00.000Z",
-    "agents": ["{agent-name}"]
-  }
-}
-```
-
-**Initial Entry Requirements**:
-
-- `status`: Must be `"running"` to signal work has begun
-- `startedAt`: ISO 8601 timestamp when work started
-- `agents`: Array containing the agent name(s) working on this task
-
-### 2. Progress File - Final Entry (`.kanban/kanban-progress.json`)
-
-**After completing work**, update the entry with all fields:
-
-```json
-{
-  "{task.name}": {
-    "status": "completed",
-    "startedAt": "2026-01-19T12:00:00.000Z",
-    "completedAt": "2026-01-19T12:15:00.000Z",
-    "log": "## Work Summary\n\n<Brief description of what was implemented>\n\n### Changes Made\n- <Bullet point for each change>\n\n### Verification\n<Results of verification steps>",
-    "affectedFiles": ["path/to/file1.ts", "path/to/file2.ts"],
-    "agents": ["{agent-name}"]
-  }
-}
-```
-
-**Final Entry Requirements**:
-
-- `status`: Set to `"completed"` on success, `"error"` on failure, `"blocked"` if dependencies not met
-- `startedAt`: Preserve the original start timestamp
-- `completedAt`: ISO 8601 timestamp when work finished
-- `log`: Markdown-formatted summary of work done (use `\n` for newlines in JSON)
-- `affectedFiles`: Array of all file paths that were created, modified, or deleted
-- `agents`: Array containing the agent name(s) that worked on this task
-
-**⚠️ CRITICAL**: The `affectedFiles` array is **MANDATORY**.
-Every task MUST list ALL files that were:
-
-- Created (new files)
-- Modified (edited existing files)
-- Deleted (removed files)
-
-Extract file paths from your changes and include them explicitly.
-Empty `affectedFiles: []` is only acceptable if truly no files were touched.
-
-**Status Values**:
-
-- `running` - Task is in progress (set at start)
-- `completed` - Task completed and all verification passed
-- `error` - Task failed due to an error (include error details in log)
-- `blocked` - Task cannot proceed due to unmet dependencies
-
-### 3. Board File (`.kanban/kanban-board.json`)
-
-Find the task entry by name and update `passes` field:
-
-```json
-{
-  "name": "{task.name}",
-  "description": "...",
-  "category": "{task.category}",
-  "steps": [...],
-  "passes": true
-}
-```
-
-**Only set `passes: true` if ALL verification steps passed successfully.**
-
----
-
-## Execution Workflow
-
-### Phase 1: Mark In-Progress
-
-1. Read existing `.kanban/kanban-progress.json`
-2. Add initial entry with `status: "running"`, `startedAt`, and `agents`
-3. Write updated progress file - **This signals to dispatcher that work has begun**
-
-### Phase 2: Implementation
-
-1. Analyze the task description and understand requirements
-2. Identify existing patterns in the codebase to follow
-3. Implement the changes following project conventions
-4. Track all files you create, modify, or delete
-
-### Phase 3: Verification
-
-Execute each verification step:
-
-```
-Step 1: <step description>
-Result: PASS/FAIL - <details>
-
-Step 2: <step description>
-Result: PASS/FAIL - <details>
-...
-```
-
-### Phase 4: Completion
-
-1. Update `.kanban/kanban-progress.json` entry with `status: "completed"`, `completedAt`, `log`, `affectedFiles`
-2. If all steps passed: Set `passes: true` in `.kanban/kanban-board.json`
 
 ---
 
@@ -202,6 +208,26 @@ Follow the project's `CLAUDE.md` for:
 
 ---
 
+## Board File Update
+
+After verification passes, update `.kanban/kanban-board.json`:
+
+Find your task by name and set `passes: true`:
+
+```json
+{
+  "name": "{task.name}",
+  "description": "...",
+  "category": "{task.category}",
+  "steps": [...],
+  "passes": true
+}
+```
+
+**Only set `passes: true` if ALL verification steps passed successfully.**
+
+---
+
 ## Error Handling
 
 If you encounter an error that prevents task completion:
@@ -210,17 +236,18 @@ If you encounter an error that prevents task completion:
 2. Set `status: "error"` in the progress.json entry
 3. Do NOT set `passes: true` in kanban-board.json
 4. Include helpful context for debugging
+5. **Still populate affectedFiles** with any files you touched before the error
 
-Example error entry in progress.json:
+**Error Entry Template:**
 
 ```json
 {
   "{task.name}": {
     "status": "error",
-    "startedAt": "2026-01-19T12:00:00.000Z",
-    "completedAt": "2026-01-19T12:05:00.000Z",
-    "log": "## Error\n\nFailed to complete task due to missing dependency.\n\n### Details\n- Required package `example-lib` not found\n- Attempted to install but npm install failed\n\n### Suggested Fix\nRun `npm install example-lib` manually and retry.",
-    "affectedFiles": [],
+    "startedAt": "PRESERVE-FROM-INITIAL-ENTRY",
+    "completedAt": "YYYY-MM-DDTHH:MM:SS.000Z",
+    "log": "## Error\n\nFailed to complete task due to <reason>.\n\n### Details\n- <Specific error details>\n\n### Suggested Fix\n<How to resolve>",
+    "affectedFiles": ["files/touched/before/error.ts"],
     "agents": ["{agent-name}"]
   }
 }
@@ -228,37 +255,24 @@ Example error entry in progress.json:
 
 ### Blocked Tasks
 
-If you discover the task has unmet dependencies (required files, tasks, or resources don't exist):
+If you discover the task has unmet dependencies:
 
-1. Document the missing dependencies in the progress.json log field
+1. Document the missing dependencies in the log field
 2. Set `status: "blocked"` in the progress.json entry
 3. Do NOT set `passes: true` in kanban-board.json
-4. List the specific dependencies that must be completed first
+4. List specific dependencies that must be completed first
 
-Example blocked entry in progress.json:
+**Blocked Entry Template:**
 
 ```json
 {
   "{task.name}": {
     "status": "blocked",
-    "startedAt": "2026-01-19T12:00:00.000Z",
-    "completedAt": "2026-01-19T12:05:00.000Z",
-    "log": "## Task Blocked - Dependencies Not Met\n\n### Issue\nCannot complete task because required files don't exist yet.\n\n### Missing Dependencies\n- `path/to/required-file.ts` - required by task `other-task-name`\n\n### Required Tasks\n1. `other-task-name` must be completed first",
+    "startedAt": "PRESERVE-FROM-INITIAL-ENTRY",
+    "completedAt": "YYYY-MM-DDTHH:MM:SS.000Z",
+    "log": "## Task Blocked - Dependencies Not Met\n\n### Issue\nCannot complete task because required resources don't exist.\n\n### Missing Dependencies\n- <List specific missing items>\n\n### Required Tasks\n1. <Tasks that must complete first>",
     "affectedFiles": [],
     "agents": ["{agent-name}"]
   }
 }
 ```
-
----
-
-## Final Checklist
-
-Before finishing, verify:
-
-- [ ] Initial entry written to progress.json with `status: "running"` at start
-- [ ] All verification steps executed and documented
-- [ ] `.kanban/kanban-progress.json` updated with final entry (`status: "completed"`, `status: "error"`, or `status: "blocked"`)
-- [ ] `.kanban/kanban-board.json` updated (`passes: true` only if all steps passed)
-- [ ] **MANDATORY**: All affected files listed in `affectedFiles` array (extract from changes made)
-- [ ] Agent name recorded in `agents` array

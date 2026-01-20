@@ -57,6 +57,64 @@ $AgentMapping = @{
 
 #region Helper Functions
 
+function Test-ProgressEntry {
+    param(
+        [object]$Entry,
+        [string]$TaskName
+    )
+
+    $warnings = @()
+
+    # Check required fields for all entries
+    if (-not $Entry.status) {
+        $warnings += "Missing 'status' field"
+    }
+    if (-not $Entry.startedAt) {
+        $warnings += "Missing 'startedAt' field"
+    }
+    if (-not $Entry.agents -or $Entry.agents.Count -eq 0) {
+        $warnings += "Missing or empty 'agents' field"
+    }
+
+    # For completed entries, check additional fields
+    if ($Entry.status -eq "completed") {
+        if (-not $Entry.completedAt) {
+            $warnings += "Missing 'completedAt' field"
+        }
+        if (-not $Entry.log) {
+            $warnings += "Missing 'log' field"
+        }
+        if (-not $Entry.affectedFiles) {
+            $warnings += "Missing 'affectedFiles' field"
+        }
+        elseif ($Entry.affectedFiles.Count -eq 0) {
+            $warnings += "Empty 'affectedFiles' array - worker likely didn't track files"
+        }
+    }
+
+    # For error entries, check log field
+    if ($Entry.status -eq "error") {
+        if (-not $Entry.completedAt) {
+            $warnings += "Missing 'completedAt' field"
+        }
+        if (-not $Entry.log) {
+            $warnings += "Missing 'log' field (should contain error details)"
+        }
+    }
+
+    # For blocked entries, check log field
+    if ($Entry.status -eq "blocked") {
+        if (-not $Entry.completedAt) {
+            $warnings += "Missing 'completedAt' field"
+        }
+        if (-not $Entry.log) {
+            $warnings += "Missing 'log' field (should contain blocking reason)"
+        }
+    }
+
+    return $warnings
+}
+
 function Write-Header {
     param([string]$Title)
     Write-Host ""
@@ -330,7 +388,13 @@ function Wait-WorkerBatch {
         $status = $null
         $entry = $progress[$taskName]
 
+        # Validate progress entry and collect warnings
+        $validationWarnings = @()
+
         if ($entry) {
+            # Run validation on the entry
+            $validationWarnings = Test-ProgressEntry -Entry $entry -TaskName $taskName
+
             $entryStatus = $entry.status
             if ($entryStatus -eq "completed") {
                 $status = @{
@@ -338,6 +402,7 @@ function Wait-WorkerBatch {
                     log = $entry.log
                     affectedFiles = $entry.affectedFiles
                     agents = $entry.agents
+                    validationWarnings = $validationWarnings
                 }
             } elseif ($entryStatus -eq "error") {
                 $status = @{
@@ -345,12 +410,22 @@ function Wait-WorkerBatch {
                     error = if ($entry.log) { $entry.log } else { "Task failed with error status" }
                     affectedFiles = $entry.affectedFiles
                     agents = $entry.agents
+                    validationWarnings = $validationWarnings
+                }
+            } elseif ($entryStatus -eq "blocked") {
+                $status = @{
+                    status = "blocked"
+                    error = if ($entry.log) { $entry.log } else { "Task blocked due to unmet dependencies" }
+                    affectedFiles = $entry.affectedFiles
+                    agents = $entry.agents
+                    validationWarnings = $validationWarnings
                 }
             } elseif ($entryStatus -eq "running") {
                 # Worker still shows running - job completed but may not have finished updating
                 $status = @{
                     status = "unknown"
                     error = "Worker job finished but progress status still shows 'running'"
+                    validationWarnings = $validationWarnings
                 }
             } else {
                 # Legacy entry without status field - check if it has required fields
@@ -360,11 +435,13 @@ function Wait-WorkerBatch {
                         log = $entry.log
                         affectedFiles = $entry.affectedFiles
                         agents = $entry.agents
+                        validationWarnings = $validationWarnings
                     }
                 } else {
                     $status = @{
                         status = "unknown"
                         error = "Progress entry exists but status unclear"
+                        validationWarnings = $validationWarnings
                     }
                 }
             }
@@ -372,6 +449,7 @@ function Wait-WorkerBatch {
             $status = @{
                 status = "failure"
                 error = "No progress entry created by worker"
+                validationWarnings = @("Worker did not create a progress entry at all")
             }
         }
 
@@ -392,6 +470,7 @@ function Show-BatchResults {
 
     $successCount = 0
     $failureCount = 0
+    $warningCount = 0
 
     foreach ($result in $Results) {
         $taskName = $result.Task.name
@@ -405,6 +484,32 @@ function Show-BatchResults {
                 Write-Host "       $($status.summary)" -ForegroundColor Gray
             }
             $successCount++
+
+            # Display validation warnings for successful tasks
+            if ($status.validationWarnings -and $status.validationWarnings.Count -gt 0) {
+                $warningCount += $status.validationWarnings.Count
+                Write-Host "       Warnings:" -ForegroundColor Yellow
+                foreach ($warning in $status.validationWarnings) {
+                    Write-Host "         - $warning" -ForegroundColor Yellow
+                }
+            }
+        } elseif ($status.status -eq "blocked") {
+            Write-Host "[BLOCKED] " -ForegroundColor Magenta -NoNewline
+            Write-Host "$taskName" -ForegroundColor White
+            if ($status.error) {
+                Write-Host "       Reason: $($status.error)" -ForegroundColor Magenta
+            }
+            Write-Host "       Log: $($result.LogPath)" -ForegroundColor DarkGray
+
+            # Display validation warnings for blocked tasks
+            if ($status.validationWarnings -and $status.validationWarnings.Count -gt 0) {
+                $warningCount += $status.validationWarnings.Count
+                Write-Host "       Warnings:" -ForegroundColor Yellow
+                foreach ($warning in $status.validationWarnings) {
+                    Write-Host "         - $warning" -ForegroundColor Yellow
+                }
+            }
+            $failureCount++
         } else {
             Write-Host "[FAIL] " -ForegroundColor Red -NoNewline
             Write-Host "$taskName" -ForegroundColor White
@@ -412,6 +517,15 @@ function Show-BatchResults {
                 Write-Host "       Error: $($status.error)" -ForegroundColor Red
             }
             Write-Host "       Log: $($result.LogPath)" -ForegroundColor DarkGray
+
+            # Display validation warnings for failed tasks
+            if ($status.validationWarnings -and $status.validationWarnings.Count -gt 0) {
+                $warningCount += $status.validationWarnings.Count
+                Write-Host "       Warnings:" -ForegroundColor Yellow
+                foreach ($warning in $status.validationWarnings) {
+                    Write-Host "         - $warning" -ForegroundColor Yellow
+                }
+            }
             $failureCount++
         }
     }
@@ -420,11 +534,18 @@ function Show-BatchResults {
     Write-Host "Batch Summary: " -NoNewline
     Write-Host "$successCount passed" -ForegroundColor Green -NoNewline
     Write-Host ", " -NoNewline
-    Write-Host "$failureCount failed" -ForegroundColor Red
+    Write-Host "$failureCount failed" -ForegroundColor Red -NoNewline
+    if ($warningCount -gt 0) {
+        Write-Host ", " -NoNewline
+        Write-Host "$warningCount validation warnings" -ForegroundColor Yellow
+    } else {
+        Write-Host ""
+    }
 
     return @{
         SuccessCount = $successCount
         FailureCount = $failureCount
+        WarningCount = $warningCount
         FailedTasks = $Results | Where-Object { $_.Status.status -ne "success" -and $_.Status.status -ne "completed" }
     }
 }

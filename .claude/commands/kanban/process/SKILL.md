@@ -210,6 +210,24 @@ Workers update `kanban-progress.json` entries. The dispatcher monitors these for
 - `running` - Task in progress (set at start)
 - `completed` - All verification steps passed
 - `error` - Execution error occurred (include details in log)
+- `blocked` - Task cannot proceed due to unmet dependencies
+
+### Validation Warnings
+
+The dispatcher validates each progress entry for completeness and displays warnings in yellow. Validation checks:
+
+- Required fields present (`status`, `startedAt`, `agents`)
+- For completed entries: `completedAt`, `log`, and `affectedFiles` should be populated
+- For error/blocked entries: `completedAt` and `log` should be populated
+- Empty `affectedFiles` array triggers a warning for completed tasks (worker likely didn't track files)
+
+Batch results display warnings after each task status:
+
+```
+[PASS] task-name
+       Warnings:
+         - Empty 'affectedFiles' array - worker likely didn't track files
+```
 
 ---
 

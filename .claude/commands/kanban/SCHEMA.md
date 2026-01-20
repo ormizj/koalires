@@ -170,9 +170,14 @@ type TaskStatus = 'running' | 'completed' | 'error' | 'blocked';
 | `status`        | enum   | Yes      | One of: `running`, `completed`, `error`, `blocked` |
 | `startedAt`     | string | Yes      | ISO 8601 format with milliseconds                  |
 | `agents`        | array  | Yes      | At least 1 agent name string                       |
-| `completedAt`   | string | No       | ISO 8601 format, set when status != `running`      |
-| `log`           | string | No       | Markdown format with `\n` for newlines             |
-| `affectedFiles` | array  | No       | Relative file paths from project root              |
+| `completedAt`   | string | No*      | ISO 8601 format, set when status != `running`      |
+| `log`           | string | No*      | Markdown format with `\n` for newlines             |
+| `affectedFiles` | array  | No*      | Relative file paths from project root              |
+
+**\*Worker Protocol Requirements**: While these fields are technically optional in the JSON schema, the worker protocol expects them to be populated:
+- `completedAt`, `log`, and `affectedFiles` are **expected** for `completed` entries
+- `completedAt` and `log` are **expected** for `error` and `blocked` entries
+- The dispatcher validates entries and displays warnings for missing/empty fields
 
 ---
 
