@@ -376,6 +376,23 @@ function Wait-WorkerBatch {
         }
     }
 
+    # Re-read board.json to check if workers updated passes field
+    $boardContent = $null
+    $boardTasks = @{}
+    if (Test-Path $BoardFile) {
+        try {
+            $boardContent = Get-Content $BoardFile -Raw | ConvertFrom-Json
+            if ($boardContent -and $boardContent.tasks) {
+                foreach ($task in $boardContent.tasks) {
+                    $boardTasks[$task.name] = $task
+                }
+            }
+        }
+        catch {
+            Write-Host "Warning: Failed to parse board file" -ForegroundColor Yellow
+        }
+    }
+
     foreach ($worker in $Workers) {
         $task = $worker.Task
         $logPath = $worker.LogPath
@@ -394,6 +411,14 @@ function Wait-WorkerBatch {
         if ($entry) {
             # Run validation on the entry
             $validationWarnings = Test-ProgressEntry -Entry $entry -TaskName $taskName
+
+            # Check if worker updated passes field in board.json
+            $boardTask = $boardTasks[$taskName]
+            if ($boardTask) {
+                if ($entry.status -eq "completed" -and $boardTask.passes -ne $true) {
+                    $validationWarnings += "CRITICAL: Worker completed but did NOT set passes=true in board.json - task will remain stuck in 'in-progress'"
+                }
+            }
 
             $entryStatus = $entry.status
             if ($entryStatus -eq "completed") {
@@ -478,8 +503,19 @@ function Show-BatchResults {
 
         # Accept both "success" and "completed" as valid success states
         if ($status.status -eq "success" -or $status.status -eq "completed") {
-            Write-Host "[PASS] " -ForegroundColor Green -NoNewline
-            Write-Host "$taskName" -ForegroundColor White
+            # Check if there's a critical passes warning
+            $hasCriticalPassesWarning = $status.validationWarnings | Where-Object { $_ -like "*passes*" }
+
+            if ($hasCriticalPassesWarning) {
+                # Worker completed but didn't update board - show prominent warning
+                Write-Host "[WARN] " -ForegroundColor Yellow -NoNewline
+                Write-Host "$taskName" -ForegroundColor White -NoNewline
+                Write-Host " - worker finished but task stuck in 'in-progress'" -ForegroundColor Yellow
+            } else {
+                Write-Host "[PASS] " -ForegroundColor Green -NoNewline
+                Write-Host "$taskName" -ForegroundColor White
+            }
+
             if ($status.summary) {
                 Write-Host "       $($status.summary)" -ForegroundColor Gray
             }

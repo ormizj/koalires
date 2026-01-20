@@ -22,6 +22,25 @@ Complete these steps in order to verify your implementation:
 
 ---
 
+## 🚨 TWO-FILE UPDATE REQUIREMENT - READ THIS FIRST
+
+**⚠️ YOUR TASK IS NOT COMPLETE UNTIL YOU UPDATE BOTH FILES:**
+
+| File | What to Update | When |
+|------|----------------|------|
+| `.kanban/kanban-progress.json` | Set `status: "completed"` with work log | After finishing work |
+| `.kanban/kanban-board.json` | Set `passes: true` for your task | After verification passes |
+
+**FAILURE TO UPDATE BOTH FILES = TASK REMAINS STUCK IN "IN-PROGRESS" FOREVER**
+
+The dispatcher derives task status from BOTH files:
+- `passes: false` + `status: "completed"` → **in-progress** (stuck!)
+- `passes: true` + `status: "completed"` → **completed** (correct!)
+
+**DO NOT FORGET THE BOARD FILE UPDATE.** This is the most commonly missed step.
+
+---
+
 ## ⚠️ CRITICAL: Progress Update Protocol
 
 **READ THIS SECTION FIRST - These are MANDATORY requirements.**
@@ -153,6 +172,7 @@ Result: PASS/FAIL - <details>
 
 **⚠️ BEFORE FINISHING, verify EACH item:**
 
+### Progress File Checklist
 ```
 □ Progress.json has entry for "{task.name}"
 □ Entry has status = "completed" (or "error"/"blocked")
@@ -161,8 +181,19 @@ Result: PASS/FAIL - <details>
 □ Entry has log with work summary (not empty)
 □ Entry has affectedFiles array (NOT EMPTY if any files were changed)
 □ Entry has agents array with "{agent-name}"
-□ If verification passed: kanban-board.json has passes: true for this task
 ```
+
+### 🚨 BOARD FILE CHECKLIST (CRITICAL - DO NOT SKIP)
+```
+□ READ kanban-board.json and found task "{task.name}"
+□ SET passes: true for this task (if verification succeeded)
+□ WROTE updated kanban-board.json back to disk
+□ RE-READ kanban-board.json to VERIFY passes is actually true
+```
+
+**⛔ STOP! Have you updated BOTH files?**
+- `.kanban/kanban-progress.json` → status: "completed"
+- `.kanban/kanban-board.json` → passes: true
 
 **If any checkbox fails, FIX IT before finishing.**
 
