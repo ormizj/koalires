@@ -79,9 +79,12 @@ Reviews completed tasks and creates git commits:
 
 ```
 pending → in-progress → code-review → completed
+              ↓
+           blocked (if dependencies not met)
 ```
 
 - **pending** - Not started
+- **blocked** - Cannot proceed due to unmet dependencies
 - **in-progress** - Agent working on task
 - **code-review** - Verification passed, awaiting commit approval
 - **completed** - Committed to git
@@ -93,7 +96,7 @@ Run `npm run kanban` to open the interactive viewer at `http://localhost:4150/.k
 Features:
 
 - Real-time updates (1s refresh)
-- 4-column board (Pending | In Progress | Code Review | Completed)
+- 5-column board (Pending | Blocked | In Progress | Code Review | Completed)
 - Expandable task cards with description, steps, affected files
 - Progress bar and statistics
 

@@ -107,7 +107,7 @@ This is a **{projectType}** project using Feature-Sliced Design (FSD) architectu
 ```
 
 **Final Entry Requirements**:
-- `status`: Set to `"completed"` on success, `"error"` on failure
+- `status`: Set to `"completed"` on success, `"error"` on failure, `"blocked"` if dependencies not met
 - `startedAt`: Preserve the original start timestamp
 - `completedAt`: ISO 8601 timestamp when work finished
 - `log`: Markdown-formatted summary of work done (use `\n` for newlines in JSON)
@@ -115,10 +115,20 @@ This is a **{projectType}** project using Feature-Sliced Design (FSD) architectu
 - `affectedFiles`: Array of all file paths that were created, modified, or deleted
 - `agents`: Array containing the agent name(s) that worked on this task
 
+**⚠️ CRITICAL**: The `affectedFiles` array is **MANDATORY**.
+Every task MUST list ALL files that were:
+- Created (new files)
+- Modified (edited existing files)
+- Deleted (removed files)
+
+Extract file paths from your changes and include them explicitly.
+Empty `affectedFiles: []` is only acceptable if truly no files were touched.
+
 **Status Values**:
 - `running` - Task is in progress (set at start)
 - `completed` - Task completed and all verification passed
 - `error` - Task failed due to an error (include error details in log)
+- `blocked` - Task cannot proceed due to unmet dependencies
 
 ### 3. Board File (`.kanban/kanban-board.json`)
 
@@ -217,6 +227,31 @@ Example error entry in progress.json:
 }
 ```
 
+### Blocked Tasks
+
+If you discover the task has unmet dependencies (required files, tasks, or resources don't exist):
+
+1. Document the missing dependencies in the progress.json log field
+2. Set `status: "blocked"` in the progress.json entry
+3. Do NOT set `passes: true` in kanban-board.json
+4. List the specific dependencies that must be completed first
+
+Example blocked entry in progress.json:
+
+```json
+{
+  "{task.name}": {
+    "status": "blocked",
+    "startedAt": "2026-01-19T12:00:00.000Z",
+    "completedAt": "2026-01-19T12:05:00.000Z",
+    "log": "## Task Blocked - Dependencies Not Met\n\n### Issue\nCannot complete task because required files don't exist yet.\n\n### Missing Dependencies\n- `path/to/required-file.ts` - required by task `other-task-name`\n\n### Required Tasks\n1. `other-task-name` must be completed first",
+    "committed": false,
+    "affectedFiles": [],
+    "agents": ["{agent-name}"]
+  }
+}
+```
+
 ---
 
 ## Final Checklist
@@ -225,7 +260,7 @@ Before finishing, verify:
 
 - [ ] Initial entry written to progress.json with `status: "running"` at start
 - [ ] All verification steps executed and documented
-- [ ] `.kanban/kanban-progress.json` updated with final entry (`status: "completed"` or `status: "error"`)
+- [ ] `.kanban/kanban-progress.json` updated with final entry (`status: "completed"`, `status: "error"`, or `status: "blocked"`)
 - [ ] `.kanban/kanban-board.json` updated (`passes: true` only if all steps passed)
-- [ ] All affected files listed in `affectedFiles` array
+- [ ] **MANDATORY**: All affected files listed in `affectedFiles` array (extract from changes made)
 - [ ] Agent name recorded in `agents` array

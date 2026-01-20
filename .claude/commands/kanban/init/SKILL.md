@@ -18,6 +18,24 @@ Execute these steps in order:
 mkdir -p .kanban
 ```
 
+### 1.5. Create Logs Directory
+
+```bash
+mkdir -p .kanban/logs
+```
+
+### 1.6. Create .gitignore
+
+Create `.kanban/.gitignore` with content:
+
+```gitignore
+# Ignore worker logs
+logs/
+
+# Ignore worker status files
+workers/
+```
+
 ### 2. Copy Viewer Template (Always Override)
 
 Read the template file from this skill directory and write it to the project:
@@ -70,6 +88,8 @@ Use the Edit tool to add this script.
 
 After completing all steps, report:
 - Created `.kanban/` directory
+- Created `.kanban/logs/` directory
+- Created `.kanban/.gitignore`
 - Created `.kanban/kanban-viewer.html`
 - Created `.kanban/kanban-progress.json`
 - Added `kanban` script to package.json

@@ -75,12 +75,20 @@
             color: #3fb950;
         }
 
+        .stat-blocked .stat-value {
+            color: #f85149;
+        }
+
         .board {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            display: flex;
             gap: 20px;
-            max-width: 1800px;
+            max-width: 2000px;
             margin: 0 auto;
+            overflow-x: auto;
+        }
+
+        .board.has-maximized {
+            display: block;
         }
 
         .column {
@@ -88,6 +96,76 @@
             border-radius: 12px;
             padding: 16px;
             min-height: 500px;
+            min-width: 280px;
+            flex: 1;
+            transition: all 0.3s ease;
+        }
+
+        .column.minimized {
+            min-width: 36px;
+            width: 36px;
+            max-width: 36px;
+            flex: 0 0 36px;
+            padding: 12px 6px;
+            cursor: pointer;
+        }
+
+        .column.minimized:hover {
+            background: #1c2128;
+        }
+
+        .column.minimized .column-header {
+            flex-direction: column;
+            align-items: center;
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            transform: rotate(180deg);
+            border-bottom: none;
+            padding-bottom: 0;
+            height: auto;
+            gap: 8px;
+        }
+
+        .column.minimized .column-title {
+            font-size: 0.7rem;
+            letter-spacing: 1px;
+        }
+
+        .column.minimized .column-count {
+            writing-mode: horizontal-tb;
+            transform: rotate(180deg);
+            width: 22px;
+            height: 22px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            font-size: 0.7rem;
+            margin: 0;
+        }
+
+        .column.minimized .column-controls {
+            display: none;
+        }
+
+        .column.minimized .tasks {
+            display: none;
+        }
+
+        .column.hidden {
+            display: none;
+        }
+
+        .column.maximized {
+            min-width: 100%;
+            width: 100%;
+        }
+
+        .column.maximized .tasks {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 16px;
         }
 
         .column-header {
@@ -108,9 +186,55 @@
 
         .column-count {
             background: #30363d;
-            padding: 2px 8px;
-            border-radius: 10px;
+            width: 24px;
+            height: 24px;
+            padding: 0;
+            border-radius: 50%;
             font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .column-controls {
+            display: flex;
+            gap: 6px;
+            margin-left: auto;
+        }
+
+        .control-btn {
+            width: 28px;
+            height: 28px;
+            border: 1px solid #30363d;
+            background: #21262d;
+            color: #8b949e;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            padding: 0;
+        }
+
+        .control-btn svg {
+            width: 14px;
+            height: 14px;
+            stroke: currentColor;
+            stroke-width: 2;
+            fill: none;
+        }
+
+        .control-btn:hover {
+            background: #30363d;
+            color: #c9d1d9;
+            border-color: #58a6ff;
+        }
+
+        .control-btn.active {
+            background: #58a6ff;
+            color: #0d1117;
+            border-color: #58a6ff;
         }
 
         .column-pending .column-title {
@@ -127,6 +251,10 @@
 
         .column-completed .column-title {
             color: #3fb950;
+        }
+
+        .column-blocked .column-title {
+            color: #f85149;
         }
 
         .tasks {
@@ -408,7 +536,13 @@
             font-size: 1rem;
         }
 
-        @media (max-width: 1200px) {
+        @media (max-width: 1400px) {
+            .board {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 1000px) {
             .board {
                 grid-template-columns: repeat(2, 1fr);
             }
@@ -430,6 +564,10 @@
             <div class="stat-value" id="stat-pending">0</div>
             <div class="stat-label">Pending</div>
         </div>
+        <div class="stat stat-blocked">
+            <div class="stat-value" id="stat-blocked">0</div>
+            <div class="stat-label">Blocked</div>
+        </div>
         <div class="stat stat-progress">
             <div class="stat-value" id="stat-progress">0</div>
             <div class="stat-label">In Progress</div>
@@ -449,34 +587,102 @@
 </div>
 
 <div class="board">
-    <div class="column column-pending">
+    <div class="column column-pending" data-column="pending" onclick="handleColumnClick(event, this)">
         <div class="column-header">
             <span class="column-title">Pending</span>
             <span class="column-count" id="count-pending">0</span>
+            <div class="column-controls">
+                <button class="control-btn minimize-btn" title="Minimize" onclick="toggleMinimize(event, 'pending')">
+                    <svg viewBox="0 0 24 24">
+                        <line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                </button>
+                <button class="control-btn maximize-btn" title="Maximize" onclick="toggleMaximize(event, 'pending')">
+                    <svg viewBox="0 0 24 24">
+                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    </svg>
+                </button>
+            </div>
         </div>
         <div class="tasks" id="tasks-pending"></div>
     </div>
 
-    <div class="column column-progress">
+    <div class="column column-blocked" data-column="blocked" onclick="handleColumnClick(event, this)">
+        <div class="column-header">
+            <span class="column-title">Blocked</span>
+            <span class="column-count" id="count-blocked">0</span>
+            <div class="column-controls">
+                <button class="control-btn minimize-btn" title="Minimize" onclick="toggleMinimize(event, 'blocked')">
+                    <svg viewBox="0 0 24 24">
+                        <line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                </button>
+                <button class="control-btn maximize-btn" title="Maximize" onclick="toggleMaximize(event, 'blocked')">
+                    <svg viewBox="0 0 24 24">
+                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <div class="tasks" id="tasks-blocked"></div>
+    </div>
+
+    <div class="column column-progress" data-column="progress" onclick="handleColumnClick(event, this)">
         <div class="column-header">
             <span class="column-title">In Progress</span>
             <span class="column-count" id="count-progress">0</span>
+            <div class="column-controls">
+                <button class="control-btn minimize-btn" title="Minimize" onclick="toggleMinimize(event, 'progress')">
+                    <svg viewBox="0 0 24 24">
+                        <line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                </button>
+                <button class="control-btn maximize-btn" title="Maximize" onclick="toggleMaximize(event, 'progress')">
+                    <svg viewBox="0 0 24 24">
+                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    </svg>
+                </button>
+            </div>
         </div>
         <div class="tasks" id="tasks-progress"></div>
     </div>
 
-    <div class="column column-review">
+    <div class="column column-review" data-column="review" onclick="handleColumnClick(event, this)">
         <div class="column-header">
             <span class="column-title">Code Review</span>
             <span class="column-count" id="count-review">0</span>
+            <div class="column-controls">
+                <button class="control-btn minimize-btn" title="Minimize" onclick="toggleMinimize(event, 'review')">
+                    <svg viewBox="0 0 24 24">
+                        <line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                </button>
+                <button class="control-btn maximize-btn" title="Maximize" onclick="toggleMaximize(event, 'review')">
+                    <svg viewBox="0 0 24 24">
+                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    </svg>
+                </button>
+            </div>
         </div>
         <div class="tasks" id="tasks-review"></div>
     </div>
 
-    <div class="column column-completed">
+    <div class="column column-completed" data-column="completed" onclick="handleColumnClick(event, this)">
         <div class="column-header">
             <span class="column-title">Completed</span>
             <span class="column-count" id="count-completed">0</span>
+            <div class="column-controls">
+                <button class="control-btn minimize-btn" title="Minimize" onclick="toggleMinimize(event, 'completed')">
+                    <svg viewBox="0 0 24 24">
+                        <line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                </button>
+                <button class="control-btn maximize-btn" title="Maximize" onclick="toggleMaximize(event, 'completed')">
+                    <svg viewBox="0 0 24 24">
+                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    </svg>
+                </button>
+            </div>
         </div>
         <div class="tasks" id="tasks-completed"></div>
     </div>
@@ -490,6 +696,152 @@
 <script>
     let lastBoardData = null;
     let lastProgressData = null;
+    let maximizedColumn = null;
+
+    const COLUMN_STATE_KEY = 'kanban-column-state';
+
+    function getColumnState() {
+        try {
+            const state = localStorage.getItem(COLUMN_STATE_KEY);
+            return state ? JSON.parse(state) : {minimized: [], maximized: null};
+        } catch {
+            return {minimized: [], maximized: null};
+        }
+    }
+
+    function saveColumnState(minimized, maximized) {
+        try {
+            localStorage.setItem(COLUMN_STATE_KEY, JSON.stringify({minimized, maximized}));
+        } catch {
+            // localStorage not available
+        }
+    }
+
+    function toggleMinimize(event, columnId) {
+        event.stopPropagation();
+        const column = document.querySelector(`[data-column="${columnId}"]`);
+        if (!column) return;
+
+        // If maximized, exit maximize mode first
+        if (maximizedColumn) {
+            exitMaximizeMode();
+        }
+
+        const isMinimized = column.classList.toggle('minimized');
+        const state = getColumnState();
+
+        if (isMinimized) {
+            if (!state.minimized.includes(columnId)) {
+                state.minimized.push(columnId);
+            }
+        } else {
+            state.minimized = state.minimized.filter(id => id !== columnId);
+        }
+
+        saveColumnState(state.minimized, state.maximized);
+    }
+
+    function toggleMaximize(event, columnId) {
+        event.stopPropagation();
+        const column = document.querySelector(`[data-column="${columnId}"]`);
+        if (!column) return;
+
+        const board = document.querySelector('.board');
+        const allColumns = document.querySelectorAll('.column');
+
+        if (maximizedColumn === columnId) {
+            // Exit maximize mode
+            exitMaximizeMode();
+        } else {
+            // Enter maximize mode
+            maximizedColumn = columnId;
+            board.classList.add('has-maximized');
+
+            allColumns.forEach(col => {
+                const colId = col.dataset.column;
+                if (colId === columnId) {
+                    col.classList.remove('minimized', 'hidden');
+                    col.classList.add('maximized');
+                    // Update button to show close icon
+                    const maxBtn = col.querySelector('.maximize-btn');
+                    if (maxBtn) {
+                        maxBtn.innerHTML = '<svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+                        maxBtn.title = 'Restore';
+                        maxBtn.classList.add('active');
+                    }
+                } else {
+                    col.classList.add('hidden');
+                }
+            });
+
+            const state = getColumnState();
+            state.maximized = columnId;
+            saveColumnState(state.minimized, state.maximized);
+        }
+    }
+
+    function exitMaximizeMode() {
+        const board = document.querySelector('.board');
+        const allColumns = document.querySelectorAll('.column');
+        const state = getColumnState();
+
+        board.classList.remove('has-maximized');
+        maximizedColumn = null;
+
+        allColumns.forEach(col => {
+            const colId = col.dataset.column;
+            col.classList.remove('maximized', 'hidden');
+
+            // Restore minimized state if it was minimized before
+            if (state.minimized.includes(colId)) {
+                col.classList.add('minimized');
+            }
+
+            // Reset maximize button
+            const maxBtn = col.querySelector('.maximize-btn');
+            if (maxBtn) {
+                maxBtn.innerHTML = '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>';
+                maxBtn.title = 'Maximize';
+                maxBtn.classList.remove('active');
+            }
+        });
+
+        state.maximized = null;
+        saveColumnState(state.minimized, state.maximized);
+    }
+
+    function handleColumnClick(event, column) {
+        // Only restore if column is minimized and click is not on a button or task
+        if (column.classList.contains('minimized')) {
+            const isButton = event.target.closest('.control-btn');
+            const isTask = event.target.closest('.task');
+            if (!isButton && !isTask) {
+                const columnId = column.dataset.column;
+                toggleMinimize(event, columnId);
+            }
+        }
+    }
+
+    function restoreColumnState() {
+        const state = getColumnState();
+
+        // Restore minimized columns
+        state.minimized.forEach(columnId => {
+            const column = document.querySelector(`[data-column="${columnId}"]`);
+            if (column) {
+                column.classList.add('minimized');
+            }
+        });
+
+        // Restore maximized column
+        if (state.maximized) {
+            const fakeEvent = {
+                stopPropagation: () => {
+                }
+            };
+            toggleMaximize(fakeEvent, state.maximized);
+        }
+    }
 
     function escapeHtml(text) {
         const div = document.createElement('div');
@@ -550,6 +902,7 @@
     // Status logic:
     // - passes === true AND committed === true → completed
     // - passes === true AND committed === false → code-review (awaiting commit)
+    // - progress.status === 'blocked' → blocked
     // - In progress file but passes !== true → in-progress
     // - Not in progress file → pending
     function getTaskStatus(task, progressData) {
@@ -566,6 +919,9 @@
         }
         if (task.status === 'code-review') {
             return 'code-review';
+        }
+        if (progress?.status === 'blocked') {
+            return 'blocked';
         }
         if (isStarted) {
             return 'in-progress';
@@ -630,6 +986,7 @@
 
         // Categorize tasks by status
         const pending = [];
+        const blocked = [];
         const inProgress = [];
         const codeReview = [];
         const completed = [];
@@ -639,6 +996,9 @@
             switch (status) {
                 case 'pending':
                     pending.push(task);
+                    break;
+                case 'blocked':
+                    blocked.push(task);
                     break;
                 case 'in-progress':
                     inProgress.push(task);
@@ -658,12 +1018,14 @@
 
         // Update stats
         document.getElementById('stat-pending').textContent = pending.length;
+        document.getElementById('stat-blocked').textContent = blocked.length;
         document.getElementById('stat-progress').textContent = inProgress.length;
         document.getElementById('stat-review').textContent = codeReview.length;
         document.getElementById('stat-completed').textContent = completed.length;
 
         // Update counts
         document.getElementById('count-pending').textContent = pending.length;
+        document.getElementById('count-blocked').textContent = blocked.length;
         document.getElementById('count-progress').textContent = inProgress.length;
         document.getElementById('count-review').textContent = codeReview.length;
         document.getElementById('count-completed').textContent = completed.length;
@@ -678,6 +1040,11 @@
             pending.length > 0
                 ? pending.map(t => createTaskCard(t, 'pending', progressObj[t.name])).join('')
                 : '<div class="empty-column">No pending tasks</div>';
+
+        document.getElementById('tasks-blocked').innerHTML =
+            blocked.length > 0
+                ? blocked.map(t => createTaskCard(t, 'blocked', progressObj[t.name])).join('')
+                : '<div class="empty-column">No blocked tasks</div>';
 
         document.getElementById('tasks-progress').innerHTML =
             inProgress.length > 0
@@ -743,6 +1110,9 @@
 
     // Initial load
     fetchAndRender();
+
+    // Restore column state from localStorage
+    restoreColumnState();
 
     // Auto-refresh every 1 second
     setInterval(fetchAndRender, 1000);
