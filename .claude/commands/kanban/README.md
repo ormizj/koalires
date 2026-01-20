@@ -42,6 +42,7 @@ Dispatches tasks to parallel `claude -p` workers in dependency waves:
 4. On failure, prompts: retry/skip/stop
 
 **Flags:**
+
 - `-Parallel N` - Max concurrent workers (default: 3)
 - `-DryRun` - Preview without executing
 
@@ -56,12 +57,13 @@ Reviews completed tasks and creates git commits:
 5. Rejected tasks return to pending for re-work
 
 **Flags:**
+
 - `--batch` - Auto-approve all tasks without prompts
 
 ## Files
 
 | File                           | Purpose                                         |
-|--------------------------------|-------------------------------------------------|
+| ------------------------------ | ----------------------------------------------- |
 | `.kanban/kanban-board.json`    | Task definitions                                |
 | `.kanban/kanban-progress.json` | Progress tracking (log, affected files, agents) |
 | `.kanban/kanban-viewer.html`   | Interactive board UI                            |
@@ -73,7 +75,7 @@ For strict schema definitions of all data files, see [SCHEMA.md](./SCHEMA.md).
 ## Task Categories
 
 | Category      | Agent             | Purpose                  |
-|---------------|-------------------|--------------------------|
+| ------------- | ----------------- | ------------------------ |
 | `data`        | backend-developer | Database schemas, models |
 | `api`         | backend-developer | Endpoints, services      |
 | `ui`          | vue-expert        | Components, styling      |

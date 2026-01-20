@@ -49,7 +49,7 @@ IF args is empty or only whitespace:
 3. **Analyze existing tasks**
    - Count tasks where `passes: false` (incomplete tasks)
    - Count tasks in `kanban-progress.json` (tasks with active work)
-   - Separate tasks by status: in-progress (`committed: false`) vs code-review (`passes: true && committed: false`)
+   - Separate tasks by status: in-progress (`passes: false` + entry exists) vs code-review (`passes: true` + `status != "completed"`)
 
 4. **Warn if incomplete work exists**
 
@@ -57,8 +57,8 @@ IF args is empty or only whitespace:
 IF kanban-board.json exists:
   incomplete_count = count tasks where passes == false
   progress_entries = Object.keys(kanban-progress.json)
-  in_progress_count = count entries where committed == false
-  in_review_count = count entries where task.passes == true && committed == false
+  in_progress_count = count entries where task.passes == false && entry exists
+  in_review_count = count entries where task.passes == true && status != "completed"
 
   IF incomplete_count > 0 OR progress_entries.length > 0:
     THEN:
@@ -110,6 +110,7 @@ Each task follows this simplified structure:
 The `steps` array must contain **sequential test steps** that describe the exact flow a tester would follow to verify the feature works. Think of these as manual QA test scripts that Claude can execute in order.
 
 **Good steps** (sequential, actionable):
+
 ```json
 "steps": [
   "Navigate to the login page",
@@ -121,6 +122,7 @@ The `steps` array must contain **sequential test steps** that describe the exact
 ```
 
 **Bad steps** (assertions, not sequential):
+
 ```json
 "steps": [
   "Login works correctly",
@@ -130,6 +132,7 @@ The `steps` array must contain **sequential test steps** that describe the exact
 ```
 
 Each step should be:
+
 1. **Actionable** - Describes a specific action to take
 2. **Sequential** - Builds on the previous step
 3. **Verifiable** - Has a clear pass/fail outcome
@@ -137,17 +140,16 @@ Each step should be:
 
 ## Task Status Logic
 
-Task status is derived from: `passes` field in kanban-board.json, presence in kanban-progress.json, and `committed` field:
+Task status is derived from: `passes` field in kanban-board.json and `status` field in kanban-progress.json:
 
-| passes  | In progress.json | committed | Status          |
-| ------- | ---------------- | --------- | --------------- |
-| `false` | No               | -         | **pending**     |
-| `false` | Yes              | `false`   | **in-progress** |
-| `true`  | Yes              | `false`   | **code-review** |
-| `true`  | Yes              | `true`    | **completed**   |
-| `true`  | No               | -         | **completed**   |
-
-Note: `passes: false` + `committed: true` is an invalid state and should not occur.
+| passes  | In progress.json | status          | Derived Status  |
+| ------- | ---------------- | --------------- | --------------- |
+| `false` | No               | -               | **pending**     |
+| `false` | Yes              | any             | **in-progress** |
+| `false` | Yes              | `blocked`       | **blocked**     |
+| `true`  | Yes              | NOT `completed` | **code-review** |
+| `true`  | Yes              | `completed`     | **completed**   |
+| `true`  | No               | -               | **completed**   |
 
 ## Workflow
 
@@ -207,14 +209,14 @@ Grep: [relevant keywords from feature description]
 
 Break down the feature into these universal categories:
 
-| Category      | Description                                              |
-| ------------- | -------------------------------------------------------- |
-| `data`        | Database schemas, models, data structures                |
-| `api`         | Backend endpoints, services, business logic              |
-| `ui`          | User interface components and styling                    |
-| `integration` | Connecting different parts, third-party services         |
-| `config`      | Configuration, environment, setup                        |
-| `testing`     | Test cases and validation                                |
+| Category      | Description                                      |
+| ------------- | ------------------------------------------------ |
+| `data`        | Database schemas, models, data structures        |
+| `api`         | Backend endpoints, services, business logic      |
+| `ui`          | User interface components and styling            |
+| `integration` | Connecting different parts, third-party services |
+| `config`      | Configuration, environment, setup                |
+| `testing`     | Test cases and validation                        |
 
 ### Step 4: Generate Task List
 
@@ -225,10 +227,7 @@ For each requirement, create a task with this structure:
   "name": "short-task-name",
   "description": "## Task Description\n\nDetailed description in markdown format.\n\n### Implementation Notes\n- Note 1\n- Note 2",
   "category": "data|api|ui|integration|config|testing",
-  "steps": [
-    "Step to verify implementation works",
-    "Another verification step"
-  ],
+  "steps": ["Step to verify implementation works", "Another verification step"],
   "passes": false
 }
 ```
@@ -249,6 +248,7 @@ Use descriptive, kebab-case names:
 The `steps` array must contain **sequential test steps** describing the exact flow to verify the feature. These are like manual QA test scripts:
 
 **For API tasks:**
+
 ```json
 "steps": [
   "Start the development server",
@@ -261,6 +261,7 @@ The `steps` array must contain **sequential test steps** describing the exact fl
 ```
 
 **For UI tasks:**
+
 ```json
 "steps": [
   "Navigate to /profile in the browser",
@@ -302,36 +303,35 @@ Create an empty progress tracker:
 ```
 
 **Structure (keyed by task name):**
+
 ```json
 {
   "user-profile-api": {
+    "status": "running",
+    "startedAt": "2026-01-20T10:00:00.000Z",
     "log": "Created GET endpoint, added auth middleware. Need to add error handling next session.",
-    "committed": false,
     "affectedFiles": [
       "server/api/users/profile.get.ts",
       "server/middleware/auth.ts"
     ],
-    "agents": [
-      "backend-developer",
-      "change-impact-analyzer"
-    ]
+    "agents": ["backend-developer", "change-impact-analyzer"]
   },
   "profile-page-ui": {
+    "status": "completed",
+    "startedAt": "2026-01-20T09:00:00.000Z",
+    "completedAt": "2026-01-20T09:30:00.000Z",
     "log": "Completed Vue page with avatar, name, email display. Edit button opens modal. Ready for review.",
-    "committed": true,
     "affectedFiles": [
       "client/pages/profile.vue",
       "client/components/Avatar.vue"
     ],
-    "agents": [
-      "vue-expert"
-    ]
+    "agents": ["vue-expert"]
   }
 }
 ```
 
+- `status` - Current execution state: `running`, `completed`, `error`, or `blocked`
 - `log` - Narrative of work done, useful for resuming context across sessions
-- `committed` - Whether this work has been committed to git
 - `affectedFiles` - Array of file paths that were created, modified, or deleted during this task
 - `agents` - Array of agent names that worked on this task (in order of invocation)
 

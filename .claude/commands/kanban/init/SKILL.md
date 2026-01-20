@@ -69,17 +69,20 @@ This is an object where keys are task names and values contain progress data:
 ```json
 {
   "task-name": {
+    "status": "running",
+    "startedAt": "2026-01-20T10:00:00.000Z",
     "log": "Narrative of work done, useful for resuming context across sessions",
-    "committed": false,
     "affectedFiles": ["path/to/file1.ts", "path/to/file2.ts"],
     "agents": ["backend-developer", "change-impact-analyzer"]
   }
 }
 ```
 
-Task status is derived from:
-- `passes: true` + `committed: true` in progress.json → completed
-- `passes: true` + `committed: false` in progress.json → code-review
+Task status is derived from `passes` (kanban-board.json) and `status` (kanban-progress.json):
+
+- `passes: true` + `status: "completed"` → completed
+- `passes: true` + `status != "completed"` → code-review
+- `passes: false` + `status: "blocked"` → blocked
 - `passes: false` + entry exists in progress.json → in-progress
 - No entry in progress.json → pending
 
@@ -98,6 +101,7 @@ Use the Edit tool to add this script.
 ## Completion
 
 After completing all steps, report:
+
 - Created `.kanban/` directory
 - Created `.kanban/logs/` directory
 - Created `.kanban/.gitignore`
@@ -107,6 +111,7 @@ After completing all steps, report:
 - Added `kanban` script to package.json
 
 The user can now:
+
 1. Run `/kanban:create <feature description>` to create a kanban board
 2. Run `npm run kanban` to open the kanban board viewer
 3. Run `/kanban:process` to start processing tasks

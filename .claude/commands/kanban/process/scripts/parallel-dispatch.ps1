@@ -197,22 +197,24 @@ function Get-TaskStatus {
 
     if ($Task.passes -eq $true) {
         # Task verification passed
-        if ($entry -and $entry.committed -eq $false) {
-            return "code-review"
+        if ($entry -and $entry.status -eq "completed") {
+            return "completed"
         }
-        return "completed"
+        return "code-review"
     } else {
         # Task verification not yet passed
         if ($entry) {
             # Check the status field in progress entry
             $status = $entry.status
-            if ($status -eq "running") {
+            if ($status -eq "blocked") {
+                return "blocked"
+            } elseif ($status -eq "running") {
                 return "in-progress"
             } elseif ($status -eq "completed" -or $status -eq "error") {
                 # Worker finished but passes is false - likely verification failed
                 return "in-progress"
             }
-            # Legacy entry without status field
+            # Entry without status field
             return "in-progress"
         }
         return "pending"

@@ -28,36 +28,37 @@ This skill orchestrates parallel task execution using a wave-based system:
 
 All kanban files are in the `.kanban/` directory:
 
-| Path | Purpose |
-|------|---------|
-| `.kanban/kanban-board.json` | Task definitions with passes field |
+| Path                           | Purpose                                            |
+| ------------------------------ | -------------------------------------------------- |
+| `.kanban/kanban-board.json`    | Task definitions with passes field                 |
 | `.kanban/kanban-progress.json` | Status tracking, work logs, affected files, agents |
-| `.kanban/logs/` | Worker output logs (created by dispatcher) |
+| `.kanban/logs/`                | Worker output logs (created by dispatcher)         |
 
 ## Task Status Logic
 
-Task status is derived from the `passes` field, progress.json entry `status`, and `committed` field:
+Task status is derived from the `passes` field (kanban-board.json) and `status` field (kanban-progress.json):
 
-| passes | progress.json status | committed | Derived Status |
-|--------|---------------------|-----------|----------------|
-| `false` | (no entry) | - | **pending** |
-| `false` | `running` | - | **in-progress** |
-| `false` | `completed` / `error` | - | **in-progress** |
-| `true` | any | `false` | **code-review** |
-| `true` | any | `true` | **completed** |
-| `true` | (no entry) | - | **completed** |
+| passes  | progress.json status | Derived Status  |
+| ------- | -------------------- | --------------- |
+| `false` | (no entry)           | **pending**     |
+| `false` | `running`            | **in-progress** |
+| `false` | `completed` / `error`| **in-progress** |
+| `false` | `blocked`            | **blocked**     |
+| `true`  | NOT `completed`      | **code-review** |
+| `true`  | `completed`          | **completed**   |
+| `true`  | (no entry)           | **completed**   |
 
 ## Wave System
 
 Tasks are processed in waves based on category dependencies:
 
-| Wave | Categories | Depends On |
-|------|------------|------------|
-| 1 | data, config | None |
-| 2 | api | Wave 1 |
-| 3 | integration | Wave 2 |
-| 4 | ui | Wave 3 |
-| 5 | testing | Wave 4 |
+| Wave | Categories   | Depends On |
+| ---- | ------------ | ---------- |
+| 1    | data, config | None       |
+| 2    | api          | Wave 1     |
+| 3    | integration  | Wave 2     |
+| 4    | ui           | Wave 3     |
+| 5    | testing      | Wave 4     |
 
 Each wave completes before the next begins, ensuring dependent tasks have their prerequisites ready.
 
@@ -65,14 +66,14 @@ Each wave completes before the next begins, ensuring dependent tasks have their 
 
 Workers are assigned agents based on task category:
 
-| Category | Agent |
-|----------|-------|
-| data | backend-developer |
-| config | backend-developer |
-| api | backend-developer |
+| Category    | Agent             |
+| ----------- | ----------------- |
+| data        | backend-developer |
+| config      | backend-developer |
+| api         | backend-developer |
 | integration | backend-developer |
-| ui | vue-expert |
-| testing | backend-developer |
+| ui          | vue-expert        |
+| testing     | backend-developer |
 
 ---
 
@@ -100,6 +101,7 @@ Completed: X
 ```
 
 If no pending tasks remain:
+
 - If code-review tasks exist, direct user to run `kanban:code-review`
 - Otherwise, report completion
 
@@ -113,10 +115,10 @@ powershell -ExecutionPolicy Bypass -File ".claude/commands/kanban/process/script
 
 **Optional Parameters**:
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `-Parallel N` | Maximum concurrent workers | 3 |
-| `-DryRun` | Show what would run without executing | false |
+| Parameter     | Description                           | Default |
+| ------------- | ------------------------------------- | ------- |
+| `-Parallel N` | Maximum concurrent workers            | 3       |
+| `-DryRun`     | Show what would run without executing | false   |
 
 **Examples**:
 
@@ -177,6 +179,7 @@ Each worker is a `claude -p` process that:
 Workers update `kanban-progress.json` entries. The dispatcher monitors these for status:
 
 **Initial Entry** (written immediately when work starts):
+
 ```json
 {
   "task-name": {
@@ -188,6 +191,7 @@ Workers update `kanban-progress.json` entries. The dispatcher monitors these for
 ```
 
 **Final Entry** (written when work completes):
+
 ```json
 {
   "task-name": {
@@ -195,7 +199,6 @@ Workers update `kanban-progress.json` entries. The dispatcher monitors these for
     "startedAt": "2026-01-19T12:00:00.000Z",
     "completedAt": "2026-01-19T12:15:00.000Z",
     "log": "## Work Summary\n\nBrief description...",
-    "committed": false,
     "affectedFiles": ["path/to/file1.ts", "path/to/file2.ts"],
     "agents": ["backend-developer"]
   }
@@ -203,6 +206,7 @@ Workers update `kanban-progress.json` entries. The dispatcher monitors these for
 ```
 
 **Status Values**:
+
 - `running` - Task in progress (set at start)
 - `completed` - All verification steps passed
 - `error` - Execution error occurred (include details in log)
@@ -244,8 +248,8 @@ This skill supports resuming interrupted sessions:
 
 1. **Pending tasks**: No progress entry, will be processed
 2. **In-progress tasks**: Have `status: "running"` entry, treated as pending for retry
-3. **Code-review tasks**: Passed (`passes: true`) but not committed, skip processing
-4. **Completed tasks**: Already committed, skip entirely
+3. **Code-review tasks**: Passed (`passes: true`) but `status != "completed"`, skip processing
+4. **Completed tasks**: Have `passes: true` AND `status: "completed"`, skip entirely
 
 The dispatcher automatically determines which tasks need processing based on current state.
 

@@ -8,7 +8,6 @@
 
 <!-- Paste the article content below this line -->
 
-
 Effective harnesses for long-running agents
 Published Nov 26, 2025
 

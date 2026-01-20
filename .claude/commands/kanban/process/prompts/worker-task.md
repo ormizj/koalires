@@ -81,6 +81,7 @@ This is a **{projectType}** project using Feature-Sliced Design (FSD) architectu
 ```
 
 **Initial Entry Requirements**:
+
 - `status`: Must be `"running"` to signal work has begun
 - `startedAt`: ISO 8601 timestamp when work started
 - `agents`: Array containing the agent name(s) working on this task
@@ -96,27 +97,24 @@ This is a **{projectType}** project using Feature-Sliced Design (FSD) architectu
     "startedAt": "2026-01-19T12:00:00.000Z",
     "completedAt": "2026-01-19T12:15:00.000Z",
     "log": "## Work Summary\n\n<Brief description of what was implemented>\n\n### Changes Made\n- <Bullet point for each change>\n\n### Verification\n<Results of verification steps>",
-    "committed": false,
-    "affectedFiles": [
-      "path/to/file1.ts",
-      "path/to/file2.ts"
-    ],
+    "affectedFiles": ["path/to/file1.ts", "path/to/file2.ts"],
     "agents": ["{agent-name}"]
   }
 }
 ```
 
 **Final Entry Requirements**:
+
 - `status`: Set to `"completed"` on success, `"error"` on failure, `"blocked"` if dependencies not met
 - `startedAt`: Preserve the original start timestamp
 - `completedAt`: ISO 8601 timestamp when work finished
 - `log`: Markdown-formatted summary of work done (use `\n` for newlines in JSON)
-- `committed`: Always set to `false` (commits happen in review phase)
 - `affectedFiles`: Array of all file paths that were created, modified, or deleted
 - `agents`: Array containing the agent name(s) that worked on this task
 
 **⚠️ CRITICAL**: The `affectedFiles` array is **MANDATORY**.
 Every task MUST list ALL files that were:
+
 - Created (new files)
 - Modified (edited existing files)
 - Deleted (removed files)
@@ -125,6 +123,7 @@ Extract file paths from your changes and include them explicitly.
 Empty `affectedFiles: []` is only acceptable if truly no files were touched.
 
 **Status Values**:
+
 - `running` - Task is in progress (set at start)
 - `completed` - Task completed and all verification passed
 - `error` - Task failed due to an error (include error details in log)
@@ -186,6 +185,7 @@ Result: PASS/FAIL - <details>
 ## Agent Guidelines
 
 Follow the project's `CLAUDE.md` for:
+
 - Available agents and their responsibilities
 - Architecture patterns (FSD layers, imports, exports)
 - Code conventions and style
@@ -193,12 +193,12 @@ Follow the project's `CLAUDE.md` for:
 
 **Important**: You are operating as the `{agent-name}` agent. Focus on your domain expertise:
 
-| Agent | Focus Areas |
-|-------|-------------|
-| `backend-developer` | API routes, server logic, database operations, Prisma |
-| `vue-expert` | Vue components, composables, Nuxt pages, Pinia stores |
-| `ui-designer` | Visual design, Tailwind styling, accessibility |
-| `websocket-engineer` | Real-time features, WebSocket connections |
+| Agent                | Focus Areas                                           |
+| -------------------- | ----------------------------------------------------- |
+| `backend-developer`  | API routes, server logic, database operations, Prisma |
+| `vue-expert`         | Vue components, composables, Nuxt pages, Pinia stores |
+| `ui-designer`        | Visual design, Tailwind styling, accessibility        |
+| `websocket-engineer` | Real-time features, WebSocket connections             |
 
 ---
 
@@ -220,7 +220,6 @@ Example error entry in progress.json:
     "startedAt": "2026-01-19T12:00:00.000Z",
     "completedAt": "2026-01-19T12:05:00.000Z",
     "log": "## Error\n\nFailed to complete task due to missing dependency.\n\n### Details\n- Required package `example-lib` not found\n- Attempted to install but npm install failed\n\n### Suggested Fix\nRun `npm install example-lib` manually and retry.",
-    "committed": false,
     "affectedFiles": [],
     "agents": ["{agent-name}"]
   }
@@ -245,7 +244,6 @@ Example blocked entry in progress.json:
     "startedAt": "2026-01-19T12:00:00.000Z",
     "completedAt": "2026-01-19T12:05:00.000Z",
     "log": "## Task Blocked - Dependencies Not Met\n\n### Issue\nCannot complete task because required files don't exist yet.\n\n### Missing Dependencies\n- `path/to/required-file.ts` - required by task `other-task-name`\n\n### Required Tasks\n1. `other-task-name` must be completed first",
-    "committed": false,
     "affectedFiles": [],
     "agents": ["{agent-name}"]
   }

@@ -35,26 +35,31 @@ First, understand the nature of the changes:
 Search systematically for all usages:
 
 1. **Direct imports**: Search for import statements referencing the changed file
+
    ```
    Search pattern: from ['"](.*changed-file-path)['"]|import.*changed-export-name
    ```
 
 2. **Type references**: Find extends, implements, or type references
+
    ```
    Search pattern: extends ChangedType|implements ChangedInterface|: ChangedType
    ```
 
 3. **Component usages**: For Vue components, search for template usage
+
    ```
    Search pattern: <ComponentName|<component-name
    ```
 
 4. **API consumers**: For endpoint changes, find fetch/axios calls to that endpoint
+
    ```
    Search pattern: /api/endpoint-path|useFetch.*endpoint|$fetch.*endpoint
    ```
 
 5. **Store consumers**: For Pinia stores, find useStore calls and state/action references
+
    ```
    Search pattern: useStoreName|storeName\.actionName|storeName\.stateProp
    ```
@@ -78,6 +83,7 @@ Apply FSD architecture rules to determine impact scope:
 ### Step 4: Categorize Findings
 
 **🔴 BREAKING** - Will cause immediate errors:
+
 - Removed exports that are imported elsewhere
 - Required parameters added without defaults
 - Required type properties added
@@ -86,6 +92,7 @@ Apply FSD architecture rules to determine impact scope:
 - TypeScript errors that will block compilation
 
 **🟡 WARNING** - May cause bugs or runtime issues:
+
 - Changed return types that might not match expected usage
 - Optional properties that become required
 - Changed behavior that callers may depend on
@@ -93,6 +100,7 @@ Apply FSD architecture rules to determine impact scope:
 - Deprecated patterns still in use
 
 **🔵 INFO** - Optional updates for consistency:
+
 - New exports available that could be used
 - New optional features
 - Documentation updates needed
@@ -152,6 +160,7 @@ Provide a structured report:
 ## Context Awareness
 
 This project uses:
+
 - **Nuxt 4** with Feature-Sliced Design architecture
 - **client/** as the source directory with FSD layers
 - **server/** for API routes and database operations
