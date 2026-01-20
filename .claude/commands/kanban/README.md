@@ -10,6 +10,10 @@ Task management system for breaking down features into agent-delegated work.
 /kanban:process           # Execute tasks with parallel workers
 /kanban:code-review       # Review and commit completed tasks
 npm run kanban            # Open viewer
+
+# Reference docs
+/kanban:SCHEMA            # Strict schema definitions for all data files
+/kanban:ANTHROPIC_REFERENCE  # Design principles from Anthropic research
 ```
 
 ## Commands
@@ -63,6 +67,8 @@ Reviews completed tasks and creates git commits:
 | `.kanban/kanban-viewer.html`   | Interactive board UI                            |
 | `.kanban/workers/`             | Worker status files (parallel dispatch)         |
 | `.kanban/logs/`                | Worker output logs                              |
+
+For strict schema definitions of all data files, see [SCHEMA.md](./SCHEMA.md).
 
 ## Task Categories
 
