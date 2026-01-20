@@ -2,7 +2,15 @@ import type { Config } from 'tailwindcss';
 
 export default {
   darkMode: 'class',
-  content: ['./app/**/*.{vue,ts}', './components/**/*.{vue,ts}'],
+  content: [
+    './client/app/**/*.{vue,ts}',
+    './client/pages/**/*.{vue,ts}',
+    './client/widgets/**/*.{vue,ts}',
+    './client/features/**/*.{vue,ts}',
+    './client/entities/**/*.{vue,ts}',
+    './client/shared/**/*.{vue,ts}',
+    './client/plugins/**/*.{vue,ts}',
+  ],
   theme: {
     extend: {
       colors: {
