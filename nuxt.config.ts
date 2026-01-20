@@ -11,8 +11,6 @@ export default defineNuxtConfig({
   imports: {
     dirs: [
       'shared/lib',
-      'shared/api/index.ts',
-      'shared/stores/index.ts',
       'shared/config',
       'entities/**/model',
       'entities/**/api',
