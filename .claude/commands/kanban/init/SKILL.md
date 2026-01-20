@@ -31,9 +31,6 @@ Create `.kanban/.gitignore` with content:
 ```gitignore
 # Ignore worker logs
 logs/
-
-# Ignore worker status files
-workers/
 ```
 
 ### 2. Copy Viewer Template (Always Override)
