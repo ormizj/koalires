@@ -14,8 +14,8 @@ This skill orchestrates parallel task execution using a wave-based system:
 
 1. Tasks are grouped into waves by category dependencies
 2. Each wave runs up to N tasks in parallel via `claude -p` workers
-3. Workers self-update kanban files and write status files
-4. The dispatcher monitors status files and reports results
+3. Workers self-update `kanban-progress.json` with status tracking
+4. The dispatcher monitors progress.json entries and reports results
 5. Failed tasks can be retried, skipped, or halt execution
 
 ## Prerequisites
@@ -31,21 +31,21 @@ All kanban files are in the `.kanban/` directory:
 | Path | Purpose |
 |------|---------|
 | `.kanban/kanban-board.json` | Task definitions with passes field |
-| `.kanban/kanban-progress.json` | Work logs, affected files, agents |
-| `.kanban/workers/` | Worker status files (created by workers) |
+| `.kanban/kanban-progress.json` | Status tracking, work logs, affected files, agents |
 | `.kanban/logs/` | Worker output logs (created by dispatcher) |
 
 ## Task Status Logic
 
-Task status is derived from the `passes` field, presence in progress.json, and `committed` field:
+Task status is derived from the `passes` field, progress.json entry `status`, and `committed` field:
 
-| passes | In progress.json | committed | Status |
-|--------|------------------|-----------|--------|
-| `false` | No | - | **pending** |
-| `false` | Yes | `false` | **in-progress** |
-| `true` | Yes | `false` | **code-review** |
-| `true` | Yes | `true` | **completed** |
-| `true` | No | - | **completed** |
+| passes | progress.json status | committed | Derived Status |
+|--------|---------------------|-----------|----------------|
+| `false` | (no entry) | - | **pending** |
+| `false` | `running` | - | **in-progress** |
+| `false` | `completed` / `error` | - | **in-progress** |
+| `true` | any | `false` | **code-review** |
+| `true` | any | `true` | **completed** |
+| `true` | (no entry) | - | **completed** |
 
 ## Wave System
 
@@ -163,35 +163,49 @@ Run 'kanban:code-review' to review and commit completed tasks.
 Each worker is a `claude -p` process that:
 
 1. Receives a task prompt with full context
-2. Implements the task following project patterns
-3. Runs verification steps
-4. Updates kanban files directly:
+2. **Immediately** marks task as "running" in progress.json
+3. Implements the task following project patterns
+4. Runs verification steps
+5. Updates kanban files on completion:
+   - Updates progress.json with `status: "completed"`, log, affected files
    - Sets `passes: true` in kanban-board.json (if verification passes)
-   - Adds entry to kanban-progress.json with log, affected files, agents
-   - Writes status file to `.kanban/workers/{task-name}.status.json`
 
 **Worker Prompt Template**: `.claude/commands/kanban/process/prompts/worker-task.md`
 
-### Status File Format
+### Progress Entry Schema
 
-Workers write status files for the dispatcher to monitor:
+Workers update `kanban-progress.json` entries. The dispatcher monitors these for status:
 
+**Initial Entry** (written immediately when work starts):
 ```json
 {
-  "status": "success",
-  "startedAt": "2026-01-19T12:00:00.000Z",
-  "completedAt": "2026-01-19T12:15:00.000Z",
-  "log": "Brief summary of work done",
-  "affectedFiles": ["path/to/file1.ts", "path/to/file2.ts"],
-  "agents": ["backend-developer"]
+  "task-name": {
+    "status": "running",
+    "startedAt": "2026-01-19T12:00:00.000Z",
+    "agents": ["backend-developer"]
+  }
+}
+```
+
+**Final Entry** (written when work completes):
+```json
+{
+  "task-name": {
+    "status": "completed",
+    "startedAt": "2026-01-19T12:00:00.000Z",
+    "completedAt": "2026-01-19T12:15:00.000Z",
+    "log": "## Work Summary\n\nBrief description...",
+    "committed": false,
+    "affectedFiles": ["path/to/file1.ts", "path/to/file2.ts"],
+    "agents": ["backend-developer"]
+  }
 }
 ```
 
 **Status Values**:
-- `running` - Task in progress
-- `success` - All verification steps passed
-- `failure` - Verification failed
-- `error` - Execution error occurred
+- `running` - Task in progress (set at start)
+- `completed` - All verification steps passed
+- `error` - Execution error occurred (include details in log)
 
 ---
 
@@ -201,16 +215,16 @@ Workers write status files for the dispatcher to monitor:
 
 When a worker reports failure or error:
 
-1. Status file contains error details
+1. Progress entry contains `status: "error"` with details in log field
 2. Full output available in `.kanban/logs/{task-name}.log`
 3. User prompted for action (retry/skip/quit)
 4. Task remains in pending state until successfully completed
 
-### No Status File
+### No Progress Entry
 
-If a worker completes without creating a status file:
+If a worker completes without updating progress.json:
 
-1. Dispatcher creates a default status with `status: "unknown"`
+1. Dispatcher reports task as failed with "No progress entry created"
 2. Check the log file for worker output
 3. Task may need manual investigation
 
@@ -228,9 +242,9 @@ If the PowerShell script fails to start:
 
 This skill supports resuming interrupted sessions:
 
-1. **Pending tasks**: Not started, will be processed
-2. **In-progress tasks**: Have progress entry but `passes: false`, treated as pending for retry
-3. **Code-review tasks**: Passed but not committed, skip processing
+1. **Pending tasks**: No progress entry, will be processed
+2. **In-progress tasks**: Have `status: "running"` entry, treated as pending for retry
+3. **Code-review tasks**: Passed (`passes: true`) but not committed, skip processing
 4. **Completed tasks**: Already committed, skip entirely
 
 The dispatcher automatically determines which tasks need processing based on current state.
@@ -242,7 +256,7 @@ The dispatcher automatically determines which tasks need processing based on cur
 1. **Read** kanban files and calculate task statuses
 2. **Display** progress summary to user
 3. **Run** `parallel-dispatch.ps1` script with optional parameters
-4. **Monitor** worker completion via status files
+4. **Monitor** worker completion via progress.json entries
 5. **Handle** failures with retry/skip/quit options
 6. **Report** final summary when all waves complete
 7. **Direct** user to `kanban:code-review` for commits
@@ -256,4 +270,4 @@ The dispatcher automatically determines which tasks need processing based on cur
 - Each worker has full access to project files and CLAUDE.md context
 - Worker logs are preserved in `.kanban/logs/` for debugging
 - **Workers run with `--dangerously-skip-permissions`** to enable autonomous execution without permission prompts
-- Workers update `kanban-progress.json` (not their own status files) for work tracking
+- `kanban-progress.json` is the single source of truth for worker status tracking

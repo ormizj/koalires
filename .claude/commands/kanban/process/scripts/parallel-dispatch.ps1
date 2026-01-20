@@ -31,7 +31,6 @@ $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Resolve-Path (Join-Path $ScriptDir "../../../../..")
 $KanbanDir = Join-Path $ProjectRoot ".kanban"
-$WorkersDir = Join-Path $KanbanDir "workers"
 $LogsDir = Join-Path $KanbanDir "logs"
 $BoardFile = Join-Path $KanbanDir "kanban-board.json"
 $ProgressFile = Join-Path $KanbanDir "kanban-progress.json"
@@ -197,12 +196,23 @@ function Get-TaskStatus {
     $entry = $Progress[$Task.name]
 
     if ($Task.passes -eq $true) {
+        # Task verification passed
         if ($entry -and $entry.committed -eq $false) {
             return "code-review"
         }
         return "completed"
     } else {
+        # Task verification not yet passed
         if ($entry) {
+            # Check the status field in progress entry
+            $status = $entry.status
+            if ($status -eq "running") {
+                return "in-progress"
+            } elseif ($status -eq "completed" -or $status -eq "error") {
+                # Worker finished but passes is false - likely verification failed
+                return "in-progress"
+            }
+            # Legacy entry without status field
             return "in-progress"
         }
         return "pending"
@@ -235,11 +245,6 @@ function Get-TasksForWave {
 }
 
 function Initialize-Directories {
-    if (-not (Test-Path $WorkersDir)) {
-        New-Item -ItemType Directory -Path $WorkersDir -Force | Out-Null
-        Write-Host "Created workers directory: $WorkersDir" -ForegroundColor Gray
-    }
-
     if (-not (Test-Path $LogsDir)) {
         New-Item -ItemType Directory -Path $LogsDir -Force | Out-Null
         Write-Host "Created logs directory: $LogsDir" -ForegroundColor Gray
@@ -254,54 +259,34 @@ function Start-WorkerJob {
     )
 
     $taskName = $Task.name
-    $statusFile = Join-Path $WorkersDir "$taskName.status.json"
-
-    # Remove any existing status file
-    if (Test-Path $statusFile) {
-        Remove-Item $statusFile -Force
-    }
 
     # Create the job script block
     $jobScript = {
-        param($ProjectRoot, $Prompt, $LogPath, $StatusFile, $TaskName)
+        param($ProjectRoot, $Prompt, $LogPath, $TaskName)
 
         try {
             Set-Location $ProjectRoot
 
             # Run claude -p with permissions skipped for autonomous worker execution
+            # Worker is responsible for updating kanban-progress.json with status
             $output = & claude -p --dangerously-skip-permissions $Prompt 2>&1
 
             # Write output to log file
             $output | Out-File -FilePath $LogPath -Encoding UTF8
-
-            # Check if status file was created by the worker
-            if (-not (Test-Path $StatusFile)) {
-                # Create a default status file if worker didn't create one
-                @{
-                    status = "unknown"
-                    summary = "Worker completed but did not create status file"
-                    taskName = $TaskName
-                } | ConvertTo-Json | Out-File -FilePath $StatusFile -Encoding UTF8
-            }
         }
         catch {
-            # Create error status file
-            @{
-                status = "failure"
-                error = $_.Exception.Message
-                taskName = $TaskName
-            } | ConvertTo-Json | Out-File -FilePath $StatusFile -Encoding UTF8
+            # Log the error
+            "ERROR: $($_.Exception.Message)" | Out-File -FilePath $LogPath -Encoding UTF8 -Append
         }
     }
 
     # Start the background job
-    $job = Start-Job -ScriptBlock $jobScript -ArgumentList $ProjectRoot, $Prompt, $LogPath, $statusFile, $taskName
+    $job = Start-Job -ScriptBlock $jobScript -ArgumentList $ProjectRoot, $Prompt, $LogPath, $taskName
 
     return @{
         Job = $job
         Task = $Task
         LogPath = $LogPath
-        StatusFile = $statusFile
     }
 }
 
@@ -314,30 +299,77 @@ function Wait-WorkerBatch {
     $jobs = $Workers | ForEach-Object { $_.Job }
     $jobs | Wait-Job | Out-Null
 
+    # Re-read progress.json to get worker updates
+    $progressRaw = $null
+    $progress = @{}
+    if (Test-Path $ProgressFile) {
+        try {
+            $progressRaw = Get-Content $ProgressFile -Raw | ConvertFrom-Json
+            if ($progressRaw -and $progressRaw.PSObject.Properties) {
+                foreach ($prop in $progressRaw.PSObject.Properties) {
+                    $progress[$prop.Name] = $prop.Value
+                }
+            }
+        }
+        catch {
+            Write-Host "Warning: Failed to parse progress file" -ForegroundColor Yellow
+        }
+    }
+
     foreach ($worker in $Workers) {
         $task = $worker.Task
-        $statusFile = $worker.StatusFile
         $logPath = $worker.LogPath
+        $taskName = $task.name
 
         # Clean up the job
         Remove-Job -Job $worker.Job -Force
 
-        # Read status file
+        # Check progress.json for task status
         $status = $null
-        if (Test-Path $statusFile) {
-            try {
-                $status = Get-Content $statusFile -Raw | ConvertFrom-Json
-            }
-            catch {
+        $entry = $progress[$taskName]
+
+        if ($entry) {
+            $entryStatus = $entry.status
+            if ($entryStatus -eq "completed") {
                 $status = @{
-                    status = "failure"
-                    error = "Failed to parse status file"
+                    status = "completed"
+                    log = $entry.log
+                    affectedFiles = $entry.affectedFiles
+                    agents = $entry.agents
+                }
+            } elseif ($entryStatus -eq "error") {
+                $status = @{
+                    status = "error"
+                    error = if ($entry.log) { $entry.log } else { "Task failed with error status" }
+                    affectedFiles = $entry.affectedFiles
+                    agents = $entry.agents
+                }
+            } elseif ($entryStatus -eq "running") {
+                # Worker still shows running - job completed but may not have finished updating
+                $status = @{
+                    status = "unknown"
+                    error = "Worker job finished but progress status still shows 'running'"
+                }
+            } else {
+                # Legacy entry without status field - check if it has required fields
+                if ($entry.log -and $entry.affectedFiles) {
+                    $status = @{
+                        status = "completed"
+                        log = $entry.log
+                        affectedFiles = $entry.affectedFiles
+                        agents = $entry.agents
+                    }
+                } else {
+                    $status = @{
+                        status = "unknown"
+                        error = "Progress entry exists but status unclear"
+                    }
                 }
             }
         } else {
             $status = @{
                 status = "failure"
-                error = "No status file created"
+                error = "No progress entry created by worker"
             }
         }
 
@@ -345,7 +377,6 @@ function Wait-WorkerBatch {
             Task = $task
             Status = $status
             LogPath = $logPath
-            StatusFile = $statusFile
         }
     }
 
