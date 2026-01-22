@@ -200,7 +200,8 @@ function Get-TokenUsageFromLog {
             }
         }
 
-        # Extract token usage from parsed objects
+        # Extract context window per turn from assistant entries
+        # Each assistant entry has usage data for that single turn
         foreach ($obj in $objects) {
             try {
                 if ($obj.type -eq "assistant" -and $obj.message -and $obj.message.usage) {
@@ -209,17 +210,9 @@ function Get-TokenUsageFromLog {
                     $outputTokens = [int]($usage.output_tokens)
                     $cacheRead = if ($usage.cache_read_input_tokens) { [int]($usage.cache_read_input_tokens) } else { 0 }
                     $cacheCreate = if ($usage.cache_creation_input_tokens) { [int]($usage.cache_creation_input_tokens) } else { 0 }
-                    $total = $inputTokens + $outputTokens + $cacheRead + $cacheCreate
-                    $tokensArray += $total
-                }
-                if ($obj.type -eq "result" -and $obj.usage) {
-                    $usage = $obj.usage
-                    $inputTokens = [int]($usage.input_tokens)
-                    $outputTokens = [int]($usage.output_tokens)
-                    $cacheRead = if ($usage.cache_read_input_tokens) { [int]($usage.cache_read_input_tokens) } else { 0 }
-                    $cacheCreate = if ($usage.cache_creation_input_tokens) { [int]($usage.cache_creation_input_tokens) } else { 0 }
-                    $total = $inputTokens + $outputTokens + $cacheRead + $cacheCreate
-                    $tokensArray += $total
+                    $turnContext = $inputTokens + $outputTokens + $cacheRead + $cacheCreate
+
+                    $tokensArray += $turnContext
                 }
             }
             catch {
@@ -780,8 +773,8 @@ function Show-BatchResults {
         $taskName = $result.Task.name
         $status = $result.Status
 
-        # Accept both "success" and "completed" as valid success states
-        if ($status.status -eq "success" -or $status.status -eq "completed") {
+        # Accept "success", "completed", and "code-review" as valid success states
+        if ($status.status -eq "success" -or $status.status -eq "completed" -or $status.status -eq "code-review") {
             # Check if there's a critical passes warning
             $hasCriticalPassesWarning = $status.validationWarnings | Where-Object { $_ -like "*passes*" }
 
@@ -900,7 +893,7 @@ function Show-BatchResults {
         FailureCount = $failureCount
         WarningCount = $warningCount
         TotalTokens = $batchTokens
-        FailedTasks = $Results | Where-Object { $_.Status.status -ne "success" -and $_.Status.status -ne "completed" }
+        FailedTasks = $Results | Where-Object { $_.Status.status -ne "success" -and $_.Status.status -ne "completed" -and $_.Status.status -ne "code-review" }
     }
 }
 

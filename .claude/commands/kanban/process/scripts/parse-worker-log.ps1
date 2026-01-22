@@ -149,15 +149,16 @@ foreach ($entry in $logEntries) {
                 }
             }
 
-            # Extract token usage from assistant messages
+            # Extract per-turn token usage (context window at each turn)
             if ($entry.message.usage) {
                 $usage = $entry.message.usage
                 $inputTokens = [int]($usage.input_tokens)
                 $outputTokens = [int]($usage.output_tokens)
                 $cacheRead = if ($usage.cache_read_input_tokens) { [int]($usage.cache_read_input_tokens) } else { 0 }
                 $cacheCreate = if ($usage.cache_creation_input_tokens) { [int]($usage.cache_creation_input_tokens) } else { 0 }
-                $turnTotal = $inputTokens + $outputTokens + $cacheRead + $cacheCreate
-                $tokensUsed += $turnTotal
+                $turnContext = $inputTokens + $outputTokens + $cacheRead + $cacheCreate
+
+                $tokensUsed += $turnContext
             }
 
             # Look for verification step indicators in text content
@@ -186,28 +187,14 @@ foreach ($entry in $logEntries) {
             }
         }
 
-        # Extract final result data
+        # Extract final result data (but NOT tokens - those come from per-turn assistant entries)
         if ($entry.type -eq "result") {
             $isError = $entry.is_error -eq $true
             $subtype = if ($entry.subtype) { $entry.subtype } else { "unknown" }
             $durationMs = if ($entry.duration_ms) { [int]$entry.duration_ms } else { 0 }
             $workSummary = if ($entry.result) { $entry.result } else { "" }
             $totalCost = if ($entry.total_cost_usd) { $entry.total_cost_usd } else { 0 }
-
-            # Also get total usage from result entry
-            if ($entry.usage) {
-                $usage = $entry.usage
-                $inputTokens = [int]($usage.input_tokens)
-                $outputTokens = [int]($usage.output_tokens)
-                $cacheRead = if ($usage.cache_read_input_tokens) { [int]($usage.cache_read_input_tokens) } else { 0 }
-                $cacheCreate = if ($usage.cache_creation_input_tokens) { [int]($usage.cache_creation_input_tokens) } else { 0 }
-                $totalTokens = $inputTokens + $outputTokens + $cacheRead + $cacheCreate
-
-                # Add total as final entry if not already tracked
-                if ($tokensUsed.Count -eq 0 -or $tokensUsed[-1] -ne $totalTokens) {
-                    $tokensUsed += $totalTokens
-                }
-            }
+            # Note: Token extraction now happens in assistant entries above to track peak context per turn
         }
     }
     catch {
@@ -215,6 +202,7 @@ foreach ($entry in $logEntries) {
         continue
     }
 }
+
 
 # Determine status based on result entry
 $status = if ($isError -or $subtype -eq "error") {
