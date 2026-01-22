@@ -42,7 +42,7 @@
             display: flex;
             justify-content: center;
             gap: 1.875rem;
-            margin-top: 0.9375rem;
+            margin-top: 0.25rem;
         }
 
         .stat {
@@ -482,6 +482,33 @@
             border-color: #3fb950;
         }
 
+        .task-steps-collapsed {
+            font-size: 0.75rem;
+            color: #58a6ff;
+            padding: 0.25rem 0;
+            padding-left: 1rem;
+            position: relative;
+        }
+
+        .task-steps-collapsed::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 4px;
+            font-size: 0.9rem;
+            color: #6e7681;
+        }
+
+        /* Hide "N more steps..." when task is expanded */
+        .task.expanded .task-steps-collapsed {
+            display: none;
+        }
+
+        /* Show hidden steps when task is expanded */
+        .task.expanded .task-steps-hidden {
+            display: block !important;
+        }
+
         .task-affected-files {
             margin-top: 0.625rem;
             padding-top: 0.625rem;
@@ -834,7 +861,7 @@
                 </div>
                 <div class="stat stat-blocked">
                     <div class="stat-value" id="stat-blocked">0</div>
-                    <div class="stat-label">Blocked</div>
+                    <div class="stat-label">Hold</div>
                 </div>
                 <div class="stat stat-progress">
                     <div class="stat-value" id="stat-progress">0</div>
@@ -917,7 +944,7 @@
             onclick="handleColumnClick(event, this)"
     >
         <div class="column-header">
-            <span class="column-title">Blocked</span>
+            <span class="column-title">Hold</span>
             <span class="column-count" id="count-blocked">0</span>
             <div class="column-controls">
                 <button
@@ -1373,15 +1400,43 @@
     }
 
     function createTaskCard(task, status, progressEntry) {
-        const stepsHtml =
-            task.steps && task.steps.length > 0
-                ? `
-        <div class="task-steps">
-          <div class="task-steps-label">Verification Steps:</div>
-          ${task.steps.map((s) => `<div class="task-step">${escapeHtml(s)}</div>`).join('')}
-        </div>
-      `
-                : '';
+        const stepsHtml = task.steps && task.steps.length > 0
+            ? (() => {
+                const steps = task.steps;
+                const VISIBLE_FIRST = 4;
+                const SHOW_LAST = 1;
+                const THRESHOLD = VISIBLE_FIRST + SHOW_LAST + 1; // 6 steps to trigger collapse
+
+                if (steps.length <= THRESHOLD) {
+                    // Show all steps if under threshold
+                    return `
+                        <div class="task-steps">
+                            <div class="task-steps-label">Verification Steps:</div>
+                            ${steps.map((s) => `<div class="task-step">${escapeHtml(s)}</div>`).join('')}
+                        </div>
+                    `;
+                }
+
+                // Show first 4, collapsed indicator, last 1
+                const firstSteps = steps.slice(0, VISIBLE_FIRST);
+                const lastStep = steps[steps.length - 1];
+                const hiddenCount = steps.length - VISIBLE_FIRST - SHOW_LAST;
+
+                return `
+                    <div class="task-steps">
+                        <div class="task-steps-label">Verification Steps:</div>
+                        ${firstSteps.map((s) => `<div class="task-step">${escapeHtml(s)}</div>`).join('')}
+                        <div class="task-steps-collapsed">
+                            ${hiddenCount} more step${hiddenCount > 1 ? 's' : ''}...
+                        </div>
+                        <div class="task-steps-hidden" style="display: none;">
+                            ${steps.slice(VISIBLE_FIRST, -SHOW_LAST).map((s) => `<div class="task-step">${escapeHtml(s)}</div>`).join('')}
+                        </div>
+                        <div class="task-step">${escapeHtml(lastStep)}</div>
+                    </div>
+                `;
+            })()
+            : '';
 
         // Handle affectedFiles (new format) or filesCreated/filesModified (old format)
         const affectedFiles = progressEntry?.affectedFiles || [];
@@ -1418,8 +1473,8 @@
             }
         }
 
-        // Handle agents as string (new format) or array (old format)
-        const agentData = progressEntry?.agents;
+        // Handle agent as string (new format) or array (old format for backwards compat)
+        const agentData = progressEntry?.agent;
         let agentsHtml = '';
 
         if (agentData) {
@@ -1661,7 +1716,7 @@
                 ? blocked
                     .map((t) => createTaskCard(t, 'blocked', progressObj[t.name]))
                     .join('')
-                : '<div class="empty-column">No blocked tasks</div>';
+                : '<div class="empty-column">No tasks on hold</div>';
 
         document.getElementById('tasks-progress').innerHTML =
             inProgress.length > 0
