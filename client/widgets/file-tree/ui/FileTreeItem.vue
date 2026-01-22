@@ -23,7 +23,7 @@ const isSelected = computed(() => props.currentFolderId === props.folder.id);
 <template>
   <div>
     <div
-      class="flex items-center gap-1 px-2 py-1.5 hover:bg-surface-secondary rounded cursor-pointer transition-colors"
+      class="flex items-center gap-1 px-2 py-1.5 text-content hover:bg-surface-secondary rounded cursor-pointer transition-colors"
       :class="{ 'bg-primary-soft text-primary': isSelected }"
       :style="{ paddingLeft: `${depth * 16 + 8}px` }"
     >
