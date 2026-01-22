@@ -162,13 +162,16 @@ function Get-TokenUsageFromLog {
     }
 
     try {
-        $lines = Get-Content $JsonLogPath -Raw
-        # Each line is a separate JSON object
-        $jsonLines = $lines -split "`n" | Where-Object { $_.Trim() -ne "" }
+        $content = Get-Content $JsonLogPath -Raw
 
-        foreach ($line in $jsonLines) {
+        # Parse JSON - could be array or JSON-Lines format
+        $parsed = $content | ConvertFrom-Json
+
+        # Normalize to array for iteration
+        $objects = if ($parsed -is [array]) { $parsed } else { @($parsed) }
+
+        foreach ($obj in $objects) {
             try {
-                $obj = $line | ConvertFrom-Json
                 # Look for "type": "assistant" messages with usage data
                 if ($obj.type -eq "assistant" -and $obj.message -and $obj.message.usage) {
                     $usage = $obj.message.usage
@@ -177,7 +180,6 @@ function Get-TokenUsageFromLog {
                     $cacheRead = if ($usage.cache_read_input_tokens) { [int]($usage.cache_read_input_tokens) } else { 0 }
                     $cacheCreate = if ($usage.cache_creation_input_tokens) { [int]($usage.cache_creation_input_tokens) } else { 0 }
 
-                    # Total cumulative tokens = input + output + cache tokens
                     $total = $inputTokens + $outputTokens + $cacheRead + $cacheCreate
                     $tokensArray += $total
                 }
@@ -194,7 +196,7 @@ function Get-TokenUsageFromLog {
                 }
             }
             catch {
-                # Skip malformed JSON lines
+                # Skip malformed entries
             }
         }
     }
