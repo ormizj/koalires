@@ -29,7 +29,8 @@
       "Bash(ls -la \"C:\\\\Users\\\\orm\\\\Desktop\\\\Files\\\\My Projects\\\\koalires\\\\.claude\\\\skills\"\" 2>/dev/null || echo \"Directory not found \")",
       "Bash(test:*)",
       "Bash(powershell:*)",
-      "Bash(npm run typecheck:*)"
+      "Bash(npm run typecheck:*)",
+      "Bash(npx nuxi prepare)"
     ]
   }
 }

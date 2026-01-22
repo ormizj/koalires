@@ -25,3 +25,5 @@ logs
 !.env.example
 *.local
 /generated/prisma
+/database/koalires.db-shm
+/database/koalires.db-wal

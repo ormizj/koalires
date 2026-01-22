@@ -101,6 +101,7 @@ interface ProgressEntry {
   completedAt?: string; // OPTIONAL - ISO 8601 timestamp when work finished
   workLog?: string[]; // OPTIONAL - Array of work log entries
   affectedFiles?: string[]; // OPTIONAL - File paths created/modified/deleted
+  tokensUsed?: number[]; // OPTIONAL - Cumulative token count per API turn
 }
 
 type TaskStatus = 'running' | 'completed' | 'error' | 'blocked';
@@ -132,7 +133,8 @@ type TaskStatus = 'running' | 'completed' | 'error' | 'blocked';
       "Verified all verification steps pass"
     ],
     "affectedFiles": ["path/to/file1.ts", "path/to/file2.ts"],
-    "agents": ["backend-developer"]
+    "agents": ["backend-developer"],
+    "tokensUsed": [5000, 18000, 32000, 45000]
   }
 }
 ```
@@ -183,6 +185,9 @@ type TaskStatus = 'running' | 'completed' | 'error' | 'blocked';
 | `completedAt`   | string   | No\*     | ISO 8601 format, set when status != `running`      |
 | `workLog`       | string[] | No\*     | Array of work log entry strings                    |
 | `affectedFiles` | array    | No\*     | Relative file paths from project root              |
+| `tokensUsed`    | number[] | No       | Cumulative token count per API turn                |
+
+**Token Usage Tracking**: The `tokensUsed` field contains an array of cumulative token counts after each API turn during task execution. The final element represents the total tokens used for the task. This data is populated by the dispatcher after worker completion and includes input tokens, output tokens, and cache tokens. The token limit is 200,000 (context window).
 
 **\*Worker Protocol Requirements**: While these fields are technically optional in the JSON schema, the worker protocol expects them to be populated:
 

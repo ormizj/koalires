@@ -4,17 +4,21 @@ import type { User } from '~/entities/user';
 interface AuthState {
   user: User | null;
   jwt: string;
+  _initialized: boolean;
 }
 
 export const useAuthStore = defineStore('auth', {
   state: (): AuthState => ({
     user: null,
     jwt: '',
+    _initialized: false,
   }),
 
   getters: {
     isAuthenticated: (state) => !!state.jwt,
     token: (state) => state.jwt, // backward compatibility alias
+    // Show header before init (prevents SSR flash) or when authenticated
+    shouldShowHeader: (state) => !state._initialized || !!state.jwt,
   },
 
   actions: {
@@ -77,7 +81,7 @@ export const useAuthStore = defineStore('auth', {
       localStorage.removeItem('userId');
     },
 
-    async _init() {
+    _initSync() {
       // Migrate legacy 'token' key to 'jwt'
       const legacyToken = localStorage.getItem('token');
       if (legacyToken && !localStorage.getItem('jwt')) {
@@ -88,14 +92,16 @@ export const useAuthStore = defineStore('auth', {
       this.jwt = localStorage.getItem('jwt') ?? '';
       const userJson = localStorage.getItem('user');
       this.user = userJson ? JSON.parse(userJson) : null;
+      this._initialized = true;
+    },
 
+    async _validateAuth() {
       if (!this.jwt) return;
 
       try {
         const res = await $fetch<{ userId: number; email: string }>(
           '/api/auth/jwt-data'
         );
-        // Fix: compare emails case-insensitively
         if (res.email.toLowerCase() !== this.user?.email?.toLowerCase()) {
           this._clearAuth();
         }

@@ -4,7 +4,8 @@ import { useAuthStore } from '~/shared/stores';
 export function useAuth() {
   const router = useRouter();
   const authStore = useAuthStore();
-  const { user, token, isAuthenticated } = storeToRefs(authStore);
+  const { user, token, isAuthenticated, shouldShowHeader } =
+    storeToRefs(authStore);
 
   async function login(email: string, password: string) {
     await authStore.login(email, password);
@@ -30,6 +31,7 @@ export function useAuth() {
     user,
     token,
     isAuthenticated,
+    shouldShowHeader,
     initFromStorage,
     login,
     register,

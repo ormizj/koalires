@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { RegisterForm } from '~/features/auth';
 import { ThemeToggle } from '~/features/theme';
+
+definePageMeta({ layout: false });
 </script>
 
 <template>

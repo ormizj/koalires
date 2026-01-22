@@ -152,6 +152,80 @@ function Get-AgentForCategory {
     return "backend-developer"  # Default fallback
 }
 
+function Get-TokenUsageFromLog {
+    param([string]$JsonLogPath)
+
+    $tokensArray = @()
+
+    if (-not (Test-Path $JsonLogPath)) {
+        return $tokensArray
+    }
+
+    try {
+        $lines = Get-Content $JsonLogPath -Raw
+        # Each line is a separate JSON object
+        $jsonLines = $lines -split "`n" | Where-Object { $_.Trim() -ne "" }
+
+        foreach ($line in $jsonLines) {
+            try {
+                $obj = $line | ConvertFrom-Json
+                # Look for "type": "assistant" messages with usage data
+                if ($obj.type -eq "assistant" -and $obj.message -and $obj.message.usage) {
+                    $usage = $obj.message.usage
+                    $inputTokens = [int]($usage.input_tokens)
+                    $outputTokens = [int]($usage.output_tokens)
+                    $cacheRead = if ($usage.cache_read_input_tokens) { [int]($usage.cache_read_input_tokens) } else { 0 }
+                    $cacheCreate = if ($usage.cache_creation_input_tokens) { [int]($usage.cache_creation_input_tokens) } else { 0 }
+
+                    # Total cumulative tokens = input + output + cache tokens
+                    $total = $inputTokens + $outputTokens + $cacheRead + $cacheCreate
+                    $tokensArray += $total
+                }
+                # Also check the final "result" message
+                if ($obj.type -eq "result" -and $obj.usage) {
+                    $usage = $obj.usage
+                    $inputTokens = [int]($usage.input_tokens)
+                    $outputTokens = [int]($usage.output_tokens)
+                    $cacheRead = if ($usage.cache_read_input_tokens) { [int]($usage.cache_read_input_tokens) } else { 0 }
+                    $cacheCreate = if ($usage.cache_creation_input_tokens) { [int]($usage.cache_creation_input_tokens) } else { 0 }
+
+                    $total = $inputTokens + $outputTokens + $cacheRead + $cacheCreate
+                    $tokensArray += $total
+                }
+            }
+            catch {
+                # Skip malformed JSON lines
+            }
+        }
+    }
+    catch {
+        # Return empty array on error
+    }
+
+    return $tokensArray
+}
+
+function Update-ProgressWithTokens {
+    param(
+        [string]$TaskName,
+        [array]$TokensUsed,
+        [string]$ProgressFilePath
+    )
+
+    if ($TokensUsed.Count -eq 0) { return }
+
+    try {
+        $progressContent = Get-Content $ProgressFilePath -Raw | ConvertFrom-Json
+        if ($progressContent.$TaskName) {
+            $progressContent.$TaskName | Add-Member -NotePropertyName "tokensUsed" -NotePropertyValue $TokensUsed -Force
+            $progressContent | ConvertTo-Json -Depth 10 | Set-Content $ProgressFilePath -Encoding UTF8
+        }
+    }
+    catch {
+        Write-Host "Warning: Could not update progress with token data" -ForegroundColor Yellow
+    }
+}
+
 function Build-WorkerPrompt {
     param(
         [object]$Task,
@@ -327,38 +401,45 @@ function Start-WorkerJob {
     param(
         [object]$Task,
         [string]$Prompt,
-        [string]$LogPath
+        [string]$LogPath,
+        [string]$JsonLogPath
     )
 
     $taskName = $Task.name
 
     # Create the job script block
     $jobScript = {
-        param($ProjectRoot, $Prompt, $LogPath, $TaskName)
+        param($ProjectRoot, $Prompt, $LogPath, $JsonLogPath, $TaskName)
 
         try {
             Set-Location $ProjectRoot
 
             # Run claude -p with permissions skipped for autonomous worker execution
             # Worker is responsible for updating kanban-progress.json with status
-            $output = & claude -p --dangerously-skip-permissions $Prompt 2>&1
+            # Use --output-format json to capture token usage data
+            $output = & claude -p --dangerously-skip-permissions --output-format json $Prompt 2>&1
 
-            # Write output to log file
+            # Write JSON output to json log file for token tracking
+            $output | Out-File -FilePath $JsonLogPath -Encoding UTF8
+
+            # Also write human-readable version to regular log
             $output | Out-File -FilePath $LogPath -Encoding UTF8
         }
         catch {
             # Log the error
             "ERROR: $($_.Exception.Message)" | Out-File -FilePath $LogPath -Encoding UTF8 -Append
+            "ERROR: $($_.Exception.Message)" | Out-File -FilePath $JsonLogPath -Encoding UTF8 -Append
         }
     }
 
     # Start the background job
-    $job = Start-Job -ScriptBlock $jobScript -ArgumentList $ProjectRoot, $Prompt, $LogPath, $taskName
+    $job = Start-Job -ScriptBlock $jobScript -ArgumentList $ProjectRoot, $Prompt, $LogPath, $JsonLogPath, $taskName
 
     return @{
         Job = $job
         Task = $Task
         LogPath = $LogPath
+        JsonLogPath = $JsonLogPath
     }
 }
 
@@ -490,10 +571,18 @@ function Wait-WorkerBatch {
             }
         }
 
+        # Extract token usage from JSON log
+        $jsonLogPath = $worker.JsonLogPath
+        $tokensUsed = Get-TokenUsageFromLog -JsonLogPath $jsonLogPath
+        $finalTokens = if ($tokensUsed.Count -gt 0) { $tokensUsed[-1] } else { 0 }
+
         $results += @{
             Task = $task
             Status = $status
             LogPath = $logPath
+            JsonLogPath = $jsonLogPath
+            TokensUsed = $tokensUsed
+            FinalTokens = $finalTokens
         }
     }
 
@@ -533,6 +622,14 @@ function Show-BatchResults {
             }
             $successCount++
 
+            # Display token usage for successful tasks
+            if ($result.FinalTokens -gt 0) {
+                $tokenLimit = 200000
+                $percentage = [math]::Round(($result.FinalTokens / $tokenLimit) * 100, 1)
+                $tokenDisplay = "{0:N0}" -f $result.FinalTokens
+                Write-Host "       Tokens: $tokenDisplay / 200,000 ($percentage%)" -ForegroundColor DarkGray
+            }
+
             # Display validation warnings for successful tasks
             if ($status.validationWarnings -and $status.validationWarnings.Count -gt 0) {
                 $warningCount += $status.validationWarnings.Count
@@ -548,6 +645,14 @@ function Show-BatchResults {
                 Write-Host "       Reason: $($status.error)" -ForegroundColor Magenta
             }
             Write-Host "       Log: $($result.LogPath)" -ForegroundColor DarkGray
+
+            # Display token usage for blocked tasks
+            if ($result.FinalTokens -gt 0) {
+                $tokenLimit = 200000
+                $percentage = [math]::Round(($result.FinalTokens / $tokenLimit) * 100, 1)
+                $tokenDisplay = "{0:N0}" -f $result.FinalTokens
+                Write-Host "       Tokens: $tokenDisplay / 200,000 ($percentage%)" -ForegroundColor DarkGray
+            }
 
             # Display validation warnings for blocked tasks
             if ($status.validationWarnings -and $status.validationWarnings.Count -gt 0) {
@@ -566,6 +671,14 @@ function Show-BatchResults {
             }
             Write-Host "       Log: $($result.LogPath)" -ForegroundColor DarkGray
 
+            # Display token usage for failed tasks
+            if ($result.FinalTokens -gt 0) {
+                $tokenLimit = 200000
+                $percentage = [math]::Round(($result.FinalTokens / $tokenLimit) * 100, 1)
+                $tokenDisplay = "{0:N0}" -f $result.FinalTokens
+                Write-Host "       Tokens: $tokenDisplay / 200,000 ($percentage%)" -ForegroundColor DarkGray
+            }
+
             # Display validation warnings for failed tasks
             if ($status.validationWarnings -and $status.validationWarnings.Count -gt 0) {
                 $warningCount += $status.validationWarnings.Count
@@ -578,6 +691,10 @@ function Show-BatchResults {
         }
     }
 
+    # Calculate batch token total
+    $batchTokens = ($Results | Measure-Object -Property FinalTokens -Sum).Sum
+    if (-not $batchTokens) { $batchTokens = 0 }
+
     Write-Host ""
     Write-Host "Batch Summary: " -NoNewline
     Write-Host "$successCount passed" -ForegroundColor Green -NoNewline
@@ -585,7 +702,13 @@ function Show-BatchResults {
     Write-Host "$failureCount failed" -ForegroundColor Red -NoNewline
     if ($warningCount -gt 0) {
         Write-Host ", " -NoNewline
-        Write-Host "$warningCount validation warnings" -ForegroundColor Yellow
+        Write-Host "$warningCount validation warnings" -ForegroundColor Yellow -NoNewline
+    }
+
+    if ($batchTokens -gt 0) {
+        $batchTokenDisplay = "{0:N0}" -f $batchTokens
+        Write-Host ""
+        Write-Host "Batch Total: $batchTokenDisplay tokens across $($Results.Count) tasks" -ForegroundColor Cyan
     } else {
         Write-Host ""
     }
@@ -594,6 +717,7 @@ function Show-BatchResults {
         SuccessCount = $successCount
         FailureCount = $failureCount
         WarningCount = $warningCount
+        TotalTokens = $batchTokens
         FailedTasks = $Results | Where-Object { $_.Status.status -ne "success" -and $_.Status.status -ne "completed" }
     }
 }
@@ -712,6 +836,8 @@ function Main {
     # Process waves
     $totalSuccess = 0
     $totalFailure = 0
+    $totalTokens = 0
+    $taskTokens = @{}
 
     foreach ($waveNum in 1..5) {
         $waveTasks = Get-TasksForWave -Tasks $board.tasks -Progress $progress -WaveNumber $waveNum
@@ -756,10 +882,11 @@ function Main {
             foreach ($task in $batch) {
                 $prompt = Build-WorkerPrompt -Task $task -Board $board -TemplatePath $PromptTemplate
                 $logPath = Join-Path $LogsDir "$($task.name).log"
+                $jsonLogPath = Join-Path $LogsDir "$($task.name).json"
 
                 Write-Host "Starting worker for: $($task.name)" -ForegroundColor Cyan
 
-                $worker = Start-WorkerJob -Task $task -Prompt $prompt -LogPath $logPath
+                $worker = Start-WorkerJob -Task $task -Prompt $prompt -LogPath $logPath -JsonLogPath $jsonLogPath
                 $workers += $worker
             }
 
@@ -773,6 +900,19 @@ function Main {
             $summary = Show-BatchResults -Results $results
             $totalSuccess += $summary.SuccessCount
             $totalFailure += $summary.FailureCount
+            $totalTokens += $summary.TotalTokens
+
+            # Track individual task tokens and update progress file with token data
+            foreach ($result in $results) {
+                $taskName = $result.Task.name
+                if ($result.FinalTokens -gt 0) {
+                    $taskTokens[$taskName] = $result.FinalTokens
+                }
+                # Update progress file with token data
+                if ($result.TokensUsed.Count -gt 0) {
+                    Update-ProgressWithTokens -TaskName $taskName -TokensUsed $result.TokensUsed -ProgressFilePath $ProgressFile
+                }
+            }
 
             # Handle failures
             if ($summary.FailureCount -gt 0) {
@@ -794,6 +934,32 @@ function Main {
 
     # Final summary
     Write-Header "EXECUTION COMPLETE"
+
+    # Token usage summary
+    if ($totalTokens -gt 0) {
+        Write-Host ""
+        Write-Host ("=" * 47) -ForegroundColor Cyan
+        Write-Host "              TOKEN USAGE SUMMARY" -ForegroundColor Cyan
+        Write-Host ("=" * 47) -ForegroundColor Cyan
+        $totalTokenDisplay = "{0:N0}" -f $totalTokens
+        $completedTasks = $totalSuccess + $totalFailure
+        $avgTokens = if ($completedTasks -gt 0) { [math]::Round($totalTokens / $completedTasks) } else { 0 }
+        $avgTokenDisplay = "{0:N0}" -f $avgTokens
+
+        Write-Host "Total Tokens Used:  $totalTokenDisplay" -ForegroundColor White
+        Write-Host "Tasks Completed:    $completedTasks" -ForegroundColor White
+        Write-Host "Average per Task:   $avgTokenDisplay" -ForegroundColor White
+
+        # Find highest token usage task
+        if ($taskTokens.Count -gt 0) {
+            $highestTask = $taskTokens.GetEnumerator() | Sort-Object Value -Descending | Select-Object -First 1
+            $highestTokenDisplay = "{0:N0}" -f $highestTask.Value
+            Write-Host "Highest Usage:      $($highestTask.Key) ($highestTokenDisplay)" -ForegroundColor White
+        }
+        Write-Host ("=" * 47) -ForegroundColor Cyan
+    }
+
+    Write-Host ""
     Write-Host "Total Passed:  $totalSuccess" -ForegroundColor Green
     Write-Host "Total Failed:  $totalFailure" -ForegroundColor Red
     Write-Host ""

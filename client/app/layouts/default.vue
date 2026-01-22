@@ -2,12 +2,12 @@
 import { useAuth } from '~/features/auth';
 import { AppHeader } from '~/widgets/app-header';
 
-const { isAuthenticated } = useAuth();
+const { shouldShowHeader } = useAuth();
 </script>
 
 <template>
   <div class="min-h-screen bg-surface-secondary flex flex-col">
-    <AppHeader v-if="isAuthenticated" />
+    <AppHeader v-if="shouldShowHeader" />
     <main class="flex-1">
       <slot />
     </main>
