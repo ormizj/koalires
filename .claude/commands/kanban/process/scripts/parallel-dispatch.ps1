@@ -74,8 +74,8 @@ function Test-ProgressEntry {
     if (-not $Entry.startedAt) {
         $warnings += "Missing 'startedAt' field"
     }
-    if (-not $Entry.agents -or $Entry.agents.Count -eq 0) {
-        $warnings += "Missing or empty 'agents' field"
+    if (-not $Entry.agent) {
+        $warnings += "Missing 'agent' field"
     }
 
     # For completed entries, check additional fields
@@ -347,7 +347,7 @@ function Set-TaskRunning {
         $runningEntry = @{
             status = "running"
             startedAt = $startedAt
-            agents = @($AgentName)
+            agent = $AgentName
         }
 
         $progressContent | Add-Member -NotePropertyName $TaskName -NotePropertyValue ([PSCustomObject]$runningEntry) -Force
@@ -479,7 +479,7 @@ On Success:
   "status": "success",
   "log": "Brief description of what was done",
   "affectedFiles": ["path/to/file1.ts", "path/to/file2.ts"],
-  "agents": ["{agent-name}"]
+  "agent": "{agent-name}"
 }
 ``
 
@@ -489,7 +489,7 @@ On Failure:
   "status": "failure",
   "error": "Description of what went wrong",
   "affectedFiles": [],
-  "agents": ["{agent-name}"]
+  "agent": "{agent-name}"
 }
 ``
 "@

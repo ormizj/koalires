@@ -305,10 +305,10 @@ On approve, set `status: "completed"`:
 ```json
 {
   "task-name": {
-    "status": "completed",  // Updated from "running" or other
+    "status": "completed",  // Updated from "code-review" to "completed"
     "log": "...",
     "affectedFiles": [...],
-    "agents": [...]
+    "agent": "..."
   }
 }
 ```

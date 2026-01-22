@@ -84,6 +84,32 @@ IF kanban-board.json exists:
         - STOP execution - do not proceed further
 ```
 
+## Logs Directory Clearing
+
+Before creating a new kanban board, offer to clear the existing logs directory to start fresh.
+
+### Check Steps
+
+1. **Check if `.kanban/logs/` directory exists and has files**
+   - Use Glob to check for `.kanban/logs/*`
+   - If directory is empty or doesn't exist → skip this section
+   - If files exist → continue to step 2
+
+2. **Prompt user for clearing**
+   - Use AskUserQuestion tool:
+     - Question: "Clear existing logs directory before creating new board?"
+     - Options:
+       - "Yes, clear logs" - Delete all files in `.kanban/logs/`
+       - "No, keep logs" - Preserve existing log files
+
+3. **Execute clearing if requested**
+   - If user selects "Yes, clear logs":
+     - Delete all files in `.kanban/logs/` directory
+     - Keep the directory itself
+     - Output: "Cleared .kanban/logs/ directory"
+   - If user selects "No, keep logs":
+     - Output: "Preserving existing log files"
+
 ## Output Files
 
 All kanban files are stored in the `.kanban/` directory:
@@ -314,10 +340,10 @@ Create an empty progress tracker:
       "server/api/users/profile.get.ts",
       "server/middleware/auth.ts"
     ],
-    "agents": ["backend-developer", "change-impact-analyzer"]
+    "agent": "backend-developer"
   },
   "profile-page-ui": {
-    "status": "completed",
+    "status": "code-review",
     "startedAt": "2026-01-20T09:00:00.000Z",
     "completedAt": "2026-01-20T09:30:00.000Z",
     "log": "Completed Vue page with avatar, name, email display. Edit button opens modal. Ready for review.",
@@ -325,15 +351,15 @@ Create an empty progress tracker:
       "client/pages/profile.vue",
       "client/components/Avatar.vue"
     ],
-    "agents": ["vue-expert"]
+    "agent": "vue-expert"
   }
 }
 ```
 
-- `status` - Current execution state: `running`, `completed`, `error`, or `blocked`
+- `status` - Current execution state: `running`, `code-review`, `completed`, `error`, or `blocked`
 - `log` - Narrative of work done, useful for resuming context across sessions
 - `affectedFiles` - Array of file paths that were created, modified, or deleted during this task
-- `agents` - Array of agent names that worked on this task (in order of invocation)
+- `agent` - Agent name that worked on this task
 
 The log field serves as a narrative history that helps agents understand context when resuming work (following Anthropic's "claude-progress.txt" pattern for cross-session context).
 

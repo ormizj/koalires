@@ -130,7 +130,7 @@ catch {
 
 # Map worker output status to progress status
 $progressStatus = switch ($outputContent.status) {
-    "success" { "completed" }
+    "success" { "code-review" }
     "error" { "error" }
     "blocked" { "blocked" }
     default { "error" }
@@ -141,7 +141,7 @@ $progressEntry = @{
     status = $progressStatus
     startedAt = if ($outputContent.startedAt) { $outputContent.startedAt } else { (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }
     completedAt = if ($outputContent.completedAt) { $outputContent.completedAt } else { (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }
-    agents = if ($outputContent.agent) { @($outputContent.agent) } else { @("unknown") }
+    agent = if ($outputContent.agent) { $outputContent.agent } else { "unknown" }
 }
 
 # Add workLog from output

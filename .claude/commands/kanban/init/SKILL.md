@@ -24,15 +24,6 @@ mkdir -p .kanban
 mkdir -p .kanban/logs
 ```
 
-### 1.6. Create .gitignore
-
-Create `.kanban/.gitignore` with content:
-
-```gitignore
-# Ignore worker logs
-logs/
-```
-
 ### 2. Copy Viewer Template (Always Override)
 
 Read the template file from this skill directory and write it to the project:
@@ -73,7 +64,7 @@ This is an object where keys are task names and values contain progress data:
     "startedAt": "2026-01-20T10:00:00.000Z",
     "log": "Narrative of work done, useful for resuming context across sessions",
     "affectedFiles": ["path/to/file1.ts", "path/to/file2.ts"],
-    "agents": ["backend-developer", "change-impact-analyzer"]
+    "agent": "backend-developer"
   }
 }
 ```
@@ -104,7 +95,6 @@ After completing all steps, report:
 
 - Created `.kanban/` directory
 - Created `.kanban/logs/` directory
-- Created `.kanban/.gitignore`
 - Created `.kanban/kanban-viewer.html`
 - Created `.kanban/kanban-board.json`
 - Created `.kanban/kanban-progress.json`

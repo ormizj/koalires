@@ -11,7 +11,6 @@ Strict, unambiguous schema definitions for all kanban data files. No interpolati
 | `.kanban/kanban-board.json`    | Task definitions with passes field         | Yes                |
 | `.kanban/kanban-progress.json` | Status tracking, work logs, affected files | Yes                |
 | `.kanban/kanban-viewer.html`   | Interactive viewer UI                      | Yes                |
-| `.kanban/.gitignore`           | Ignores logs/ directory                    | Optional           |
 | `.kanban/logs/`                | Worker output logs (runtime)               | Created at runtime |
 | `.kanban/logs/{task-name}.json` | Claude session log for token tracking      | Created at runtime |
 | `.kanban/logs/{task-name}-output.json` | Worker output file with results   | Created by worker  |
@@ -98,14 +97,14 @@ interface KanbanProgress {
 interface ProgressEntry {
   status: TaskStatus; // REQUIRED - Current execution state
   startedAt: string; // REQUIRED - ISO 8601 timestamp when work began
-  agents: string[]; // REQUIRED - Agent names that worked on task
+  agent: string; // REQUIRED - Agent name that worked on task
   completedAt?: string; // OPTIONAL - ISO 8601 timestamp when work finished
   workLog?: string[]; // OPTIONAL - Array of work log entries
   affectedFiles?: string[]; // OPTIONAL - File paths created/modified/deleted
   tokensUsed?: number[]; // OPTIONAL - Cumulative token count per API turn
 }
 
-type TaskStatus = 'running' | 'completed' | 'error' | 'blocked';
+type TaskStatus = 'running' | 'code-review' | 'completed' | 'error' | 'blocked';
 ```
 
 ### Initial Entry (Written at Task Start)
@@ -115,7 +114,7 @@ type TaskStatus = 'running' | 'completed' | 'error' | 'blocked';
   "task-name": {
     "status": "running",
     "startedAt": "2026-01-20T10:00:00.000Z",
-    "agents": ["backend-developer"]
+    "agent": "backend-developer"
   }
 }
 ```
@@ -125,7 +124,7 @@ type TaskStatus = 'running' | 'completed' | 'error' | 'blocked';
 ```json
 {
   "task-name": {
-    "status": "completed",
+    "status": "code-review",
     "startedAt": "2026-01-20T10:00:00.000Z",
     "completedAt": "2026-01-20T10:15:00.000Z",
     "workLog": [
@@ -134,7 +133,7 @@ type TaskStatus = 'running' | 'completed' | 'error' | 'blocked';
       "Verified all verification steps pass"
     ],
     "affectedFiles": ["path/to/file1.ts", "path/to/file2.ts"],
-    "agents": ["backend-developer"],
+    "agent": "backend-developer",
     "tokensUsed": [5000, 18000, 32000, 45000]
   }
 }
@@ -153,7 +152,7 @@ type TaskStatus = 'running' | 'completed' | 'error' | 'blocked';
       "Suggested fix: Install required package first"
     ],
     "affectedFiles": [],
-    "agents": ["backend-developer"]
+    "agent": "backend-developer"
   }
 }
 ```
@@ -171,22 +170,22 @@ type TaskStatus = 'running' | 'completed' | 'error' | 'blocked';
       "Missing: required-task-name"
     ],
     "affectedFiles": [],
-    "agents": ["backend-developer"]
+    "agent": "backend-developer"
   }
 }
 ```
 
 ### Field Constraints
 
-| Field           | Type     | Required | Constraints                                        |
-| --------------- | -------- | -------- | -------------------------------------------------- |
-| `status`        | enum     | Yes      | One of: `running`, `completed`, `error`, `blocked` |
-| `startedAt`     | string   | Yes      | ISO 8601 format with milliseconds                  |
-| `agents`        | array    | Yes      | At least 1 agent name string                       |
-| `completedAt`   | string   | No\*     | ISO 8601 format, set when status != `running`      |
-| `workLog`       | string[] | No\*     | Array of work log entry strings                    |
-| `affectedFiles` | array    | No\*     | Relative file paths from project root              |
-| `tokensUsed`    | number[] | No       | Cumulative token count per API turn                |
+| Field           | Type     | Required | Constraints                                                          |
+| --------------- | -------- | -------- | -------------------------------------------------------------------- |
+| `status`        | enum     | Yes      | One of: `running`, `code-review`, `completed`, `error`, `blocked`    |
+| `startedAt`     | string   | Yes      | ISO 8601 format with milliseconds                                    |
+| `agent`         | string   | Yes      | Agent name string                                                    |
+| `completedAt`   | string   | No\*     | ISO 8601 format, set when status != `running`                        |
+| `workLog`       | string[] | No\*     | Array of work log entry strings                                      |
+| `affectedFiles` | array    | No\*     | Relative file paths from project root                                |
+| `tokensUsed`    | number[] | No       | Cumulative token count per API turn                                  |
 
 **Token Usage Tracking**: The `tokensUsed` field contains an array of cumulative token counts after each API turn during task execution. The final element represents the total tokens used for the task. This data is populated by the dispatcher after worker completion and includes input tokens, output tokens, and cache tokens. The token limit is 200,000 (context window).
 
@@ -213,12 +212,13 @@ type TaskStatus = 'running' | 'completed' | 'error' | 'blocked';
 
 ### TaskStatus
 
-| Value       | Description                               |
-| ----------- | ----------------------------------------- |
-| `running`   | Task execution in progress                |
-| `completed` | Task finished, all verification passed    |
-| `error`     | Task failed due to an error               |
-| `blocked`   | Task cannot proceed, dependencies not met |
+| Value         | Description                                          |
+| ------------- | ---------------------------------------------------- |
+| `running`     | Task execution in progress                           |
+| `code-review` | Task finished, verification passed, awaiting commit  |
+| `completed`   | Task finished and committed                          |
+| `error`       | Task failed due to an error                          |
+| `blocked`     | Task cannot proceed, dependencies not met            |
 
 ---
 
@@ -303,7 +303,7 @@ Workers are assigned based on task category:
 1. Task name keys must match `tasks[].name` from board
 2. `status` - Must be valid TaskStatus enum value
 3. `startedAt` - Must be valid ISO 8601 timestamp
-4. `agents` - Must have at least 1 agent name
+4. `agent` - Must be non-empty agent name string
 5. `completedAt` - Required when status is not `running`
 6. `affectedFiles` - Paths must be relative to project root
 
@@ -319,7 +319,7 @@ The dispatcher owns all `kanban-progress.json` and `kanban-board.json` updates. 
 2. Add entry with:
    - `status: "running"`
    - `startedAt: "<current ISO timestamp>"`
-   - `agents: ["<agent-name>"]`
+   - `agent: "<agent-name>"`
 3. Write `kanban-progress.json`
 4. Spawn worker process
 
@@ -360,7 +360,7 @@ For error/blocked status, include:
 
 1. Read worker output file (`.kanban/logs/{task-name}-output.json`)
 2. Update `kanban-progress.json` with:
-   - `status` mapped from worker output (`success` → `completed`)
+   - `status` mapped from worker output (`success` → `code-review`)
    - `completedAt`, `workLog`, `affectedFiles` from output
    - `tokensUsed` extracted from Claude session log
 3. If `verification.passed: true` in output:
