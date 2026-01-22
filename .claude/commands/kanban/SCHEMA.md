@@ -13,7 +13,8 @@ Strict, unambiguous schema definitions for all kanban data files. No interpolati
 | `.kanban/kanban-viewer.html`   | Interactive viewer UI                      | Yes                |
 | `.kanban/.gitignore`           | Ignores logs/ directory                    | Optional           |
 | `.kanban/logs/`                | Worker output logs (runtime)               | Created at runtime |
-| `.kanban/logs/{task-name}.json` | One JSON log file per task worker          | Created at runtime |
+| `.kanban/logs/{task-name}.json` | Claude session log for token tracking      | Created at runtime |
+| `.kanban/logs/{task-name}-output.json` | Worker output file with results   | Created by worker  |
 
 ---
 
@@ -310,35 +311,59 @@ Workers are assigned based on task category:
 
 ## 8. File Update Protocol
 
-### When Worker Starts
+The dispatcher owns all `kanban-progress.json` and `kanban-board.json` updates. Workers create output files.
+
+### Dispatcher: Before Spawning Worker
 
 1. Read `kanban-progress.json`
-2. Add/update entry with:
+2. Add entry with:
    - `status: "running"`
    - `startedAt: "<current ISO timestamp>"`
    - `agents: ["<agent-name>"]`
 3. Write `kanban-progress.json`
+4. Spawn worker process
 
-### When Worker Completes Successfully
+### Worker: Create Output File
 
-1. Read `kanban-progress.json`
-2. Update entry with:
-   - `status: "completed"`
-   - `completedAt: "<current ISO timestamp>"`
-   - `workLog: ["<log entry 1>", "<log entry 2>", ...]`
-   - `affectedFiles: ["<paths>"]`
-3. Write `kanban-progress.json`
-4. Read `kanban-board.json`
-5. Find task by name, set `passes: true`
-6. Write `kanban-board.json`
+Workers create `.kanban/logs/{task-name}-output.json`:
 
-### When Worker Fails
+```json
+{
+  "taskName": "<task-name>",
+  "status": "success|error|blocked",
+  "startedAt": "<ISO timestamp>",
+  "completedAt": "<ISO timestamp>",
+  "agent": "<agent-name>",
+  "verification": {
+    "passed": true|false,
+    "steps": [{ "description": "...", "passed": true|false }]
+  },
+  "workLog": ["<log entry 1>", "<log entry 2>"],
+  "affectedFiles": ["<path1>", "<path2>"]
+}
+```
 
-1. Read `kanban-progress.json`
-2. Update entry with:
-   - `status: "error"` or `status: "blocked"`
-   - `completedAt: "<current ISO timestamp>"`
-   - `workLog: ["<error details>", "<suggested fix>"]`
-   - `affectedFiles: []`
-3. Write `kanban-progress.json`
-4. Do NOT update `passes` in `kanban-board.json`
+For error/blocked status, include:
+```json
+{
+  "error": {
+    "message": "What went wrong",
+    "type": "execution|verification|dependency",
+    "suggestedFix": "How to resolve"
+  }
+}
+```
+
+**Important**: Workers do NOT update `kanban-progress.json` or `kanban-board.json` directly.
+
+### Dispatcher: After Worker Completes
+
+1. Read worker output file (`.kanban/logs/{task-name}-output.json`)
+2. Update `kanban-progress.json` with:
+   - `status` mapped from worker output (`success` → `completed`)
+   - `completedAt`, `workLog`, `affectedFiles` from output
+   - `tokensUsed` extracted from Claude session log
+3. If `verification.passed: true` in output:
+   - Read `kanban-board.json`
+   - Set `passes: true` for task
+   - Write `kanban-board.json`

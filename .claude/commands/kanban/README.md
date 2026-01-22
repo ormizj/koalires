@@ -38,7 +38,7 @@ Dispatches tasks to parallel `claude -p` workers in dependency waves:
 
 1. Groups tasks by category into waves (data/config → api → integration → ui → testing)
 2. Spawns up to N workers per wave (default: 3)
-3. Workers self-update kanban files on completion
+3. Workers create output files, dispatcher updates kanban files
 4. On failure, prompts: retry/skip/stop
 
 **Flags:**

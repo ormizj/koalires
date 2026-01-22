@@ -6,7 +6,7 @@ allowed-tools: Bash, Read, Write
 
 # Process Kanban Skill
 
-Process the kanban board by dispatching tasks to parallel `claude -p` worker processes. Workers execute independently and self-update kanban files on completion.
+Process the kanban board by dispatching tasks to parallel `claude -p` worker processes. Workers create output files that the dispatcher processes to update kanban tracking files.
 
 ## Overview
 
@@ -14,9 +14,10 @@ This skill orchestrates parallel task execution using a wave-based system:
 
 1. Tasks are grouped into waves by category dependencies
 2. Each wave runs up to N tasks in parallel via `claude -p` workers
-3. Workers self-update `kanban-progress.json` with status tracking
-4. The dispatcher monitors progress.json entries and reports results
-5. Failed tasks can be retried, skipped, or halt execution
+3. Dispatcher marks tasks "running" before spawning workers
+4. Workers create `.kanban/logs/{task-name}-output.json` files
+5. Dispatcher reads output files and updates `kanban-progress.json` and `kanban-board.json`
+6. Failed tasks can be retried, skipped, or halt execution
 
 ## Prerequisites
 
@@ -33,6 +34,7 @@ All kanban files are in the `.kanban/` directory:
 | `.kanban/kanban-board.json`    | Task definitions with passes field                 |
 | `.kanban/kanban-progress.json` | Status tracking, work logs, affected files, agents |
 | `.kanban/logs/`                | Worker output logs (created by dispatcher)         |
+| `.kanban/logs/{task}-output.json` | Worker output file (created by worker)          |
 
 ## Task Status Logic
 
@@ -165,52 +167,52 @@ Run 'kanban:code-review' to review and commit completed tasks.
 Each worker is a `claude -p` process that:
 
 1. Receives a task prompt with full context
-2. **Immediately** marks task as "running" in progress.json
-3. Implements the task following project patterns
-4. Runs verification steps
-5. Updates kanban files on completion:
-   - Updates progress.json with `status: "completed"`, log, affected files
-   - Sets `passes: true` in kanban-board.json (if verification passes)
+2. Implements the task following project patterns
+3. Runs verification steps
+4. Creates output file with results (`.kanban/logs/{task-name}-output.json`)
+
+**Important**: Workers do NOT update `kanban-progress.json` or `kanban-board.json` directly. The dispatcher handles all kanban file updates.
 
 **Worker Prompt Template**: `.claude/commands/kanban/process/prompts/worker-task.md`
 
-### Progress Entry Schema
+### Worker Output File Schema
 
-Workers update `kanban-progress.json` entries. The dispatcher monitors these for status:
-
-**Initial Entry** (written immediately when work starts):
+Workers create `.kanban/logs/{task-name}-output.json`:
 
 ```json
 {
-  "task-name": {
-    "status": "running",
-    "startedAt": "2026-01-19T12:00:00.000Z",
-    "agents": ["backend-developer"]
-  }
+  "taskName": "task-name",
+  "status": "success",
+  "startedAt": "2026-01-19T12:00:00.000Z",
+  "completedAt": "2026-01-19T12:15:00.000Z",
+  "agent": "backend-developer",
+  "verification": {
+    "passed": true,
+    "steps": [
+      { "description": "Step 1", "passed": true },
+      { "description": "Step 2", "passed": true }
+    ]
+  },
+  "workLog": ["Brief description of work done", "Change 1", "Change 2"],
+  "affectedFiles": ["path/to/file1.ts", "path/to/file2.ts"]
 }
 ```
 
-**Final Entry** (written when work completes):
+**Status Values** (in worker output):
 
-```json
-{
-  "task-name": {
-    "status": "completed",
-    "startedAt": "2026-01-19T12:00:00.000Z",
-    "completedAt": "2026-01-19T12:15:00.000Z",
-    "log": "## Work Summary\n\nBrief description...",
-    "affectedFiles": ["path/to/file1.ts", "path/to/file2.ts"],
-    "agents": ["backend-developer"]
-  }
-}
-```
-
-**Status Values**:
-
-- `running` - Task in progress (set at start)
-- `completed` - All verification steps passed
-- `error` - Execution error occurred (include details in log)
+- `success` - All verification steps passed
+- `error` - Execution error occurred (include `error` object with details)
 - `blocked` - Task cannot proceed due to unmet dependencies
+
+### Dispatcher Responsibilities
+
+The dispatcher (`parallel-dispatch.ps1`) handles:
+
+1. Marking tasks as `status: "running"` before spawning workers
+2. Reading worker output files after completion
+3. Updating `kanban-progress.json` with worker results
+4. Setting `passes: true` in `kanban-board.json` when verification passes
+5. Adding token usage data to progress entries
 
 ### Validation Warnings
 
