@@ -36,6 +36,7 @@ $BoardFile = Join-Path $KanbanDir "kanban-board.json"
 $ProgressFile = Join-Path $KanbanDir "kanban-progress.json"
 $PromptTemplate = Join-Path $ScriptDir "../prompts/worker-task.md"
 $ProcessWorkerOutputScript = Join-Path $ScriptDir "process-worker-output.ps1"
+$ParseWorkerLogScript = Join-Path $ScriptDir "parse-worker-log.ps1"
 
 # Wave definitions - tasks are processed in dependency order
 $WaveDefinitions = @{
@@ -171,8 +172,9 @@ function Get-TokenUsageFromLog {
             return $tokensArray
         }
 
-        # Remove BOM if present
-        if ($content[0] -eq 0xFEFF -or $content[0] -eq 0xFFFE -or $content.StartsWith([char]0xFEFF)) {
+        # Remove BOM if present (U+FEFF = 65279)
+        # Note: Only check the actual character code, not StartsWith which can be unreliable
+        if ([int][char]$content[0] -eq 65279) {
             $content = $content.Substring(1)
         }
 
@@ -337,23 +339,77 @@ function Set-TaskRunning {
         [string]$AgentName
     )
 
+    $startedAt = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+
     try {
         $progressContent = Get-Content $ProgressFile -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
 
         $runningEntry = @{
             status = "running"
-            startedAt = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+            startedAt = $startedAt
             agents = @($AgentName)
         }
 
         $progressContent | Add-Member -NotePropertyName $TaskName -NotePropertyValue ([PSCustomObject]$runningEntry) -Force
         $progressContent | ConvertTo-Json -Depth 10 | Set-Content $ProgressFile -Encoding UTF8 -ErrorAction Stop
 
-        return $true
+        return $startedAt
     }
     catch {
         Write-Host "       [Error] Failed to mark task '$TaskName' as running: $($_.Exception.Message)" -ForegroundColor Red
-        return $false
+        return $null
+    }
+}
+
+function Invoke-ParseWorkerLog {
+    param(
+        [string]$TaskName,
+        [string]$JsonLogPath,
+        [string]$OutputFilePath,
+        [string]$AgentName,
+        [string]$StartedAt
+    )
+
+    if (-not (Test-Path $JsonLogPath)) {
+        return @{
+            success = $false
+            error = "JSON log file not found: $JsonLogPath"
+        }
+    }
+
+    try {
+        $scriptArgs = @(
+            "-TaskName", "`"$TaskName`"",
+            "-JsonLogPath", "`"$JsonLogPath`"",
+            "-OutputFilePath", "`"$OutputFilePath`"",
+            "-AgentName", "`"$AgentName`""
+        )
+
+        if ($StartedAt) {
+            $scriptArgs += @("-StartedAt", "`"$StartedAt`"")
+        }
+
+        $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $ParseWorkerLogScript @scriptArgs 2>&1
+
+        # Parse JSON result
+        $outputStr = $output | Out-String
+        $result = $outputStr.Trim() | ConvertFrom-Json -ErrorAction Stop
+
+        return @{
+            success = $result.success
+            error = $result.error
+            status = $result.status
+            affectedFilesCount = $result.affectedFilesCount
+            tokensCount = $result.tokensCount
+            verificationPassed = $result.verificationPassed
+            outputFile = $result.outputFile
+        }
+    }
+    catch {
+        return @{
+            success = $false
+            error = "Failed to parse worker log: $($_.Exception.Message)"
+        }
     }
 }
 
@@ -541,9 +597,11 @@ function Start-WorkerJob {
     $agentName = Get-AgentForCategory -Category $Task.category
 
     # DISPATCHER RESPONSIBILITY: Mark task as "running" BEFORE spawning worker
-    $marked = Set-TaskRunning -TaskName $taskName -AgentName $agentName
-    if (-not $marked) {
+    # Set-TaskRunning now returns the startedAt timestamp
+    $startedAt = Set-TaskRunning -TaskName $taskName -AgentName $agentName
+    if (-not $startedAt) {
         Write-Host "       [Warning] Could not mark task '$taskName' as running" -ForegroundColor Yellow
+        $startedAt = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
     }
 
     # Create the job script block
@@ -577,6 +635,8 @@ function Start-WorkerJob {
         LogPath = $LogPath
         JsonLogPath = $JsonLogPath
         OutputFilePath = $OutputFilePath
+        StartedAt = $startedAt
+        AgentName = $agentName
     }
 }
 
@@ -626,20 +686,31 @@ function Wait-WorkerBatch {
         }
 
         if (-not $fileReady) {
-            Write-Host "       [Token] Warning: JSON log not ready after ${maxWaitMs}ms for $taskName" -ForegroundColor Yellow
+            Write-Host "       [Warning] JSON log not ready after ${maxWaitMs}ms for $taskName" -ForegroundColor Yellow
         }
 
-        # Extract token usage from JSON log
-        $tokensUsed = Get-TokenUsageFromLog -JsonLogPath $jsonLogPath
-        Write-Host "       [DEBUG] Extracted $($tokensUsed.Count) token entries from $jsonLogPath" -ForegroundColor Magenta
-        $finalTokens = if ($tokensUsed.Count -gt 0) { $tokensUsed[-1] } else { 0 }
+        # NEW APPROACH: Parse raw log to create output file (dispatcher owns output file creation)
+        # This ensures consistent data extraction regardless of worker behavior
+        $agentName = $worker.AgentName
+        $startedAt = $worker.StartedAt
 
-        # Process worker output file via dedicated script
+        Write-Host "       [Dispatcher] Parsing raw log for $taskName..." -ForegroundColor Gray
+        $parseResult = Invoke-ParseWorkerLog -TaskName $taskName -JsonLogPath $jsonLogPath -OutputFilePath $outputFilePath -AgentName $agentName -StartedAt $startedAt
+
+        # Initialize variables
+        $tokensUsed = @()
+        $finalTokens = 0
         $status = $null
         $validationWarnings = @()
 
-        if (Test-Path $outputFilePath) {
-            # Worker created output file - use process-worker-output.ps1 to update kanban files
+        if ($parseResult.success) {
+            Write-Host "       [Dispatcher] Parsed: $($parseResult.affectedFilesCount) files, $($parseResult.tokensCount) token entries" -ForegroundColor Gray
+
+            # Extract token usage from JSON log for display (parse script also extracts this)
+            $tokensUsed = Get-TokenUsageFromLog -JsonLogPath $jsonLogPath
+            $finalTokens = if ($tokensUsed.Count -gt 0) { $tokensUsed[-1] } else { 0 }
+
+            # Process the parsed output file via dedicated script
             $processResult = Invoke-ProcessWorkerOutput -TaskName $taskName -OutputFile $outputFilePath -TokensUsed $tokensUsed
 
             if ($processResult.success) {
@@ -655,7 +726,7 @@ function Wait-WorkerBatch {
                 if ($processResult.boardUpdated) {
                     Write-Host "       [Dispatcher] Updated board.json passes=true for $taskName" -ForegroundColor Gray
                 }
-                elseif ($processResult.status -eq "completed") {
+                elseif ($processResult.status -eq "completed" -and -not $parseResult.verificationPassed) {
                     $validationWarnings += "Worker completed but verification did not pass - board.json not updated"
                 }
             }
@@ -668,49 +739,16 @@ function Wait-WorkerBatch {
             }
         }
         else {
-            # No output file - worker may have crashed or failed to create it
-            # Fall back to reading progress.json directly to check if worker updated it the old way
-            Write-Host "       [Warning] No worker output file found: $outputFilePath" -ForegroundColor Yellow
+            # Parse failed - try to extract tokens anyway for diagnostics
+            $tokensUsed = Get-TokenUsageFromLog -JsonLogPath $jsonLogPath
+            $finalTokens = if ($tokensUsed.Count -gt 0) { $tokensUsed[-1] } else { 0 }
 
-            $entry = $null
-            if (Test-Path $ProgressFile) {
-                try {
-                    $progressRaw = Get-Content $ProgressFile -Raw | ConvertFrom-Json
-                    if ($progressRaw.PSObject.Properties[$taskName]) {
-                        $entry = $progressRaw.$taskName
-                    }
-                }
-                catch {
-                    Write-Host "       [Warning] Failed to read progress file" -ForegroundColor Yellow
-                }
+            $status = @{
+                status = "error"
+                error = $parseResult.error
+                validationWarnings = @("Failed to parse worker log: $($parseResult.error)")
             }
-
-            if ($entry -and $entry.status -and $entry.status -ne "running") {
-                # Worker updated progress.json directly (legacy behavior)
-                $validationWarnings += "Worker used legacy direct file update instead of output file"
-                $validationWarnings += Test-ProgressEntry -Entry $entry -TaskName $taskName
-
-                $status = @{
-                    status = $entry.status
-                    workLog = $entry.workLog
-                    affectedFiles = $entry.affectedFiles
-                    agents = $entry.agents
-                    validationWarnings = $validationWarnings
-                }
-
-                # Update tokens in progress if we have them
-                if ($tokensUsed.Count -gt 0) {
-                    $null = Update-ProgressWithTokens -TaskName $taskName -TokensUsed $tokensUsed -ProgressFilePath $ProgressFile
-                }
-            }
-            else {
-                # Worker failed without creating output or updating progress
-                $status = @{
-                    status = "failure"
-                    error = "Worker completed without creating output file or progress entry"
-                    validationWarnings = @("Worker did not create output file: $outputFilePath")
-                }
-            }
+            Write-Host "       [Error] Failed to parse log for $taskName`: $($parseResult.error)" -ForegroundColor Red
         }
 
         $status.validationWarnings = $validationWarnings

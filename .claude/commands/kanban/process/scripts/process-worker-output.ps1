@@ -186,7 +186,7 @@ if ($outputContent.error) {
     }
 }
 
-# Add tokens if provided
+# Add tokens - prefer command-line argument, fall back to output file
 if ($TokensJson) {
     try {
         $tokens = $TokensJson | ConvertFrom-Json -ErrorAction Stop
@@ -197,6 +197,10 @@ if ($TokensJson) {
     catch {
         # Silently ignore token parsing errors - not critical
     }
+}
+elseif ($outputContent.tokensUsed -and $outputContent.tokensUsed.Count -gt 0) {
+    # Fall back to tokens from output file (populated by parse-worker-log.ps1)
+    $progressEntry.tokensUsed = @($outputContent.tokensUsed)
 }
 
 # Update progress file

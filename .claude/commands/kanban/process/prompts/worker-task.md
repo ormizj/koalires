@@ -22,115 +22,36 @@ Complete these steps in order to verify your implementation:
 
 ---
 
-## Worker Output Protocol
+## Worker Responsibilities
 
-**IMPORTANT**: Do NOT update `kanban-progress.json` or `kanban-board.json` directly.
+**IMPORTANT**: You do NOT create any output files. The dispatcher handles all tracking.
 
-The dispatcher handles all progress tracking. Your only responsibility is to:
+Your only responsibilities are:
 
-1. Implement the task
-2. Verify all steps
-3. Create output file with results
-
-### Output File
-
-Create: `.kanban/logs/{task.name}-output.json`
-
-### Output Format
-
-**On Success:**
-
-```json
-{
-  "taskName": "{task.name}",
-  "status": "success",
-  "startedAt": "YYYY-MM-DDTHH:MM:SS.000Z",
-  "completedAt": "YYYY-MM-DDTHH:MM:SS.000Z",
-  "agent": "{agent-name}",
-  "verification": {
-    "passed": true,
-    "steps": [
-      { "description": "Step 1 description", "passed": true },
-      { "description": "Step 2 description", "passed": true }
-    ]
-  },
-  "workLog": [
-    "Brief description of what was implemented",
-    "Change 1: description of first change",
-    "Change 2: description of second change"
-  ],
-  "affectedFiles": ["path/to/file1.ts", "path/to/file2.ts"]
-}
-```
-
-**On Error:**
-
-```json
-{
-  "taskName": "{task.name}",
-  "status": "error",
-  "startedAt": "YYYY-MM-DDTHH:MM:SS.000Z",
-  "completedAt": "YYYY-MM-DDTHH:MM:SS.000Z",
-  "agent": "{agent-name}",
-  "verification": {
-    "passed": false,
-    "steps": [
-      { "description": "Step 1 description", "passed": true },
-      { "description": "Step 2 description", "passed": false }
-    ]
-  },
-  "error": {
-    "message": "Description of what went wrong",
-    "type": "execution|verification|dependency",
-    "suggestedFix": "How to resolve"
-  },
-  "workLog": ["Work attempted before error"],
-  "affectedFiles": ["files/touched/before/error.ts"]
-}
-```
-
-**On Blocked:**
-
-```json
-{
-  "taskName": "{task.name}",
-  "status": "blocked",
-  "startedAt": "YYYY-MM-DDTHH:MM:SS.000Z",
-  "completedAt": "YYYY-MM-DDTHH:MM:SS.000Z",
-  "agent": "{agent-name}",
-  "verification": {
-    "passed": false,
-    "steps": []
-  },
-  "error": {
-    "message": "Task blocked due to unmet dependencies",
-    "type": "dependency",
-    "suggestedFix": "Required tasks: <tasks that must complete first>"
-  },
-  "workLog": ["Cannot complete because required resources don't exist"],
-  "affectedFiles": []
-}
-```
+1. **Implement the task** - Follow the description and create/modify files as needed
+2. **Run verification steps** - Execute each step and document results
+3. **Report clearly** - Use the output format below so the dispatcher can extract results
 
 ---
 
-## File Tracking Protocol
+## Verification Output Format
 
-**MANDATORY**: Track ALL files you touch during implementation.
+After completing implementation, document each verification step like this:
 
-### How to Track Files
+```
+## Verification Results
 
-As you work, maintain a list of every file you:
+Step 1: <step description>
+Result: PASS - <details of what was verified>
 
-- **CREATE** - add path to affectedFiles
-- **MODIFY** - add path to affectedFiles
-- **DELETE** - add path to affectedFiles
+Step 2: <step description>
+Result: PASS - <details of what was verified>
 
-### affectedFiles Requirements
+Step 3: <step description>
+Result: FAIL - <details of what failed and why>
+```
 
-- Include the FULL relative path from project root (e.g., `"client/features/auth/ui/LoginForm.vue"`)
-- Include ALL files: created, modified, AND deleted
-- Empty `affectedFiles: []` is ONLY acceptable if truly NO files were touched
+**Important**: Use exactly `PASS` or `FAIL` (case-insensitive) after each step for the dispatcher to detect.
 
 ---
 
@@ -141,30 +62,24 @@ As you work, maintain a list of every file you:
 1. Analyze the task description and understand requirements
 2. Identify existing patterns in the codebase to follow
 3. Implement the changes following project conventions
-4. **TRACK**: Add each file you touch to your affected files list
+4. Use TypeScript with proper types
 
 ### Phase 2: Verification
 
-Execute each verification step and document results:
+Execute each verification step in order:
 
-```
-Step 1: <step description>
-Result: PASS/FAIL - <details>
+1. Run the verification step (e.g., type check, lint, test)
+2. Document the result as PASS or FAIL
+3. If a step fails, document what went wrong
+4. Continue with remaining steps even if one fails
 
-Step 2: <step description>
-Result: PASS/FAIL - <details>
-...
-```
+### Phase 3: Summary
 
-### Phase 3: Create Output File
+Provide a brief summary of:
 
-1. Create `.kanban/logs/{task.name}-output.json`
-2. Set `status` based on verification results:
-   - `"success"` - all verification steps passed
-   - `"error"` - implementation or verification failed
-   - `"blocked"` - dependencies not met
-3. Set `verification.passed` to `true` only if ALL steps passed
-4. Include complete `workLog` and `affectedFiles`
+- What was implemented
+- Which files were created or modified
+- Final verification status (all passed / some failed)
 
 ---
 
@@ -212,17 +127,28 @@ Follow the project's `CLAUDE.md` for:
 
 If you encounter an error that prevents task completion:
 
-1. Document the error in the output file
-2. Set `status: "error"`
-3. Set `verification.passed: false`
-4. Include helpful context in the `error` object
-5. **Still populate affectedFiles** with any files you touched before the error
+1. Document the error clearly in your response
+2. Still attempt remaining verification steps if possible
+3. Provide suggestions for how to fix the issue
 
 ### Blocked Tasks
 
 If you discover the task has unmet dependencies:
 
-1. Document the missing dependencies in the error object
-2. Set `status: "blocked"`
-3. Set `verification.passed: false`
-4. List specific dependencies that must be completed first in `error.suggestedFix`
+1. Clearly state what dependencies are missing
+2. List which specific tasks or resources must be completed first
+3. Do not attempt implementation if blocked
+
+---
+
+## What NOT to Do
+
+- **DO NOT** create `.kanban/logs/{task.name}-output.json` - the dispatcher creates this
+- **DO NOT** update `kanban-progress.json` - the dispatcher handles this
+- **DO NOT** update `kanban-board.json` - the dispatcher handles this
+- **DO NOT** fabricate timestamps or token counts
+
+The dispatcher parses your raw session log to extract:
+- Files you created/modified (from Write/Edit tool calls)
+- Verification results (from your text output)
+- Token usage (from session metadata)

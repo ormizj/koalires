@@ -6,7 +6,7 @@ allowed-tools: Bash, Read, Write
 
 # Process Kanban Skill
 
-Process the kanban board by dispatching tasks to parallel `claude -p` worker processes. Workers create output files that the dispatcher processes to update kanban tracking files.
+Process the kanban board by dispatching tasks to parallel `claude -p` worker processes. The dispatcher parses raw worker logs to extract results, ensuring consistent tracking regardless of worker behavior.
 
 ## Overview
 
@@ -15,9 +15,42 @@ This skill orchestrates parallel task execution using a wave-based system:
 1. Tasks are grouped into waves by category dependencies
 2. Each wave runs up to N tasks in parallel via `claude -p` workers
 3. Dispatcher marks tasks "running" before spawning workers
-4. Workers create `.kanban/logs/{task-name}-output.json` files
-5. Dispatcher reads output files and updates `kanban-progress.json` and `kanban-board.json`
-6. Failed tasks can be retried, skipped, or halt execution
+4. Workers implement tasks and output verification results in text
+5. **Dispatcher parses raw worker logs** to create output files
+6. Dispatcher updates `kanban-progress.json` and `kanban-board.json`
+7. Failed tasks can be retried, skipped, or halt execution
+
+## Architecture
+
+### Data Flow (Dispatcher-Owned Output)
+
+```
+Worker executes task
+    ↓
+Raw session log written to .kanban/logs/{task}.json
+    ↓
+parse-worker-log.ps1 extracts:
+  - Affected files (from Write/Edit tool calls)
+  - Token usage (from message.usage fields)
+  - Verification results (from text patterns)
+  - Success/failure status (from result entry)
+    ↓
+Creates .kanban/logs/{task}-output.json (normalized format)
+    ↓
+process-worker-output.ps1 updates:
+  - kanban-progress.json (work log, files, tokens)
+  - kanban-board.json (passes: true if verification passed)
+```
+
+### Why Dispatcher Owns Output Files
+
+Previous approach had workers create output files, but AI workers are unpredictable:
+- Used wrong field names (`status: "passed"` vs `passed: true`)
+- Inconsistent file path formats
+- Fabricated timestamps
+- Missed tracking files
+
+New approach: Dispatcher parses the raw session log as the single source of truth.
 
 ## Prerequisites
 
@@ -29,12 +62,21 @@ This skill orchestrates parallel task execution using a wave-based system:
 
 All kanban files are in the `.kanban/` directory:
 
-| Path                           | Purpose                                            |
-| ------------------------------ | -------------------------------------------------- |
-| `.kanban/kanban-board.json`    | Task definitions with passes field                 |
-| `.kanban/kanban-progress.json` | Status tracking, work logs, affected files, agents |
-| `.kanban/logs/`                | Worker output logs (created by dispatcher)         |
-| `.kanban/logs/{task}-output.json` | Worker output file (created by worker)          |
+| Path                               | Purpose                                            |
+| ---------------------------------- | -------------------------------------------------- |
+| `.kanban/kanban-board.json`        | Task definitions with passes field                 |
+| `.kanban/kanban-progress.json`     | Status tracking, work logs, affected files, agents |
+| `.kanban/logs/`                    | Worker output logs                                 |
+| `.kanban/logs/{task}.json`         | Raw worker session log (JSON format)               |
+| `.kanban/logs/{task}-output.json`  | Parsed/normalized output (created by dispatcher)   |
+
+## Scripts
+
+| Script                      | Purpose                                                    |
+| --------------------------- | ---------------------------------------------------------- |
+| `parallel-dispatch.ps1`     | Main orchestrator - spawns workers, coordinates parsing    |
+| `parse-worker-log.ps1`      | Parses raw JSON log, creates normalized output file        |
+| `process-worker-output.ps1` | Updates kanban files from normalized output                |
 
 ## Task Status Logic
 
@@ -140,8 +182,9 @@ powershell -ExecutionPolicy Bypass -File ".claude/commands/kanban/process/script
 The dispatcher script handles monitoring automatically:
 
 1. Displays live progress as workers complete
-2. Shows pass/fail status for each task
-3. On failure, prompts user:
+2. Parses raw logs to extract results
+3. Shows pass/fail status for each task
+4. On failure, prompts user:
    - **[R]etry** - Retry failed tasks
    - **[S]kip** - Skip and continue to next wave
    - **[Q]uit** - Stop all processing
@@ -168,16 +211,27 @@ Each worker is a `claude -p` process that:
 
 1. Receives a task prompt with full context
 2. Implements the task following project patterns
-3. Runs verification steps
-4. Creates output file with results (`.kanban/logs/{task-name}-output.json`)
-
-**Important**: Workers do NOT update `kanban-progress.json` or `kanban-board.json` directly. The dispatcher handles all kanban file updates.
+3. Runs verification steps and documents results
+4. **Does NOT create any output files** - dispatcher handles this
 
 **Worker Prompt Template**: `.claude/commands/kanban/process/prompts/worker-task.md`
 
-### Worker Output File Schema
+### Worker Output Detection
 
-Workers create `.kanban/logs/{task-name}-output.json`:
+The dispatcher extracts data from raw worker logs:
+
+| Data             | Source in Raw Log                                                    |
+| ---------------- | -------------------------------------------------------------------- |
+| Affected Files   | `type: "assistant"` → `tool_use` with `name: "Write"` or `"Edit"`    |
+| Token Usage      | `type: "assistant"` → `message.usage` or `type: "result"` → `usage`  |
+| Success/Failure  | `type: "result"` → `is_error` and `subtype`                          |
+| Duration         | `type: "result"` → `duration_ms`                                     |
+| Work Summary     | `type: "result"` → `result` (final text response)                    |
+| Verification     | Text patterns like "Step N: PASS/FAIL" in assistant messages         |
+
+### Normalized Output File Schema
+
+The dispatcher creates `.kanban/logs/{task-name}-output.json`:
 
 ```json
 {
@@ -194,42 +248,27 @@ Workers create `.kanban/logs/{task-name}-output.json`:
     ]
   },
   "workLog": ["Brief description of work done", "Change 1", "Change 2"],
-  "affectedFiles": ["path/to/file1.ts", "path/to/file2.ts"]
+  "affectedFiles": ["path/to/file1.ts", "path/to/file2.ts"],
+  "tokensUsed": [45000, 89000, 120000],
+  "durationMs": 174026
 }
 ```
 
-**Status Values** (in worker output):
+**Status Values**:
 
-- `success` - All verification steps passed
-- `error` - Execution error occurred (include `error` object with details)
-- `blocked` - Task cannot proceed due to unmet dependencies
+- `success` - Worker completed without errors, result indicates success
+- `error` - Execution error occurred or result indicates failure
 
 ### Dispatcher Responsibilities
 
 The dispatcher (`parallel-dispatch.ps1`) handles:
 
 1. Marking tasks as `status: "running"` before spawning workers
-2. Reading worker output files after completion
-3. Updating `kanban-progress.json` with worker results
-4. Setting `passes: true` in `kanban-board.json` when verification passes
-5. Adding token usage data to progress entries
-
-### Validation Warnings
-
-The dispatcher validates each progress entry for completeness and displays warnings in yellow. Validation checks:
-
-- Required fields present (`status`, `startedAt`, `agents`)
-- For completed entries: `completedAt`, `log`, and `affectedFiles` should be populated
-- For error/blocked entries: `completedAt` and `log` should be populated
-- Empty `affectedFiles` array triggers a warning for completed tasks (worker likely didn't track files)
-
-Batch results display warnings after each task status:
-
-```
-[PASS] task-name
-       Warnings:
-         - Empty 'affectedFiles' array - worker likely didn't track files
-```
+2. **Calling `parse-worker-log.ps1`** to extract data from raw logs
+3. Creating normalized output files
+4. Calling `process-worker-output.ps1` to update kanban files
+5. Setting `passes: true` in board when verification passes
+6. Tracking and displaying token usage
 
 ---
 
@@ -237,20 +276,20 @@ Batch results display warnings after each task status:
 
 ### Worker Failure
 
-When a worker reports failure or error:
+When a worker fails:
 
-1. Progress entry contains `status: "error"` with details in log field
-2. Full output available in `.kanban/logs/{task-name}.json`
-3. User prompted for action (retry/skip/quit)
-4. Task remains in pending state until successfully completed
+1. Parse script extracts error information from raw log
+2. Progress entry contains `status: "error"` with details
+3. Full output available in `.kanban/logs/{task-name}.json`
+4. User prompted for action (retry/skip/quit)
 
-### No Progress Entry
+### Parse Failure
 
-If a worker completes without updating progress.json:
+If the parse script fails to extract data:
 
-1. Dispatcher reports task as failed with "No progress entry created"
-2. Check the log file for worker output
-3. Task may need manual investigation
+1. Dispatcher reports parse error with details
+2. Task marked as error
+3. Raw log preserved for manual investigation
 
 ### Script Execution Errors
 
@@ -280,10 +319,11 @@ The dispatcher automatically determines which tasks need processing based on cur
 1. **Read** kanban files and calculate task statuses
 2. **Display** progress summary to user
 3. **Run** `parallel-dispatch.ps1` script with optional parameters
-4. **Monitor** worker completion via progress.json entries
-5. **Handle** failures with retry/skip/quit options
-6. **Report** final summary when all waves complete
-7. **Direct** user to `kanban:code-review` for commits
+4. **Parse** raw worker logs to create normalized output files
+5. **Update** kanban files with extracted data
+6. **Handle** failures with retry/skip/quit options
+7. **Report** final summary when all waves complete
+8. **Direct** user to `kanban:code-review` for commits
 
 ---
 
@@ -293,5 +333,6 @@ The dispatcher automatically determines which tasks need processing based on cur
 - Workers operate independently and may run concurrently
 - Each worker has full access to project files and CLAUDE.md context
 - Worker logs are preserved in `.kanban/logs/` for debugging
-- **Workers run with `--dangerously-skip-permissions`** to enable autonomous execution without permission prompts
+- **Workers run with `--dangerously-skip-permissions`** to enable autonomous execution
+- **Dispatcher owns output file creation** - workers do not create tracking files
 - `kanban-progress.json` is the single source of truth for worker status tracking
