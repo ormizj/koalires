@@ -6,9 +6,9 @@ const { isAuthenticated } = useAuth();
 </script>
 
 <template>
-  <div class="min-h-screen bg-surface-secondary">
+  <div class="min-h-screen bg-surface-secondary flex flex-col">
     <AppHeader v-if="isAuthenticated" />
-    <main :class="{ 'pt-14': isAuthenticated }">
+    <main class="flex-1">
       <slot />
     </main>
   </div>
