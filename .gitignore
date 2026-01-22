@@ -17,7 +17,7 @@ logs
 .DS_Store
 .fleet
 .idea
-/database/koalires.db
+/database/*
 
 # Local env files
 .env
@@ -25,5 +25,3 @@ logs
 !.env.example
 *.local
 /generated/prisma
-/database/koalires.db-shm
-/database/koalires.db-wal
