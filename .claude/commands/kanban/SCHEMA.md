@@ -13,7 +13,7 @@ Strict, unambiguous schema definitions for all kanban data files. No interpolati
 | `.kanban/kanban-viewer.html`   | Interactive viewer UI                      | Yes                |
 | `.kanban/.gitignore`           | Ignores logs/ directory                    | Optional           |
 | `.kanban/logs/`                | Worker output logs (runtime)               | Created at runtime |
-| `.kanban/logs/{task-name}.log` | One log file per task worker               | Created at runtime |
+| `.kanban/logs/{task-name}.json` | One JSON log file per task worker          | Created at runtime |
 
 ---
 

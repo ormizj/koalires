@@ -238,7 +238,7 @@ Batch results display warnings after each task status:
 When a worker reports failure or error:
 
 1. Progress entry contains `status: "error"` with details in log field
-2. Full output available in `.kanban/logs/{task-name}.log`
+2. Full output available in `.kanban/logs/{task-name}.json`
 3. User prompted for action (retry/skip/quit)
 4. Task remains in pending state until successfully completed
 

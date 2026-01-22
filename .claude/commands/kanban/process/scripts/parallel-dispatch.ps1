@@ -158,50 +158,59 @@ function Get-TokenUsageFromLog {
     $tokensArray = @()
 
     if (-not (Test-Path $JsonLogPath)) {
+        Write-Host "       [Token Debug] Log file not found: $JsonLogPath" -ForegroundColor DarkYellow
         return $tokensArray
     }
 
     try {
         $content = Get-Content $JsonLogPath -Raw
 
-        # Parse JSON - could be array or JSON-Lines format
+        if ([string]::IsNullOrWhiteSpace($content)) {
+            Write-Host "       [Token Debug] Log file is empty" -ForegroundColor DarkYellow
+            return $tokensArray
+        }
+
+        # Remove BOM if present (UTF-8 BOM can cause parsing issues)
+        if ($content[0] -eq 0xFEFF -or $content[0] -eq 0xFFFE -or $content.StartsWith([char]0xFEFF)) {
+            $content = $content.Substring(1)
+        }
+
         $parsed = $content | ConvertFrom-Json
 
-        # Normalize to array for iteration
         $objects = if ($parsed -is [array]) { $parsed } else { @($parsed) }
 
         foreach ($obj in $objects) {
             try {
-                # Look for "type": "assistant" messages with usage data
                 if ($obj.type -eq "assistant" -and $obj.message -and $obj.message.usage) {
                     $usage = $obj.message.usage
                     $inputTokens = [int]($usage.input_tokens)
                     $outputTokens = [int]($usage.output_tokens)
                     $cacheRead = if ($usage.cache_read_input_tokens) { [int]($usage.cache_read_input_tokens) } else { 0 }
                     $cacheCreate = if ($usage.cache_creation_input_tokens) { [int]($usage.cache_creation_input_tokens) } else { 0 }
-
                     $total = $inputTokens + $outputTokens + $cacheRead + $cacheCreate
                     $tokensArray += $total
                 }
-                # Also check the final "result" message
                 if ($obj.type -eq "result" -and $obj.usage) {
                     $usage = $obj.usage
                     $inputTokens = [int]($usage.input_tokens)
                     $outputTokens = [int]($usage.output_tokens)
                     $cacheRead = if ($usage.cache_read_input_tokens) { [int]($usage.cache_read_input_tokens) } else { 0 }
                     $cacheCreate = if ($usage.cache_creation_input_tokens) { [int]($usage.cache_creation_input_tokens) } else { 0 }
-
                     $total = $inputTokens + $outputTokens + $cacheRead + $cacheCreate
                     $tokensArray += $total
                 }
             }
             catch {
-                # Skip malformed entries
+                # Skip malformed entries silently
             }
+        }
+
+        if ($tokensArray.Count -eq 0) {
+            Write-Host "       [Token Debug] No usage data found in $($objects.Count) objects" -ForegroundColor DarkYellow
         }
     }
     catch {
-        # Return empty array on error
+        Write-Host "       [Token Debug] Parse error: $($_.Exception.Message)" -ForegroundColor DarkYellow
     }
 
     return $tokensArray
@@ -221,10 +230,12 @@ function Update-ProgressWithTokens {
         if ($progressContent.$TaskName) {
             $progressContent.$TaskName | Add-Member -NotePropertyName "tokensUsed" -NotePropertyValue $TokensUsed -Force
             $progressContent | ConvertTo-Json -Depth 10 | Set-Content $ProgressFilePath -Encoding UTF8
+        } else {
+            Write-Host "       [Token Debug] Task '$TaskName' not found in progress file" -ForegroundColor DarkYellow
         }
     }
     catch {
-        Write-Host "Warning: Could not update progress with token data" -ForegroundColor Yellow
+        Write-Host "       [Token Debug] Progress update failed: $($_.Exception.Message)" -ForegroundColor DarkYellow
     }
 }
 
@@ -421,11 +432,8 @@ function Start-WorkerJob {
             # Use --output-format json to capture token usage data
             $output = & claude -p --dangerously-skip-permissions --output-format json $Prompt 2>&1
 
-            # Write JSON output to json log file for token tracking
+            # Write JSON output for token tracking
             $output | Out-File -FilePath $JsonLogPath -Encoding UTF8
-
-            # Also write human-readable version to regular log
-            $output | Out-File -FilePath $LogPath -Encoding UTF8
         }
         catch {
             # Log the error
@@ -575,6 +583,10 @@ function Wait-WorkerBatch {
 
         # Extract token usage from JSON log
         $jsonLogPath = $worker.JsonLogPath
+
+        # Small delay to ensure file is flushed
+        Start-Sleep -Milliseconds 100
+
         $tokensUsed = Get-TokenUsageFromLog -JsonLogPath $jsonLogPath
         $finalTokens = if ($tokensUsed.Count -gt 0) { $tokensUsed[-1] } else { 0 }
 
@@ -646,7 +658,7 @@ function Show-BatchResults {
             if ($status.error) {
                 Write-Host "       Reason: $($status.error)" -ForegroundColor Magenta
             }
-            Write-Host "       Log: $($result.LogPath)" -ForegroundColor DarkGray
+            Write-Host "       Log: $($result.JsonLogPath)" -ForegroundColor DarkGray
 
             # Display token usage for blocked tasks
             if ($result.FinalTokens -gt 0) {
@@ -671,7 +683,7 @@ function Show-BatchResults {
             if ($status.error) {
                 Write-Host "       Error: $($status.error)" -ForegroundColor Red
             }
-            Write-Host "       Log: $($result.LogPath)" -ForegroundColor DarkGray
+            Write-Host "       Log: $($result.JsonLogPath)" -ForegroundColor DarkGray
 
             # Display token usage for failed tasks
             if ($result.FinalTokens -gt 0) {
