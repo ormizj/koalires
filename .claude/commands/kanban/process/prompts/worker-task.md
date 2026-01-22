@@ -152,7 +152,12 @@ Result: PASS/FAIL - <details>
     "status": "completed",
     "startedAt": "PRESERVE-FROM-INITIAL-ENTRY",
     "completedAt": "YYYY-MM-DDTHH:MM:SS.000Z",
-    "log": "## Work Summary\n\n<Brief description of what was implemented>\n\n### Changes Made\n- <Bullet point for each change>\n\n### Verification\n<Results of verification steps>",
+    "workLog": [
+      "Brief description of what was implemented",
+      "Change 1: description of first change",
+      "Change 2: description of second change",
+      "Verification: all steps passed"
+    ],
     "affectedFiles": ["path/to/file1.ts", "path/to/file2.ts"],
     "agents": ["{agent-name}"]
   }
@@ -166,7 +171,7 @@ Result: PASS/FAIL - <details>
 | `status`        | `"completed"` on success, `"error"` on failure, `"blocked"` if dependencies not met |
 | `startedAt`     | **PRESERVE** the original timestamp from your initial entry                         |
 | `completedAt`   | Current ISO 8601 timestamp when work finished                                       |
-| `log`           | Markdown-formatted summary (use `\n` for newlines in JSON)                          |
+| `workLog`       | Array of work log entry strings describing what was done                            |
 | `affectedFiles` | **MANDATORY** - Array of ALL file paths created/modified/deleted                    |
 | `agents`        | Array containing your agent name                                                    |
 
@@ -183,7 +188,7 @@ Result: PASS/FAIL - <details>
 □ Entry has status = "completed" (or "error"/"blocked")
 □ Entry has startedAt timestamp (PRESERVED from initial entry)
 □ Entry has completedAt timestamp (current time)
-□ Entry has log with work summary (not empty)
+□ Entry has workLog array with work summary entries (not empty)
 □ Entry has affectedFiles array (NOT EMPTY if any files were changed)
 □ Entry has agents array with "{agent-name}"
 ```
@@ -284,7 +289,11 @@ If you encounter an error that prevents task completion:
     "status": "error",
     "startedAt": "PRESERVE-FROM-INITIAL-ENTRY",
     "completedAt": "YYYY-MM-DDTHH:MM:SS.000Z",
-    "log": "## Error\n\nFailed to complete task due to <reason>.\n\n### Details\n- <Specific error details>\n\n### Suggested Fix\n<How to resolve>",
+    "workLog": [
+      "Failed to complete task due to <reason>",
+      "Error details: <specific error details>",
+      "Suggested fix: <how to resolve>"
+    ],
     "affectedFiles": ["files/touched/before/error.ts"],
     "agents": ["{agent-name}"]
   }
@@ -308,7 +317,12 @@ If you discover the task has unmet dependencies:
     "status": "blocked",
     "startedAt": "PRESERVE-FROM-INITIAL-ENTRY",
     "completedAt": "YYYY-MM-DDTHH:MM:SS.000Z",
-    "log": "## Task Blocked - Dependencies Not Met\n\n### Issue\nCannot complete task because required resources don't exist.\n\n### Missing Dependencies\n- <List specific missing items>\n\n### Required Tasks\n1. <Tasks that must complete first>",
+    "workLog": [
+      "Task blocked due to unmet dependencies",
+      "Cannot complete because required resources don't exist",
+      "Missing: <list specific missing items>",
+      "Required tasks: <tasks that must complete first>"
+    ],
     "affectedFiles": [],
     "agents": ["{agent-name}"]
   }

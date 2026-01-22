@@ -81,8 +81,14 @@ function Test-ProgressEntry {
         if (-not $Entry.completedAt) {
             $warnings += "Missing 'completedAt' field"
         }
-        if (-not $Entry.log) {
-            $warnings += "Missing 'log' field"
+        if (-not $Entry.workLog) {
+            $warnings += "Missing 'workLog' field"
+        }
+        elseif ($Entry.workLog -isnot [array]) {
+            $warnings += "'workLog' should be an array, got: $($Entry.workLog.GetType().Name)"
+        }
+        elseif ($Entry.workLog.Count -eq 0) {
+            $warnings += "Empty 'workLog' array - worker likely didn't log work"
         }
         if (-not $Entry.affectedFiles) {
             $warnings += "Missing 'affectedFiles' field"
@@ -92,23 +98,29 @@ function Test-ProgressEntry {
         }
     }
 
-    # For error entries, check log field
+    # For error entries, check workLog field
     if ($Entry.status -eq "error") {
         if (-not $Entry.completedAt) {
             $warnings += "Missing 'completedAt' field"
         }
-        if (-not $Entry.log) {
-            $warnings += "Missing 'log' field (should contain error details)"
+        if (-not $Entry.workLog) {
+            $warnings += "Missing 'workLog' field (should contain error details)"
+        }
+        elseif ($Entry.workLog -isnot [array]) {
+            $warnings += "'workLog' should be an array, got: $($Entry.workLog.GetType().Name)"
         }
     }
 
-    # For blocked entries, check log field
+    # For blocked entries, check workLog field
     if ($Entry.status -eq "blocked") {
         if (-not $Entry.completedAt) {
             $warnings += "Missing 'completedAt' field"
         }
-        if (-not $Entry.log) {
-            $warnings += "Missing 'log' field (should contain blocking reason)"
+        if (-not $Entry.workLog) {
+            $warnings += "Missing 'workLog' field (should contain blocking reason)"
+        }
+        elseif ($Entry.workLog -isnot [array]) {
+            $warnings += "'workLog' should be an array, got: $($Entry.workLog.GetType().Name)"
         }
     }
 
@@ -424,7 +436,7 @@ function Wait-WorkerBatch {
             if ($entryStatus -eq "completed") {
                 $status = @{
                     status = "completed"
-                    log = $entry.log
+                    workLog = $entry.workLog
                     affectedFiles = $entry.affectedFiles
                     agents = $entry.agents
                     validationWarnings = $validationWarnings
@@ -432,7 +444,7 @@ function Wait-WorkerBatch {
             } elseif ($entryStatus -eq "error") {
                 $status = @{
                     status = "error"
-                    error = if ($entry.log) { $entry.log } else { "Task failed with error status" }
+                    error = if ($entry.workLog) { ($entry.workLog -join "; ") } else { "Task failed with error status" }
                     affectedFiles = $entry.affectedFiles
                     agents = $entry.agents
                     validationWarnings = $validationWarnings
@@ -440,7 +452,7 @@ function Wait-WorkerBatch {
             } elseif ($entryStatus -eq "blocked") {
                 $status = @{
                     status = "blocked"
-                    error = if ($entry.log) { $entry.log } else { "Task blocked due to unmet dependencies" }
+                    error = if ($entry.workLog) { ($entry.workLog -join "; ") } else { "Task blocked due to unmet dependencies" }
                     affectedFiles = $entry.affectedFiles
                     agents = $entry.agents
                     validationWarnings = $validationWarnings
@@ -454,10 +466,10 @@ function Wait-WorkerBatch {
                 }
             } else {
                 # Legacy entry without status field - check if it has required fields
-                if ($entry.log -and $entry.affectedFiles) {
+                if ($entry.workLog -and $entry.affectedFiles) {
                     $status = @{
                         status = "completed"
-                        log = $entry.log
+                        workLog = $entry.workLog
                         affectedFiles = $entry.affectedFiles
                         agents = $entry.agents
                         validationWarnings = $validationWarnings

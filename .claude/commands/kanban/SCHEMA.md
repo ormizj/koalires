@@ -99,7 +99,7 @@ interface ProgressEntry {
   startedAt: string; // REQUIRED - ISO 8601 timestamp when work began
   agents: string[]; // REQUIRED - Agent names that worked on task
   completedAt?: string; // OPTIONAL - ISO 8601 timestamp when work finished
-  log?: string; // OPTIONAL - Markdown work summary
+  workLog?: string[]; // OPTIONAL - Array of work log entries
   affectedFiles?: string[]; // OPTIONAL - File paths created/modified/deleted
 }
 
@@ -126,7 +126,11 @@ type TaskStatus = 'running' | 'completed' | 'error' | 'blocked';
     "status": "completed",
     "startedAt": "2026-01-20T10:00:00.000Z",
     "completedAt": "2026-01-20T10:15:00.000Z",
-    "log": "## Work Summary\n\nBrief description...\n\n### Changes Made\n- Item 1\n- Item 2",
+    "workLog": [
+      "Created Prisma schema with FileShare model",
+      "Generated Prisma client successfully",
+      "Verified all verification steps pass"
+    ],
     "affectedFiles": ["path/to/file1.ts", "path/to/file2.ts"],
     "agents": ["backend-developer"]
   }
@@ -141,7 +145,10 @@ type TaskStatus = 'running' | 'completed' | 'error' | 'blocked';
     "status": "error",
     "startedAt": "2026-01-20T10:00:00.000Z",
     "completedAt": "2026-01-20T10:05:00.000Z",
-    "log": "## Error\n\nFailed due to...\n\n### Suggested Fix\n...",
+    "workLog": [
+      "Failed to complete task due to missing dependency",
+      "Suggested fix: Install required package first"
+    ],
     "affectedFiles": [],
     "agents": ["backend-developer"]
   }
@@ -156,7 +163,10 @@ type TaskStatus = 'running' | 'completed' | 'error' | 'blocked';
     "status": "blocked",
     "startedAt": "2026-01-20T10:00:00.000Z",
     "completedAt": "2026-01-20T10:05:00.000Z",
-    "log": "## Task Blocked\n\n### Missing Dependencies\n- required-task-name",
+    "workLog": [
+      "Task blocked due to unmet dependencies",
+      "Missing: required-task-name"
+    ],
     "affectedFiles": [],
     "agents": ["backend-developer"]
   }
@@ -165,19 +175,19 @@ type TaskStatus = 'running' | 'completed' | 'error' | 'blocked';
 
 ### Field Constraints
 
-| Field           | Type   | Required | Constraints                                        |
-| --------------- | ------ | -------- | -------------------------------------------------- |
-| `status`        | enum   | Yes      | One of: `running`, `completed`, `error`, `blocked` |
-| `startedAt`     | string | Yes      | ISO 8601 format with milliseconds                  |
-| `agents`        | array  | Yes      | At least 1 agent name string                       |
-| `completedAt`   | string | No\*     | ISO 8601 format, set when status != `running`      |
-| `log`           | string | No\*     | Markdown format with `\n` for newlines             |
-| `affectedFiles` | array  | No\*     | Relative file paths from project root              |
+| Field           | Type     | Required | Constraints                                        |
+| --------------- | -------- | -------- | -------------------------------------------------- |
+| `status`        | enum     | Yes      | One of: `running`, `completed`, `error`, `blocked` |
+| `startedAt`     | string   | Yes      | ISO 8601 format with milliseconds                  |
+| `agents`        | array    | Yes      | At least 1 agent name string                       |
+| `completedAt`   | string   | No\*     | ISO 8601 format, set when status != `running`      |
+| `workLog`       | string[] | No\*     | Array of work log entry strings                    |
+| `affectedFiles` | array    | No\*     | Relative file paths from project root              |
 
 **\*Worker Protocol Requirements**: While these fields are technically optional in the JSON schema, the worker protocol expects them to be populated:
 
-- `completedAt`, `log`, and `affectedFiles` are **expected** for `completed` entries
-- `completedAt` and `log` are **expected** for `error` and `blocked` entries
+- `completedAt`, `workLog`, and `affectedFiles` are **expected** for `completed` entries
+- `completedAt` and `workLog` are **expected** for `error` and `blocked` entries
 - The dispatcher validates entries and displays warnings for missing/empty fields
 
 ---
@@ -310,7 +320,7 @@ Workers are assigned based on task category:
 2. Update entry with:
    - `status: "completed"`
    - `completedAt: "<current ISO timestamp>"`
-   - `log: "<markdown summary>"`
+   - `workLog: ["<log entry 1>", "<log entry 2>", ...]`
    - `affectedFiles: ["<paths>"]`
 3. Write `kanban-progress.json`
 4. Read `kanban-board.json`
@@ -323,7 +333,7 @@ Workers are assigned based on task category:
 2. Update entry with:
    - `status: "error"` or `status: "blocked"`
    - `completedAt: "<current ISO timestamp>"`
-   - `log: "<error details>"`
+   - `workLog: ["<error details>", "<suggested fix>"]`
    - `affectedFiles: []`
 3. Write `kanban-progress.json`
 4. Do NOT update `passes` in `kanban-board.json`
