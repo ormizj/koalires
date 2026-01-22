@@ -1,74 +1,93 @@
 import { defineStore } from 'pinia';
+import type { User } from '~/entities/user';
 
 interface AuthState {
-  email: string;
+  user: User | null;
   jwt: string;
-  userId: number | null;
 }
 
 export const useAuthStore = defineStore('auth', {
   state: (): AuthState => ({
-    email: '',
+    user: null,
     jwt: '',
-    userId: null,
   }),
 
   getters: {
     isAuthenticated: (state) => !!state.jwt,
+    token: (state) => state.jwt, // backward compatibility alias
   },
 
   actions: {
     async login(email: string, password: string) {
       const response = await $fetch<{
         token: string;
-        user: { id: number; email: string };
+        user: User;
       }>('/api/auth/login', {
         method: 'POST',
         body: { email, password },
       });
-      this._clientLogin(response.user.email, response.token, response.user.id);
+      this._setAuth(response.user, response.token);
       return response;
     },
 
     async register(email: string, password: string) {
       const response = await $fetch<{
         token: string;
-        user: { id: number; email: string };
+        user: User;
       }>('/api/auth/register', {
         method: 'POST',
         body: { email, password },
       });
-      this._clientLogin(response.user.email, response.token, response.user.id);
+      this._setAuth(response.user, response.token);
       return response;
     },
 
     async logout() {
       await $fetch('/api/auth/logout', { method: 'DELETE' });
-      this._clientLogout();
+      this._clearAuth();
     },
 
-    _clientLogin(email: string, jwt: string, userId: number) {
-      localStorage.setItem('jwt', jwt);
-      localStorage.setItem('email', email.toLowerCase());
-      localStorage.setItem('userId', String(userId));
+    async fetchUser() {
+      if (!this.jwt) return;
+      try {
+        const user = await $fetch<User>('/api/auth/me');
+        this.user = user;
+      } catch {
+        this._clearAuth();
+      }
+    },
+
+    _setAuth(user: User, jwt: string) {
+      this.user = user;
       this.jwt = jwt;
-      this.email = email.toLowerCase();
-      this.userId = userId;
-    },
-
-    _clientLogout() {
-      localStorage.removeItem('jwt');
+      localStorage.setItem('jwt', jwt);
+      localStorage.setItem('user', JSON.stringify(user));
+      // Clean up old keys
       localStorage.removeItem('email');
       localStorage.removeItem('userId');
+    },
+
+    _clearAuth() {
+      this.user = null;
       this.jwt = '';
-      this.email = '';
-      this.userId = null;
+      localStorage.removeItem('jwt');
+      localStorage.removeItem('user');
+      // Clean up old keys
+      localStorage.removeItem('email');
+      localStorage.removeItem('userId');
     },
 
     async _init() {
+      // Migrate legacy 'token' key to 'jwt'
+      const legacyToken = localStorage.getItem('token');
+      if (legacyToken && !localStorage.getItem('jwt')) {
+        localStorage.setItem('jwt', legacyToken);
+        localStorage.removeItem('token');
+      }
+
       this.jwt = localStorage.getItem('jwt') ?? '';
-      this.email = localStorage.getItem('email') ?? '';
-      this.userId = Number(localStorage.getItem('userId')) || null;
+      const userJson = localStorage.getItem('user');
+      this.user = userJson ? JSON.parse(userJson) : null;
 
       if (!this.jwt) return;
 
@@ -76,11 +95,12 @@ export const useAuthStore = defineStore('auth', {
         const res = await $fetch<{ userId: number; email: string }>(
           '/api/auth/jwt-data'
         );
-        if (res.email !== this.email) {
-          this._clientLogout();
+        // Fix: compare emails case-insensitively
+        if (res.email.toLowerCase() !== this.user?.email?.toLowerCase()) {
+          this._clearAuth();
         }
       } catch {
-        this._clientLogout();
+        this._clearAuth();
       }
     },
   },

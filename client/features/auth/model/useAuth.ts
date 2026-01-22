@@ -1,35 +1,30 @@
-import { useUser } from '~/entities/user';
-import { authApi } from '../api/authApi';
+import { storeToRefs } from 'pinia';
+import { useAuthStore } from '~/shared/stores';
 
 export function useAuth() {
   const router = useRouter();
-  const {
-    user,
-    token,
-    isAuthenticated,
-    setUser,
-    setToken,
-    initFromStorage,
-    clearUser,
-    fetchUser,
-  } = useUser();
+  const authStore = useAuthStore();
+  const { user, token, isAuthenticated } = storeToRefs(authStore);
 
   async function login(email: string, password: string) {
-    const response = await authApi.login(email, password);
-    setToken(response.token);
-    setUser(response.user);
+    await authStore.login(email, password);
   }
 
   async function register(email: string, password: string) {
-    const response = await authApi.register(email, password);
-    setToken(response.token);
-    setUser(response.user);
+    await authStore.register(email, password);
   }
 
-  function logout() {
-    clearUser();
+  async function logout() {
+    await authStore.logout();
     void router.push('/login');
   }
+
+  async function fetchUser() {
+    await authStore.fetchUser();
+  }
+
+  // No-op for backward compatibility
+  function initFromStorage() {}
 
   return {
     user,

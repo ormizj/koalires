@@ -21,7 +21,7 @@ interface ApiClient {
 
 function getToken(): string | null {
   if (import.meta.client) {
-    return localStorage.getItem('token');
+    return localStorage.getItem('jwt');
   }
   return null;
 }
