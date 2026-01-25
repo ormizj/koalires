@@ -978,6 +978,12 @@ body {
     color: #58a6ff;
 }
 
+.modal-tab.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 .modal-content {
     flex: 1;
     overflow: auto;

@@ -31,6 +31,9 @@ let modalStartTop = 0;
 
 const MIN_WIDTH = 500;
 const MIN_HEIGHT = 400;
+const DEFAULT_WIDTH = 700;
+const DEFAULT_HEIGHT = 600;
+const MODAL_SIZE_KEY = 'kanban-metadata-modal-size';
 
 // Auto-refresh state
 let refreshInterval = null;
@@ -51,7 +54,11 @@ export function initMetadataModal() {
 
     // Tab switching
     modalElement.querySelectorAll('.modal-tab').forEach(tab => {
-        tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+        tab.addEventListener('click', () => {
+            // Skip if tab is disabled
+            if (tab.classList.contains('disabled')) return;
+            switchTab(tab.dataset.tab);
+        });
     });
 
     // Close button
@@ -95,12 +102,6 @@ export function showModal(taskName) {
         titleElement.textContent = `Metadata: ${taskName}`;
     }
 
-    // Update log tab labels with task name
-    const logTab = modalElement.querySelector('[data-tab="log"]');
-    const outputTab = modalElement.querySelector('[data-tab="output"]');
-    if (logTab) logTab.textContent = `logs/${taskName}.json`;
-    if (outputTab) outputTab.textContent = `logs/${taskName}-output.json`;
-
     // Show overlay and modal
     overlayElement.classList.remove('hidden');
 
@@ -114,8 +115,11 @@ export function showModal(taskName) {
     }
     updateSearchCount(null);
 
-    // Load default tab (kanban-progress)
-    switchTab('progress');
+    // Check which tabs have data available
+    checkTabDataAvailability();
+
+    // Load default tab (board)
+    switchTab('board');
 
     // Start auto-refresh polling
     startRefreshPolling();
@@ -147,6 +151,110 @@ export function clearCache() {
 }
 
 /**
+ * Check which tabs have data available and update their disabled state
+ */
+async function checkTabDataAvailability() {
+    if (!modalElement || !currentTaskName) return;
+
+    const tabs = {
+        board: modalElement.querySelector('[data-tab="board"]'),
+        progress: modalElement.querySelector('[data-tab="progress"]'),
+        log: modalElement.querySelector('[data-tab="log"]'),
+        output: modalElement.querySelector('[data-tab="output"]')
+    };
+
+    // Check each data source
+    const availability = {
+        board: false,
+        progress: false,
+        log: false,
+        output: false
+    };
+
+    // Check board data
+    try {
+        const boardData = await fetchBoardData();
+        availability.board = boardData !== null;
+    } catch {
+        availability.board = false;
+    }
+
+    // Check progress data
+    try {
+        const progressData = await fetchProgressData();
+        availability.progress = progressData !== null;
+    } catch {
+        availability.progress = false;
+    }
+
+    // Check log data (worker-raw)
+    try {
+        const response = await fetch(`../logs/${currentTaskName}.json?t=${Date.now()}`);
+        availability.log = response.ok;
+    } catch {
+        availability.log = false;
+    }
+
+    // Check output data (worker-output)
+    try {
+        const response = await fetch(`../logs/${currentTaskName}-output.json?t=${Date.now()}`);
+        availability.output = response.ok;
+    } catch {
+        availability.output = false;
+    }
+
+    // Update tab disabled states
+    Object.entries(tabs).forEach(([tabName, tabElement]) => {
+        if (tabElement) {
+            if (availability[tabName]) {
+                tabElement.classList.remove('disabled');
+            } else {
+                tabElement.classList.add('disabled');
+            }
+        }
+    });
+
+    return availability;
+}
+
+/**
+ * Save modal size to localStorage
+ */
+function saveModalSize() {
+    if (!modalElement) return;
+
+    const size = {
+        width: modalElement.offsetWidth,
+        height: modalElement.offsetHeight
+    };
+
+    try {
+        localStorage.setItem(MODAL_SIZE_KEY, JSON.stringify(size));
+    } catch (e) {
+        // Ignore localStorage errors
+    }
+}
+
+/**
+ * Load modal size from localStorage
+ */
+function loadModalSize() {
+    try {
+        const stored = localStorage.getItem(MODAL_SIZE_KEY);
+        if (stored) {
+            const size = JSON.parse(stored);
+            return {
+                width: Math.max(MIN_WIDTH, size.width || DEFAULT_WIDTH),
+                height: Math.max(MIN_HEIGHT, size.height || DEFAULT_HEIGHT)
+            };
+        }
+    } catch (e) {
+        // Ignore localStorage errors
+    }
+    return { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT };
+}
+
+/**
  * Center the modal on screen
  */
 function centerModal() {
@@ -154,11 +262,12 @@ function centerModal() {
 
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
+    const size = loadModalSize();
 
-    modalElement.style.width = '700px';
-    modalElement.style.height = '600px';
-    modalElement.style.left = `${(viewportWidth - 700) / 2}px`;
-    modalElement.style.top = `${(viewportHeight - 600) / 2}px`;
+    modalElement.style.width = `${size.width}px`;
+    modalElement.style.height = `${size.height}px`;
+    modalElement.style.left = `${(viewportWidth - size.width) / 2}px`;
+    modalElement.style.top = `${(viewportHeight - size.height) / 2}px`;
 }
 
 /**
@@ -705,6 +814,9 @@ async function refreshCurrentTab() {
     // Clear cache before fetching to get fresh data
     clearCache();
 
+    // Re-check tab availability (data might have appeared)
+    checkTabDataAvailability();
+
     const newData = await fetchTabData(currentTabName);
 
     // Only re-render if data changed
@@ -769,6 +881,27 @@ function startResize(e) {
 }
 
 /**
+ * Clamp modal position to keep at least 50px of header visible within viewport
+ */
+function clampPosition(left, top, width, height) {
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const minVisible = 50; // At least 50px of header must remain visible
+
+    // Clamp horizontal: ensure minVisible pixels of modal are visible on each side
+    const minLeft = minVisible - width;
+    const maxLeft = viewportWidth - minVisible;
+    const clampedLeft = Math.max(minLeft, Math.min(maxLeft, left));
+
+    // Clamp vertical: keep header visible (top can't go above viewport, bottom limited)
+    const minTop = 0;
+    const maxTop = viewportHeight - minVisible;
+    const clampedTop = Math.max(minTop, Math.min(maxTop, top));
+
+    return { left: clampedLeft, top: clampedTop };
+}
+
+/**
  * Handle mouse move for drag/resize
  */
 function handleMouseMove(e) {
@@ -776,8 +909,14 @@ function handleMouseMove(e) {
         const deltaX = e.clientX - dragStartX;
         const deltaY = e.clientY - dragStartY;
 
-        modalElement.style.left = `${modalStartX + deltaX}px`;
-        modalElement.style.top = `${modalStartY + deltaY}px`;
+        const newLeft = modalStartX + deltaX;
+        const newTop = modalStartY + deltaY;
+        const width = modalElement.offsetWidth;
+        const height = modalElement.offsetHeight;
+
+        const clamped = clampPosition(newLeft, newTop, width, height);
+        modalElement.style.left = `${clamped.left}px`;
+        modalElement.style.top = `${clamped.top}px`;
     }
 
     if (isResizing) {
@@ -809,10 +948,13 @@ function handleMouseMove(e) {
             newTop = modalStartTop + heightDelta;
         }
 
+        // Apply viewport constraints to resized position
+        const clamped = clampPosition(newLeft, newTop, newWidth, newHeight);
+
         modalElement.style.width = `${newWidth}px`;
         modalElement.style.height = `${newHeight}px`;
-        modalElement.style.left = `${newLeft}px`;
-        modalElement.style.top = `${newTop}px`;
+        modalElement.style.left = `${clamped.left}px`;
+        modalElement.style.top = `${clamped.top}px`;
     }
 }
 
@@ -820,6 +962,9 @@ function handleMouseMove(e) {
  * Handle mouse up to end drag/resize
  */
 function handleMouseUp() {
+    if (isResizing) {
+        saveModalSize();
+    }
     isDragging = false;
     isResizing = false;
 }
