@@ -13,7 +13,7 @@
     The name of the task being processed.
 
 .PARAMETER JsonLogPath
-    Path to the raw JSON log file (.kanban/logs/{task}.json).
+    Path to the raw JSON log file (.kanban/worker-logs/{task}.json).
 
 .PARAMETER OutputFilePath
     Path where the normalized output file will be written.
@@ -25,7 +25,7 @@
     ISO timestamp when the task was marked as running (from dispatcher).
 
 .EXAMPLE
-    .\parse-worker-log.ps1 -TaskName "my-task" -JsonLogPath ".kanban/logs/my-task.json" -OutputFilePath ".kanban/logs/my-task-output.json" -AgentName "backend-developer" -StartedAt "2026-01-22T10:00:00.000Z"
+    .\parse-worker-log.ps1 -TaskName "my-task" -JsonLogPath ".kanban/worker-logs/my-task.json" -OutputFilePath ".kanban/worker-logs/my-task-output.json" -AgentName "backend-developer" -StartedAt "2026-01-22T10:00:00.000Z"
 #>
 
 param(

@@ -32,7 +32,8 @@
       "Bash(npm run typecheck:*)",
       "Bash(npx nuxi prepare)",
       "Bash(ls -la \"C:\\\\Users\\\\orm\\\\Desktop\\\\Files\\\\My Projects\\\\koalires\\\\.kanban\\\\kanban-viewer\"\" && ls -la \"C:UsersormDesktopFilesMy Projectskoalires.kanbankanban-viewerjs\"\")",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(ls -la \"C:\\\\Users\\\\orm\\\\Desktop\\\\Files\\\\My Projects\\\\koalires\\\\.kanban\"\" 2>/dev/null || echo \"No .kanban directory exists yet \")"
     ]
   }
 }

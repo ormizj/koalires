@@ -202,7 +202,7 @@ export function showModal(taskName) {
 /**
  * Show the modal for a column with multiple tasks
  */
-export function showColumnModal(columnId, taskNames) {
+export async function showColumnModal(columnId, taskNames) {
   if (!modalElement || !overlayElement || taskNames.length === 0) return;
 
   isColumnMode = true;
@@ -238,15 +238,27 @@ export function showColumnModal(columnId, taskNames) {
   currentMatchIndex = -1;
   updateSearchCount();
 
-  // Show sidebar and render task list (instead of horizontal tabs)
+  // Show sidebar and render task list with loading state
   showSidebar();
-  renderSidebarTasks(taskNames, progressDataCache);
+  renderSidebarTasks(taskNames, null, true); // true = loading state
 
   // Hide horizontal task tabs (replaced by sidebar)
   const taskTabsContainer = document.getElementById('modal-task-tabs');
   if (taskTabsContainer) {
     taskTabsContainer.classList.add('hidden');
     taskTabsContainer.innerHTML = '';
+  }
+
+  // Fetch progress data immediately (non-blocking for UI)
+  try {
+    const response = await fetch(`../kanban-progress.json?t=${Date.now()}`);
+    if (response.ok) {
+      progressDataCache = await response.json();
+      // Update sidebar with real status
+      updateSidebarTaskStatus(progressDataCache);
+    }
+  } catch (e) {
+    console.warn('Failed to fetch initial progress data:', e);
   }
 
   // Check tab data availability and load first task
@@ -1694,14 +1706,14 @@ function endSidebarResize() {
 /**
  * Render task list in sidebar
  */
-function renderSidebarTasks(taskNames, progressData) {
+function renderSidebarTasks(taskNames, progressData, isLoading = false) {
   const container = document.getElementById('sidebar-task-list');
   if (!container) return;
 
   container.innerHTML = taskNames
     .map((taskName, index) => {
-      const status = getTaskStatusFromBoard({ name: taskName }, progressData || {});
-      const statusClass = getStatusClass(status);
+      const status = isLoading ? 'loading' : getTaskStatusFromBoard({ name: taskName }, progressData || {});
+      const statusClass = isLoading ? 'loading' : getStatusClass(status);
       const isActive = index === selectedTaskIndex;
 
       return `

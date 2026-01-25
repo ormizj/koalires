@@ -11,9 +11,9 @@ Strict, unambiguous schema definitions for all kanban data files. No interpolati
 | `.kanban/kanban-board.json`            | Task definitions with passes field         | Yes                |
 | `.kanban/kanban-progress.json`         | Status tracking, work logs, affected files | Yes                |
 | `.kanban/kanban-viewer.html`           | Interactive viewer UI                      | Yes                |
-| `.kanban/logs/`                        | Worker output logs (runtime)               | Created at runtime |
-| `.kanban/logs/{task-name}.json`        | Claude session log for token tracking      | Created at runtime |
-| `.kanban/logs/{task-name}-output.json` | Worker output file with results            | Created by worker  |
+| `.kanban/worker-logs/`                        | Worker output logs (runtime)               | Created at runtime |
+| `.kanban/worker-logs/{task-name}.json`        | Claude session log for token tracking      | Created at runtime |
+| `.kanban/worker-logs/{task-name}-output.json` | Worker output file with results            | Created by worker  |
 
 ---
 
@@ -208,7 +208,7 @@ type TaskStatus = 'running' | 'code-review' | 'completed' | 'error' | 'blocked';
 | `ui`          | vue-expert        | Vue components, pages, visual design           |
 | `integration` | backend-developer | Service connections, API clients               |
 | `config`      | backend-developer | Configuration files                            |
-| `testing`     | backend-developer | Test files                                     |
+| `testing`     | kanban-unit-tester       | Test files (TDD workflow)                      |
 
 ### TaskStatus
 
@@ -281,7 +281,95 @@ Workers are assigned based on task category:
 | `api`         | `backend-developer` | Server routes, business logic, middleware   |
 | `integration` | `backend-developer` | API clients, service connections            |
 | `ui`          | `vue-expert`        | Vue components, Nuxt pages, composables     |
-| `testing`     | `backend-developer` | Unit tests, integration tests               |
+| `testing`     | `kanban-unit-tester`       | Unit tests, integration tests               |
+
+---
+
+## 6.1 TDD (Test-Driven Development) Workflow
+
+The kanban dispatcher implements a TDD workflow where tests are created BEFORE implementation begins.
+
+### TDD Categories
+
+The following task categories receive pre-implementation tests:
+
+- `data` - Database schemas, types, stores
+- `api` - Server endpoints, business logic
+- `integration` - Service connections, API clients
+- `ui` - Vue components, pages
+- `config` - Configuration files
+
+**Note**: `testing` category tasks do NOT receive pre-tests (they ARE the tests).
+
+### TDD Execution Flow
+
+```
+For each batch of tasks:
+
+PHASE 1: TEST CREATION
+┌─────────────────────────────────────────────────┐
+│ 1. Filter tasks that need tests (TDD categories)│
+│ 2. Spawn kanban-unit-tester agents in parallel         │
+│ 3. kanban-unit-tester analyzes task description/steps  │
+│ 4. Creates test files that will FAIL initially  │
+│ 5. Extract created test file paths from logs    │
+└─────────────────────────────────────────────────┘
+                       ↓
+PHASE 2: IMPLEMENTATION
+┌─────────────────────────────────────────────────┐
+│ 1. Build worker prompts with test file paths    │
+│ 2. Spawn implementation workers in parallel     │
+│ 3. Workers read tests to understand requirements│
+│ 4. Workers implement feature                    │
+│ 5. Workers run tests - must ALL pass            │
+│ 6. Workers verify manual steps                  │
+└─────────────────────────────────────────────────┘
+```
+
+### Test Creation Output
+
+The kanban-unit-tester creates test files based on task requirements:
+
+| Task Category | Test File Location                              | Example                                  |
+| ------------- | ----------------------------------------------- | ---------------------------------------- |
+| `data`        | Same directory as implementation + `.test.ts`   | `server/database/schemas/user.test.ts`   |
+| `api`         | Same directory as implementation + `.test.ts`   | `server/api/auth/login.test.ts`          |
+| `ui`          | Same directory as implementation + `.test.ts`   | `client/features/auth/ui/Login.test.ts`  |
+| `integration` | Same directory as implementation + `.test.ts`   | `server/services/email.test.ts`          |
+| `config`      | Same directory as implementation + `.test.ts`   | `config/app.test.ts`                     |
+
+### Worker Prompt with Test Files
+
+Implementation workers receive test file paths in their prompt:
+
+```markdown
+### Pre-Created Test Files
+
+The following test files have been created for this task. Your implementation MUST pass all tests:
+
+- `server/api/auth/login.test.ts`
+- `server/utils/jwt.test.ts`
+
+Run tests with: `npm run test` or the project's test command.
+```
+
+### Test File Detection
+
+The dispatcher extracts test files from kanban-unit-tester logs by detecting:
+
+- Write/Edit tool calls creating files matching test patterns
+- Patterns: `*.test.ts`, `*.spec.ts`, `test_*.py`, `*_test.py`, `*_test.go`
+
+### TDD Log Files
+
+For each task, the following log files are created:
+
+| File                                      | Purpose                                    |
+| ----------------------------------------- | ------------------------------------------ |
+| `.kanban/worker-logs/{task}-test-creation.json`  | kanban-unit-tester session log                    |
+| `.kanban/worker-logs/{task}-test-creation-prompt.txt` | Prompt sent to kanban-unit-tester            |
+| `.kanban/worker-logs/{task}.json`                | Implementation worker session log          |
+| `.kanban/worker-logs/{task}-output.json`         | Normalized implementation output           |
 
 ---
 
@@ -325,7 +413,7 @@ The dispatcher owns all `kanban-progress.json` and `kanban-board.json` updates. 
 
 ### Worker: Create Output File
 
-Workers create `.kanban/logs/{task-name}-output.json`:
+Workers create `.kanban/worker-logs/{task-name}-output.json`:
 
 ```json
 {
@@ -359,7 +447,7 @@ For error/blocked status, include:
 
 ### Dispatcher: After Worker Completes
 
-1. Read worker output file (`.kanban/logs/{task-name}-output.json`)
+1. Read worker output file (`.kanban/worker-logs/{task-name}-output.json`)
 2. Update `kanban-progress.json` with:
    - `status` mapped from worker output (`success` → `code-review`)
    - `completedAt`, `workLog`, `affectedFiles` from output

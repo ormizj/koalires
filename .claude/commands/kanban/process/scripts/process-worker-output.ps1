@@ -11,7 +11,7 @@
     The name of the task being processed.
 
 .PARAMETER OutputFile
-    Path to the worker output JSON file (.kanban/logs/{task}-output.json).
+    Path to the worker output JSON file (.kanban/worker-logs/{task}-output.json).
 
 .PARAMETER ProgressFile
     Path to the progress tracking file (.kanban/kanban-progress.json).
@@ -23,7 +23,7 @@
     Optional JSON array string of token counts to add to progress entry.
 
 .EXAMPLE
-    .\process-worker-output.ps1 -TaskName "my-task" -OutputFile ".kanban/logs/my-task-output.json" -ProgressFile ".kanban/kanban-progress.json" -BoardFile ".kanban/kanban-board.json"
+    .\process-worker-output.ps1 -TaskName "my-task" -OutputFile ".kanban/worker-logs/my-task-output.json" -ProgressFile ".kanban/kanban-progress.json" -BoardFile ".kanban/kanban-board.json"
 #>
 
 param(

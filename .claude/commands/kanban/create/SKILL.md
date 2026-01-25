@@ -90,23 +90,23 @@ Before creating a new kanban board, offer to clear the existing logs directory t
 
 ### Check Steps
 
-1. **Check if `.kanban/logs/` directory exists and has files**
-   - Use Glob to check for `.kanban/logs/*`
+1. **Check if `.kanban/worker-logs/` directory exists and has files**
+   - Use Glob to check for `.kanban/worker-logs/*`
    - If directory is empty or doesn't exist → skip this section
    - If files exist → continue to step 2
 
 2. **Prompt user for clearing**
    - Use AskUserQuestion tool:
-     - Question: "Clear existing logs directory before creating new board?"
+     - Question: "Clear existing worker-logs directory before creating new board?"
      - Options:
-       - "Yes, clear logs" - Delete all files in `.kanban/logs/`
+       - "Yes, clear logs" - Delete all files in `.kanban/worker-logs/`
        - "No, keep logs" - Preserve existing log files
 
 3. **Execute clearing if requested**
    - If user selects "Yes, clear logs":
-     - Delete all files in `.kanban/logs/` directory
+     - Delete all files in `.kanban/worker-logs/` directory
      - Keep the directory itself
-     - Output: "Cleared .kanban/logs/ directory"
+     - Output: "Cleared .kanban/worker-logs/ directory"
    - If user selects "No, keep logs":
      - Output: "Preserving existing log files"
 

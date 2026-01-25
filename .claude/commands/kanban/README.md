@@ -68,7 +68,7 @@ Reviews completed tasks and creates git commits:
 | `.kanban/kanban-progress.json` | Progress tracking (log, affected files, agents) |
 | `.kanban/kanban-viewer.html`   | Interactive board UI                            |
 | `.kanban/workers/`             | Worker status files (parallel dispatch)         |
-| `.kanban/logs/`                | Worker output logs                              |
+| `.kanban/worker-logs/`                | Worker output logs                              |
 
 For strict schema definitions of all data files, see [SCHEMA.md](./SCHEMA.md).
 
@@ -81,7 +81,7 @@ For strict schema definitions of all data files, see [SCHEMA.md](./SCHEMA.md).
 | `ui`          | vue-expert        | Components, styling      |
 | `integration` | backend-developer | Connecting services      |
 | `config`      | backend-developer | Configuration, env setup |
-| `testing`     | backend-developer | Test cases               |
+| `testing`     | kanban-unit-tester       | Test cases (TDD)         |
 
 ## Status Flow
 

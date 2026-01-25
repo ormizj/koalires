@@ -27,7 +27,7 @@ This skill orchestrates parallel task execution using a wave-based system:
 ```
 Worker executes task
     ↓
-Raw session log written to .kanban/logs/{task}.json
+Raw session log written to .kanban/worker-logs/{task}.json
     ↓
 parse-worker-log.ps1 extracts:
   - Affected files (from Write/Edit tool calls)
@@ -35,7 +35,7 @@ parse-worker-log.ps1 extracts:
   - Verification results (from text patterns)
   - Success/failure status (from result entry)
     ↓
-Creates .kanban/logs/{task}-output.json (normalized format)
+Creates .kanban/worker-logs/{task}-output.json (normalized format)
     ↓
 process-worker-output.ps1 updates:
   - kanban-progress.json (work log, files, tokens)
@@ -67,9 +67,9 @@ All kanban files are in the `.kanban/` directory:
 | --------------------------------- | -------------------------------------------------- |
 | `.kanban/kanban-board.json`       | Task definitions with passes field                 |
 | `.kanban/kanban-progress.json`    | Status tracking, work logs, affected files, agents |
-| `.kanban/logs/`                   | Worker output logs                                 |
-| `.kanban/logs/{task}.json`        | Raw worker session log (JSON format)               |
-| `.kanban/logs/{task}-output.json` | Parsed/normalized output (created by dispatcher)   |
+| `.kanban/worker-logs/`                   | Worker output logs                                 |
+| `.kanban/worker-logs/{task}.json`        | Raw worker session log (JSON format)               |
+| `.kanban/worker-logs/{task}-output.json` | Parsed/normalized output (created by dispatcher)   |
 
 ## Scripts
 
@@ -118,7 +118,7 @@ Workers are assigned agents based on task category:
 | api         | backend-developer |
 | integration | backend-developer |
 | ui          | vue-expert        |
-| testing     | backend-developer |
+| testing     | kanban-unit-tester       |
 
 ---
 
@@ -232,7 +232,7 @@ The dispatcher extracts data from raw worker logs:
 
 ### Normalized Output File Schema
 
-The dispatcher creates `.kanban/logs/{task-name}-output.json`:
+The dispatcher creates `.kanban/worker-logs/{task-name}-output.json`:
 
 ```json
 {
@@ -281,7 +281,7 @@ When a worker fails:
 
 1. Parse script extracts error information from raw log
 2. Progress entry contains `status: "error"` with details
-3. Full output available in `.kanban/logs/{task-name}.json`
+3. Full output available in `.kanban/worker-logs/{task-name}.json`
 4. User prompted for action (retry/skip/quit)
 
 ### Parse Failure
@@ -333,7 +333,7 @@ The dispatcher automatically determines which tasks need processing based on cur
 - Code review and git commits are handled by the separate `kanban:code-review` skill
 - Workers operate independently and may run concurrently
 - Each worker has full access to project files and CLAUDE.md context
-- Worker logs are preserved in `.kanban/logs/` for debugging
+- Worker logs are preserved in `.kanban/worker-logs/` for debugging
 - **Workers run with `--dangerously-skip-permissions`** to enable autonomous execution
 - **Dispatcher owns output file creation** - workers do not create tracking files
 - `kanban-progress.json` is the single source of truth for worker status tracking

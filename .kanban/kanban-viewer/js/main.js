@@ -14,6 +14,7 @@ import {
   initMetadataModal,
   clearCache as clearMetadataCache,
 } from './metadata-modal.js';
+import { initSearch } from './search.js';
 
 // Export functions to window for inline event handlers
 window.toggleMinimize = toggleMinimize;
@@ -36,6 +37,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Initialize metadata modal
   initMetadataModal();
+
+  // Initialize task search
+  initSearch();
 
   // Auto-refresh every 1 second (also clears metadata cache)
   setInterval(() => {

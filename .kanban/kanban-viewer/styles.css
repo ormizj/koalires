@@ -14,10 +14,92 @@ body {
 }
 
 .header {
+    position: relative;
     text-align: center;
     margin-bottom: 1.875rem;
     padding-bottom: 1.25rem;
     border-bottom: 1px solid #30363d;
+}
+
+/* Task Search Styles */
+.task-search {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 6px 10px;
+    width: 180px;
+    transition: all 0.2s ease;
+}
+
+.task-search:focus-within {
+    width: 220px;
+    border-color: #58a6ff;
+    box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
+}
+
+.task-search input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #c9d1d9;
+    font-size: 13px;
+    outline: none;
+    min-width: 0;
+}
+
+.task-search input::placeholder {
+    color: #6e7681;
+}
+
+.task-search .search-count {
+    font-size: 11px;
+    color: #6e7681;
+    white-space: nowrap;
+    min-width: fit-content;
+}
+
+.task-search .search-count:empty {
+    display: none;
+}
+
+.task-search .search-clear {
+    background: transparent;
+    border: none;
+    color: #6e7681;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 0 2px;
+    line-height: 1;
+    display: none;
+    transition: color 0.15s ease;
+}
+
+.task-search .search-clear:hover {
+    color: #f85149;
+}
+
+.task-search.has-value .search-clear {
+    display: block;
+}
+
+/* Hidden task state for search filtering */
+.task.search-hidden {
+    display: none !important;
+}
+
+/* Empty search message in column */
+.search-empty-msg {
+    text-align: center;
+    padding: 1.5rem 1rem;
+    color: #6e7681;
+    font-size: 0.85rem;
+    font-style: italic;
 }
 
 .header h1 {
@@ -365,9 +447,6 @@ body {
     transform: translateY(-2px);
 }
 
-.task.expanded .task-description {
-    display: block;
-}
 
 .task-header {
     display: flex;
@@ -429,13 +508,31 @@ body {
     color: #8b949e;
     margin-bottom: 0.625rem;
     line-height: 1.5;
-    display: none;
     background: #161b22;
     padding: 0.625rem;
     border-radius: 6px;
     border: 1px solid #30363d;
     max-height: 18.75rem;
     overflow-y: auto;
+}
+
+.task-description-section {
+    display: none;
+    margin-top: 0.625rem;
+    padding-top: 0.625rem;
+    border-top: 1px solid #30363d;
+}
+
+.task.expanded .task-description-section {
+    display: block;
+}
+
+.task-description-label {
+    font-size: 0.7rem;
+    color: #58a6ff;
+    margin-bottom: 0.375rem;
+    text-transform: uppercase;
+    font-weight: 600;
 }
 
 .task-steps {
@@ -1584,6 +1681,23 @@ body {
 
 .sidebar-task-status.review {
     background: #a371f7;
+}
+
+/* Loading state - pulsing animation */
+.sidebar-task-status.loading {
+    background: #6e7681;
+    animation: pulse-status 1s ease-in-out infinite;
+}
+
+@keyframes pulse-status {
+    0%, 100% {
+        opacity: 0.4;
+        transform: scale(0.8);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1);
+    }
 }
 
 /* Sidebar Resizer - Draggable divider */

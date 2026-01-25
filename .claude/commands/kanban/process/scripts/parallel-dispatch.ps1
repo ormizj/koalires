@@ -55,7 +55,7 @@ $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Resolve-Path (Join-Path $ScriptDir "../../../../..")
 $KanbanDir = Join-Path $ProjectRoot ".kanban"
-$LogsDir = Join-Path $KanbanDir "logs"
+$LogsDir = Join-Path $KanbanDir "worker-logs"
 $BoardFile = Join-Path $KanbanDir "kanban-board.json"
 $ProgressFile = Join-Path $KanbanDir "kanban-progress.json"
 $PromptTemplate = Join-Path $ScriptDir "../prompts/worker-task.md"
@@ -68,8 +68,11 @@ $WaveDefinitions = @{
     2 = @("api")                  # After data
     3 = @("integration")          # After api
     4 = @("ui")                   # After integration
-    5 = @("testing")              # After all
+    5 = @("testing")              # After all (no pre-tests needed)
 }
+
+# Categories that require pre-implementation tests (TDD)
+$TddCategories = @("data", "api", "integration", "ui", "config")
 
 # Agent mapping by category
 $AgentMapping = @{
@@ -78,7 +81,7 @@ $AgentMapping = @{
     "ui"          = "vue-expert"
     "integration" = "backend-developer"
     "config"      = "backend-developer"
-    "testing"     = "backend-developer"
+    "testing"     = "kanban-unit-tester"
 }
 
 #region Helper Functions
@@ -434,7 +437,8 @@ function Build-WorkerPrompt {
     param(
         [object]$Task,
         [object]$Board,
-        [string]$TemplatePath
+        [string]$TemplatePath,
+        [array]$TestFiles = @()
     )
 
     # Read template
@@ -459,6 +463,10 @@ You are a worker process executing a single kanban task. Complete the assigned t
 
 {task.description}
 
+### Pre-Created Test Files
+
+{test.files}
+
 ### Verification Steps
 
 Complete these steps in order to verify your implementation:
@@ -469,46 +477,29 @@ Complete these steps in order to verify your implementation:
 
 ## Worker Responsibilities
 
-1. **Implement the Task**
+1. **Review Pre-Created Tests** (if test files exist above)
+   - Read the test files to understand expected behavior
+   - Tests define the acceptance criteria for your implementation
+   - Your goal is to make ALL tests pass
+
+2. **Implement the Task**
    - Follow the description and any implementation details provided
    - Use existing project patterns and conventions
    - Ensure code is properly typed (TypeScript)
 
-2. **Verify All Steps**
+3. **Run Tests** (MANDATORY if test files exist)
+   - Run the test suite: npm run test or the project's test command
+   - All pre-created tests MUST pass
+   - Fix your implementation if any tests fail
+
+4. **Verify All Steps**
    - Execute each verification step in order
    - Document the result of each step
    - All steps must pass before marking complete
 
-3. **Update Kanban Files**
-   - Update `.kanban/kanban-progress.json` with work log
-   - Update `.kanban/kanban-board.json` to set `passes: true` if verification succeeds
-   - Write status file to `.kanban/workers/{task.name}.status.json`
-
----
-
-## Status File Format
-
-Create `.kanban/workers/{task.name}.status.json`:
-
-On Success:
-``json
-{
-  "status": "success",
-  "log": "Brief description of what was done",
-  "affectedFiles": ["path/to/file1.ts", "path/to/file2.ts"],
-  "agent": "{agent-name}"
-}
-``
-
-On Failure:
-``json
-{
-  "status": "failure",
-  "error": "Description of what went wrong",
-  "affectedFiles": [],
-  "agent": "{agent-name}"
-}
-``
+5. **Report Results**
+   - Print test results summary (pass/fail count)
+   - Print verification step results: Step N: PASS or Step N: FAIL - reason
 "@
     }
 
@@ -518,6 +509,16 @@ On Failure:
     foreach ($step in $Task.steps) {
         $stepsText += "$stepNum. $step`n"
         $stepNum++
+    }
+
+    # Build test files section
+    $testFilesText = "No pre-created test files for this task."
+    if ($TestFiles -and $TestFiles.Count -gt 0) {
+        $testFilesText = "The following test files have been created for this task. Your implementation MUST pass all tests:`n`n"
+        foreach ($testFile in $TestFiles) {
+            $testFilesText += "- ``$testFile```n"
+        }
+        $testFilesText += "`nRun tests with: ``npm run test`` or the project's test command."
     }
 
     $agentName = Get-AgentForCategory -Category $Task.category
@@ -531,8 +532,220 @@ On Failure:
     $prompt = $prompt -replace '\{task\.steps\}', $stepsText.TrimEnd()
     $prompt = $prompt -replace '\{agent-name\}', $agentName
     $prompt = $prompt -replace '\{projectType\}', $Board.projectType
+    $prompt = $prompt -replace '\{test\.files\}', $testFilesText
 
     return $prompt
+}
+
+function Build-TestCreationPrompt {
+    param(
+        [object]$Task,
+        [object]$Board
+    )
+
+    # Build numbered steps list
+    $stepsText = ""
+    $stepNum = 1
+    foreach ($step in $Task.steps) {
+        $stepsText += "$stepNum. $step`n"
+        $stepNum++
+    }
+
+    # Build simple prompt - agent has all kanban knowledge built-in
+    $prompt = @"
+Create tests for this kanban task:
+
+**Name**: $($Task.name)
+**Category**: $($Task.category)
+**Project Type**: $($Board.projectType)
+
+### Description (What Will Be Implemented)
+
+$($Task.description)
+
+### Verification Steps (Map to Test Cases)
+
+$($stepsText.TrimEnd())
+
+---
+
+Create comprehensive tests that:
+1. Initially FAIL (implementation doesn't exist yet)
+2. PASS once implementation is correct
+3. Cover ALL verification steps above
+
+Report created test files when done.
+"@
+
+    return $prompt
+}
+
+function Start-TestCreationJob {
+    param(
+        [object]$Task,
+        [string]$Prompt,
+        [string]$JsonLogPath
+    )
+
+    $taskName = $Task.name
+    $agentName = "kanban-unit-tester"
+
+    # Write prompt to a temp file
+    $promptFile = Join-Path $LogsDir "$taskName-test-creation-prompt.txt"
+    $Prompt | Set-Content -Path $promptFile -Encoding UTF8 -NoNewline
+
+    # Initialize log file
+    "" | Set-Content -Path $JsonLogPath -Encoding UTF8 -NoNewline
+
+    # Spawn kanban-unit-tester agent
+    $cmdScript = "cd /d `"$ProjectRoot`" && type `"$promptFile`" | claude -p --dangerously-skip-permissions --output-format stream-json 2>`"$JsonLogPath.stderr`" >> `"$JsonLogPath`""
+
+    $processInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $processInfo.FileName = "cmd.exe"
+    $processInfo.Arguments = "/c $cmdScript"
+    $processInfo.UseShellExecute = $false
+    $processInfo.CreateNoWindow = $true
+    $processInfo.WorkingDirectory = $ProjectRoot
+
+    $process = [System.Diagnostics.Process]::Start($processInfo)
+
+    return @{
+        Process = $process
+        Task = $Task
+        JsonLogPath = $JsonLogPath
+        AgentName = $agentName
+    }
+}
+
+function Wait-TestCreationBatch {
+    param([array]$Workers)
+
+    $results = @()
+
+    # Wait for all processes to complete
+    foreach ($worker in $Workers) {
+        $worker.Process.WaitForExit()
+    }
+
+    foreach ($worker in $Workers) {
+        $task = $worker.Task
+        $taskName = $task.name
+        $jsonLogPath = $worker.JsonLogPath
+
+        # Wait for log file to be ready
+        $maxWaitMs = 5000
+        $waitIntervalMs = 100
+        $waitedMs = 0
+        $fileReady = $false
+
+        while ($waitedMs -lt $maxWaitMs -and -not $fileReady) {
+            if (Test-Path $jsonLogPath) {
+                $fileInfo = Get-Item $jsonLogPath -ErrorAction SilentlyContinue
+                if ($fileInfo -and $fileInfo.Length -gt 100) {
+                    try {
+                        $testContent = Get-Content $jsonLogPath -Raw -ErrorAction Stop
+                        $lines = $testContent -split "`n" | Where-Object { $_.Trim() -ne "" }
+                        if ($lines.Count -gt 0) {
+                            foreach ($line in $lines) {
+                                if ($line -match '"type"\s*:\s*"result"') {
+                                    $fileReady = $true
+                                    break
+                                }
+                            }
+                        }
+                    } catch {
+                        # File not ready yet
+                    }
+                }
+            }
+            if (-not $fileReady) {
+                Start-Sleep -Milliseconds $waitIntervalMs
+                $waitedMs += $waitIntervalMs
+            }
+        }
+
+        # Extract test files from the log
+        $testFiles = Get-TestFilesFromLog -JsonLogPath $jsonLogPath
+
+        $results += @{
+            Task = $task
+            JsonLogPath = $jsonLogPath
+            TestFiles = $testFiles
+            Success = ($testFiles.Count -gt 0)
+        }
+    }
+
+    return $results
+}
+
+function Get-TestFilesFromLog {
+    param([string]$JsonLogPath)
+
+    $testFiles = @()
+
+    if (-not (Test-Path $JsonLogPath)) {
+        return $testFiles
+    }
+
+    try {
+        $content = Get-Content $JsonLogPath -Raw -ErrorAction Stop
+
+        if ([string]::IsNullOrWhiteSpace($content)) {
+            return $testFiles
+        }
+
+        # Remove BOM if present
+        if ([int][char]$content[0] -eq 65279) {
+            $content = $content.Substring(1)
+        }
+
+        # Parse JSONL format
+        $lines = $content -split "`n"
+        foreach ($line in $lines) {
+            $line = $line.Trim()
+            if ([string]::IsNullOrWhiteSpace($line)) { continue }
+
+            try {
+                $obj = $line | ConvertFrom-Json -ErrorAction Stop
+
+                # Look for Write/Edit tool calls to extract created test files
+                if ($obj.type -eq "assistant" -and $obj.message -and $obj.message.content) {
+                    foreach ($contentItem in $obj.message.content) {
+                        if ($contentItem.type -eq "tool_use") {
+                            $toolName = $contentItem.name
+                            if ($toolName -eq "Write" -or $toolName -eq "Edit") {
+                                $input = $contentItem.input
+                                if ($input -and $input.file_path) {
+                                    $filePath = $input.file_path
+                                    # Check if it's a test file
+                                    if ($filePath -match '\.(test|spec)\.(ts|js|tsx|jsx)$' -or
+                                        $filePath -match 'test_.*\.py$' -or
+                                        $filePath -match '.*_test\.py$' -or
+                                        $filePath -match '.*_test\.go$') {
+                                        # Convert to relative path if absolute
+                                        if ($filePath.StartsWith($ProjectRoot)) {
+                                            $filePath = $filePath.Substring($ProjectRoot.Length).TrimStart('\', '/')
+                                        }
+                                        if ($testFiles -notcontains $filePath) {
+                                            $testFiles += $filePath
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch {
+                # Skip unparseable lines
+            }
+        }
+    }
+    catch {
+        Write-Host "       [TestFiles] Error reading log: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+
+    return $testFiles
 }
 
 function Get-TaskStatus {
@@ -597,7 +810,7 @@ function Get-TasksForWave {
 function Initialize-Directories {
     if (-not (Test-Path $LogsDir)) {
         New-Item -ItemType Directory -Path $LogsDir -Force | Out-Null
-        Write-Host "Created logs directory: $LogsDir" -ForegroundColor Gray
+        Write-Host "Created worker-logs directory: $LogsDir" -ForegroundColor Gray
     }
 }
 
@@ -1096,6 +1309,9 @@ function Main {
         $taskQueue = @($waveTasks)
         $queueIndex = 0
 
+        # Track test files created for each task
+        $taskTestFiles = @{}
+
         while ($queueIndex -lt $taskQueue.Count) {
             # Get batch of tasks
             $remainingCount = $taskQueue.Count - $queueIndex
@@ -1105,10 +1321,73 @@ function Main {
 
             Write-SubHeader "Processing Batch ($batchSize tasks)"
 
+            # ============================================================
+            # PHASE 1: TDD TEST CREATION (for non-testing categories)
+            # ============================================================
+            $tddBatch = $batch | Where-Object { $TddCategories -contains $_.category }
+
+            if ($tddBatch.Count -gt 0) {
+                Write-Host ""
+                Write-Host "[TDD] Creating tests for $($tddBatch.Count) tasks before implementation..." -ForegroundColor Magenta
+
+                # Start test creation workers
+                $testCreators = @()
+                foreach ($task in $tddBatch) {
+                    $testPrompt = Build-TestCreationPrompt -Task $task -Board $board
+                    $testLogPath = Join-Path $LogsDir "$($task.name)-test-creation.json"
+
+                    Write-Host "  [TDD] Starting test creation for: $($task.name)" -ForegroundColor Magenta
+
+                    $testCreator = Start-TestCreationJob -Task $task -Prompt $testPrompt -JsonLogPath $testLogPath
+                    $testCreators += $testCreator
+                }
+
+                Write-Host ""
+                Write-Host "[TDD] Waiting for $($testCreators.Count) test creators to complete..." -ForegroundColor Magenta
+
+                # Wait for test creation to complete
+                $testResults = Wait-TestCreationBatch -Workers $testCreators
+
+                # Display test creation results and store test files
+                Write-Host ""
+                Write-Host "[TDD] Test Creation Results:" -ForegroundColor Magenta
+                foreach ($result in $testResults) {
+                    $taskName = $result.Task.name
+                    $testFiles = $result.TestFiles
+                    $taskTestFiles[$taskName] = $testFiles
+
+                    if ($testFiles.Count -gt 0) {
+                        Write-Host "  [PASS] " -ForegroundColor Green -NoNewline
+                        Write-Host "$taskName" -ForegroundColor White -NoNewline
+                        Write-Host " - $($testFiles.Count) test file(s) created" -ForegroundColor Gray
+                        foreach ($testFile in $testFiles) {
+                            Write-Host "         - $testFile" -ForegroundColor DarkGray
+                        }
+                    } else {
+                        Write-Host "  [SKIP] " -ForegroundColor Yellow -NoNewline
+                        Write-Host "$taskName" -ForegroundColor White -NoNewline
+                        Write-Host " - No test files created (proceeding without tests)" -ForegroundColor Yellow
+                    }
+                }
+
+                Write-Host ""
+            }
+
+            # ============================================================
+            # PHASE 2: IMPLEMENTATION WORKERS (with test files if available)
+            # ============================================================
+            Write-Host "[IMPL] Starting implementation workers..." -ForegroundColor Cyan
+
             # Start workers
             $workers = @()
             foreach ($task in $batch) {
-                $prompt = Build-WorkerPrompt -Task $task -Board $board -TemplatePath $PromptTemplate
+                # Get test files for this task (if any were created)
+                $testFiles = @()
+                if ($taskTestFiles.ContainsKey($task.name)) {
+                    $testFiles = $taskTestFiles[$task.name]
+                }
+
+                $prompt = Build-WorkerPrompt -Task $task -Board $board -TemplatePath $PromptTemplate -TestFiles $testFiles
                 $logPath = Join-Path $LogsDir "$($task.name).log"
                 $jsonLogPath = Join-Path $LogsDir "$($task.name).json"
                 $outputFilePath = Join-Path $LogsDir "$($task.name)-output.json"
@@ -1195,7 +1474,7 @@ function Main {
     }
 
     if ($totalFailure -gt 0) {
-        Write-Host "Check logs in $LogsDir for failure details." -ForegroundColor Yellow
+        Write-Host "Check worker-logs in $LogsDir for failure details." -ForegroundColor Yellow
     }
 }
 
