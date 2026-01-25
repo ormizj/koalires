@@ -309,15 +309,36 @@
                 </button>
             </div>
         </div>
-        <div class="modal-task-tabs hidden" id="modal-task-tabs"></div>
-        <div class="modal-tabs">
-            <button class="modal-tab active" data-tab="board">board</button>
-            <button class="modal-tab" data-tab="progress">progress</button>
-            <button class="modal-tab" data-tab="log">worker-raw</button>
-            <button class="modal-tab" data-tab="output">worker-output</button>
-        </div>
-        <div class="modal-content">
-            <div class="modal-loading">Loading...</div>
+        <div class="modal-body-wrapper">
+            <div class="modal-sidebar hidden" id="modal-sidebar">
+                <div class="sidebar-header">
+                    <span class="sidebar-title">Tasks</span>
+                    <button class="sidebar-collapse-btn" id="sidebar-collapse-btn" title="Collapse sidebar">
+                        <svg viewBox="0 0 24 24" width="14" height="14">
+                            <polyline points="15,18 9,12 15,6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="sidebar-content" id="sidebar-task-list"></div>
+            </div>
+            <button class="sidebar-expand-btn hidden" id="sidebar-expand-btn" title="Expand sidebar">
+                <svg viewBox="0 0 24 24" width="12" height="12">
+                    <polyline points="9,18 15,12 9,6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+            <div class="sidebar-resizer hidden" id="sidebar-resizer"></div>
+            <div class="modal-main">
+                <div class="modal-task-tabs hidden" id="modal-task-tabs"></div>
+                <div class="modal-tabs">
+                    <button class="modal-tab active" data-tab="board">board</button>
+                    <button class="modal-tab" data-tab="progress">progress</button>
+                    <button class="modal-tab" data-tab="log">worker-raw</button>
+                    <button class="modal-tab" data-tab="output">worker-output</button>
+                </div>
+                <div class="modal-content">
+                    <div class="modal-loading">Loading...</div>
+                </div>
+            </div>
         </div>
         <!-- Resize handles -->
         <div class="resize-handle resize-n"></div>
