@@ -12,10 +12,19 @@
 .PARAMETER DryRun
     Show what would be done without executing.
 
+.PARAMETER NonInteractive
+    Run in non-interactive mode without prompting for user input.
+    Auto-detected when running in CI, piped contexts, or CLAUDE_CODE environment.
+
+.PARAMETER DefaultFailAction
+    Action to take when tasks fail in non-interactive mode.
+    Valid values: Skip (default), Retry, Quit.
+
 .EXAMPLE
     .\parallel-dispatch.ps1
     .\parallel-dispatch.ps1 -Parallel 5
     .\parallel-dispatch.ps1 -DryRun
+    .\parallel-dispatch.ps1 -NonInteractive -DefaultFailAction Skip
 #>
 
 param(
@@ -23,8 +32,23 @@ param(
     [int]$Parallel = 3,
 
     [Parameter()]
-    [switch]$DryRun
+    [switch]$DryRun,
+
+    [Parameter()]
+    [switch]$NonInteractive,
+
+    [Parameter()]
+    [ValidateSet("Skip", "Retry", "Quit")]
+    [string]$DefaultFailAction = "Skip"
 )
+
+# Detect non-interactive environment if not explicitly set
+if (-not $NonInteractive) {
+    $NonInteractive = -not [Environment]::UserInteractive -or
+                      [Console]::IsInputRedirected -or
+                      $env:CI -eq "true" -or
+                      $env:CLAUDE_CODE -eq "true"
+}
 
 # Script configuration
 $ErrorActionPreference = "Stop"
@@ -699,19 +723,22 @@ function Wait-WorkerBatch {
         $status = $null
         $validationWarnings = @()
 
-        if ($parseResult.success) {
-            Write-Host "       [Dispatcher] Parsed: $($parseResult.affectedFilesCount) files, $($parseResult.tokensCount) token entries" -ForegroundColor Gray
+        if ($parseResult -and $parseResult.success) {
+            $filesCount = if ($parseResult.affectedFilesCount) { $parseResult.affectedFilesCount } else { 0 }
+            $tokensCount = if ($parseResult.tokensCount) { $parseResult.tokensCount } else { 0 }
+            Write-Host "       [Dispatcher] Parsed: $filesCount files, $tokensCount token entries" -ForegroundColor Gray
 
             # Extract token usage from JSON log for display (parse script also extracts this)
             $tokensUsed = Get-TokenUsageFromLog -JsonLogPath $jsonLogPath
-            $finalTokens = if ($tokensUsed.Count -gt 0) { $tokensUsed[-1] } else { 0 }
+            $finalTokens = if ($tokensUsed -and $tokensUsed.Count -gt 0) { $tokensUsed[-1] } else { 0 }
 
             # Process the parsed output file via dedicated script
             $processResult = Invoke-ProcessWorkerOutput -TaskName $taskName -OutputFile $outputFilePath -TokensUsed $tokensUsed
 
-            if ($processResult.success) {
+            if ($processResult -and $processResult.success) {
+                $resultStatus = if ($processResult.status) { $processResult.status } else { "unknown" }
                 $status = @{
-                    status = $processResult.status
+                    status = $resultStatus
                     validationWarnings = @()
                 }
 
@@ -903,12 +930,35 @@ function Show-BatchResults {
 function Handle-FailedTasks {
     param([array]$FailedResults)
 
-    if ($FailedResults.Count -eq 0) {
+    if (-not $FailedResults -or $FailedResults.Count -eq 0) {
         return @()
     }
 
     Write-Host ""
     Write-Host "Some tasks failed. What would you like to do?" -ForegroundColor Yellow
+
+    # In non-interactive mode, use the default action
+    if ($NonInteractive) {
+        Write-Host "[Non-interactive mode] Using default action: $DefaultFailAction" -ForegroundColor Cyan
+
+        switch ($DefaultFailAction) {
+            "Retry" {
+                Write-Host "Retrying failed tasks..." -ForegroundColor Yellow
+                return $FailedResults | ForEach-Object { $_.Task }
+            }
+            "Skip" {
+                Write-Host "Skipping failed tasks..." -ForegroundColor Yellow
+                return @()
+            }
+            "Quit" {
+                Write-Host "Stopping execution." -ForegroundColor Yellow
+                exit 0
+            }
+        }
+        return @()
+    }
+
+    # Interactive mode - prompt user
     Write-Host "  [R]etry  - Retry all failed tasks"
     Write-Host "  [S]kip   - Skip failed tasks and continue"
     Write-Host "  [Q]uit   - Stop processing"

@@ -6,14 +6,14 @@ Strict, unambiguous schema definitions for all kanban data files. No interpolati
 
 ## File Locations
 
-| Path                           | Purpose                                    | Required           |
-| ------------------------------ | ------------------------------------------ | ------------------ |
-| `.kanban/kanban-board.json`    | Task definitions with passes field         | Yes                |
-| `.kanban/kanban-progress.json` | Status tracking, work logs, affected files | Yes                |
-| `.kanban/kanban-viewer.html`   | Interactive viewer UI                      | Yes                |
-| `.kanban/logs/`                | Worker output logs (runtime)               | Created at runtime |
-| `.kanban/logs/{task-name}.json` | Claude session log for token tracking      | Created at runtime |
-| `.kanban/logs/{task-name}-output.json` | Worker output file with results   | Created by worker  |
+| Path                                   | Purpose                                    | Required           |
+| -------------------------------------- | ------------------------------------------ | ------------------ |
+| `.kanban/kanban-board.json`            | Task definitions with passes field         | Yes                |
+| `.kanban/kanban-progress.json`         | Status tracking, work logs, affected files | Yes                |
+| `.kanban/kanban-viewer.html`           | Interactive viewer UI                      | Yes                |
+| `.kanban/logs/`                        | Worker output logs (runtime)               | Created at runtime |
+| `.kanban/logs/{task-name}.json`        | Claude session log for token tracking      | Created at runtime |
+| `.kanban/logs/{task-name}-output.json` | Worker output file with results            | Created by worker  |
 
 ---
 
@@ -177,15 +177,15 @@ type TaskStatus = 'running' | 'code-review' | 'completed' | 'error' | 'blocked';
 
 ### Field Constraints
 
-| Field           | Type     | Required | Constraints                                                          |
-| --------------- | -------- | -------- | -------------------------------------------------------------------- |
-| `status`        | enum     | Yes      | One of: `running`, `code-review`, `completed`, `error`, `blocked`    |
-| `startedAt`     | string   | Yes      | ISO 8601 format with milliseconds                                    |
-| `agent`         | string   | Yes      | Agent name string                                                    |
-| `completedAt`   | string   | No\*     | ISO 8601 format, set when status != `running`                        |
-| `workLog`       | string[] | No\*     | Array of work log entry strings                                      |
-| `affectedFiles` | array    | No\*     | Relative file paths from project root                                |
-| `tokensUsed`    | number[] | No       | Context window usage per API turn                                    |
+| Field           | Type     | Required | Constraints                                                       |
+| --------------- | -------- | -------- | ----------------------------------------------------------------- |
+| `status`        | enum     | Yes      | One of: `running`, `code-review`, `completed`, `error`, `blocked` |
+| `startedAt`     | string   | Yes      | ISO 8601 format with milliseconds                                 |
+| `agent`         | string   | Yes      | Agent name string                                                 |
+| `completedAt`   | string   | No\*     | ISO 8601 format, set when status != `running`                     |
+| `workLog`       | string[] | No\*     | Array of work log entry strings                                   |
+| `affectedFiles` | array    | No\*     | Relative file paths from project root                             |
+| `tokensUsed`    | number[] | No       | Context window usage per API turn                                 |
 
 **Token Usage Tracking**: The `tokensUsed` field contains an array of context window usage values, one per API turn during task execution. Each value represents the total context size at that turn (input + output + cache tokens). This data is populated by the dispatcher after worker completion. The token limit is 200,000 (context window). Typical per-turn values are 30k-50k tokens.
 
@@ -212,13 +212,13 @@ type TaskStatus = 'running' | 'code-review' | 'completed' | 'error' | 'blocked';
 
 ### TaskStatus
 
-| Value         | Description                                          |
-| ------------- | ---------------------------------------------------- |
-| `running`     | Task execution in progress                           |
-| `code-review` | Task finished, verification passed, awaiting commit  |
-| `completed`   | Task finished and committed                          |
-| `error`       | Task failed due to an error                          |
-| `blocked`     | Task cannot proceed, dependencies not met            |
+| Value         | Description                                         |
+| ------------- | --------------------------------------------------- |
+| `running`     | Task execution in progress                          |
+| `code-review` | Task finished, verification passed, awaiting commit |
+| `completed`   | Task finished and committed                         |
+| `error`       | Task failed due to an error                         |
+| `blocked`     | Task cannot proceed, dependencies not met           |
 
 ---
 
@@ -344,6 +344,7 @@ Workers create `.kanban/logs/{task-name}-output.json`:
 ```
 
 For error/blocked status, include:
+
 ```json
 {
   "error": {

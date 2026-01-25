@@ -45,6 +45,7 @@ process-worker-output.ps1 updates:
 ### Why Dispatcher Owns Output Files
 
 Previous approach had workers create output files, but AI workers are unpredictable:
+
 - Used wrong field names (`status: "passed"` vs `passed: true`)
 - Inconsistent file path formats
 - Fabricated timestamps
@@ -62,21 +63,21 @@ New approach: Dispatcher parses the raw session log as the single source of trut
 
 All kanban files are in the `.kanban/` directory:
 
-| Path                               | Purpose                                            |
-| ---------------------------------- | -------------------------------------------------- |
-| `.kanban/kanban-board.json`        | Task definitions with passes field                 |
-| `.kanban/kanban-progress.json`     | Status tracking, work logs, affected files, agents |
-| `.kanban/logs/`                    | Worker output logs                                 |
-| `.kanban/logs/{task}.json`         | Raw worker session log (JSON format)               |
-| `.kanban/logs/{task}-output.json`  | Parsed/normalized output (created by dispatcher)   |
+| Path                              | Purpose                                            |
+| --------------------------------- | -------------------------------------------------- |
+| `.kanban/kanban-board.json`       | Task definitions with passes field                 |
+| `.kanban/kanban-progress.json`    | Status tracking, work logs, affected files, agents |
+| `.kanban/logs/`                   | Worker output logs                                 |
+| `.kanban/logs/{task}.json`        | Raw worker session log (JSON format)               |
+| `.kanban/logs/{task}-output.json` | Parsed/normalized output (created by dispatcher)   |
 
 ## Scripts
 
-| Script                      | Purpose                                                    |
-| --------------------------- | ---------------------------------------------------------- |
-| `parallel-dispatch.ps1`     | Main orchestrator - spawns workers, coordinates parsing    |
-| `parse-worker-log.ps1`      | Parses raw JSON log, creates normalized output file        |
-| `process-worker-output.ps1` | Updates kanban files from normalized output                |
+| Script                      | Purpose                                                 |
+| --------------------------- | ------------------------------------------------------- |
+| `parallel-dispatch.ps1`     | Main orchestrator - spawns workers, coordinates parsing |
+| `parse-worker-log.ps1`      | Parses raw JSON log, creates normalized output file     |
+| `process-worker-output.ps1` | Updates kanban files from normalized output             |
 
 ## Task Status Logic
 
@@ -220,14 +221,14 @@ Each worker is a `claude -p` process that:
 
 The dispatcher extracts data from raw worker logs:
 
-| Data             | Source in Raw Log                                                    |
-| ---------------- | -------------------------------------------------------------------- |
-| Affected Files   | `type: "assistant"` → `tool_use` with `name: "Write"` or `"Edit"`    |
-| Token Usage      | `type: "assistant"` → `message.usage` or `type: "result"` → `usage`  |
-| Success/Failure  | `type: "result"` → `is_error` and `subtype`                          |
-| Duration         | `type: "result"` → `duration_ms`                                     |
-| Work Summary     | `type: "result"` → `result` (final text response)                    |
-| Verification     | Text patterns like "Step N: PASS/FAIL" in assistant messages         |
+| Data            | Source in Raw Log                                                   |
+| --------------- | ------------------------------------------------------------------- |
+| Affected Files  | `type: "assistant"` → `tool_use` with `name: "Write"` or `"Edit"`   |
+| Token Usage     | `type: "assistant"` → `message.usage` or `type: "result"` → `usage` |
+| Success/Failure | `type: "result"` → `is_error` and `subtype`                         |
+| Duration        | `type: "result"` → `duration_ms`                                    |
+| Work Summary    | `type: "result"` → `result` (final text response)                   |
+| Verification    | Text patterns like "Step N: PASS/FAIL" in assistant messages        |
 
 ### Normalized Output File Schema
 

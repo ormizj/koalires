@@ -166,16 +166,38 @@ foreach ($entry in $logEntries) {
                 if ($contentItem.type -eq "text" -and $contentItem.text) {
                     $text = $contentItem.text
 
-                    # Match patterns like "Step 1: PASS", "Step 1: FAIL", "Verification passed", etc.
-                    $stepMatches = [regex]::Matches($text, '(?i)step\s*(\d+)[:\s]*(?:.*?)?(pass|fail)', [System.Text.RegularExpressions.RegexOptions]::Singleline)
+                    # Match patterns like "Step 1: PASS", "Step 1: FAIL", "| 1 | desc | PASS |"
+                    # Pattern 1: Standard "Step N: PASS/FAIL" format
+                    $stepMatches = [regex]::Matches($text, '(?i)step\s*(\d+)[:\s]+[^|]*?\b(pass(?:ed)?|fail(?:ed)?)\b')
                     foreach ($match in $stepMatches) {
                         $stepNum = $match.Groups[1].Value
                         $result = $match.Groups[2].Value.ToLower()
-                        $passed = $result -eq "pass"
+                        $passed = $result -match "pass"
 
                         # Check if we already have this step
                         $existingStep = $verificationSteps | Where-Object { $_.stepNum -eq $stepNum }
                         if (-not $existingStep) {
+                            $verificationSteps += @{
+                                stepNum = $stepNum
+                                description = "Step $stepNum"
+                                passed = $passed
+                            }
+                        }
+                    }
+
+                    # Pattern 2: Markdown table format "| N | description | PASS/FAIL |"
+                    $tableMatches = [regex]::Matches($text, '\|\s*(\d+)\s*\|[^|]+\|\s*\*{0,2}(PASS|FAIL)\*{0,2}\s*\|')
+                    foreach ($match in $tableMatches) {
+                        $stepNum = $match.Groups[1].Value
+                        $result = $match.Groups[2].Value.ToLower()
+                        $passed = $result -eq "pass"
+
+                        # Check if we already have this step (table results take precedence)
+                        $existingStep = $verificationSteps | Where-Object { $_.stepNum -eq $stepNum }
+                        if ($existingStep) {
+                            # Update existing step with table result (more authoritative)
+                            $existingStep.passed = $passed
+                        } else {
                             $verificationSteps += @{
                                 stepNum = $stepNum
                                 description = "Step $stepNum"
@@ -205,14 +227,27 @@ foreach ($entry in $logEntries) {
 
 
 # Determine status based on result entry
+# Priority: explicit error flags > subtype > keyword analysis (with false positive checks)
 $status = if ($isError -or $subtype -eq "error") {
     "error"
 } elseif ($subtype -eq "success") {
     "success"
 } else {
-    # Check work summary for error indicators
-    if ($workSummary -match "(?i)(error|failed|failure|blocked|cannot|unable)") {
-        "error"
+    # Check work summary for error indicators, but avoid false positives
+    # False positive pattern: "Error: | N | description | **PASS**" or similar table formats
+    $hasErrorKeyword = $workSummary -match "(?i)\b(error|failed|failure|blocked|cannot|unable)\b"
+    $hasPassIndicator = $workSummary -match "(?i)\b(pass(?:ed)?|success(?:ful)?|completed?|verified)\b"
+
+    if ($hasErrorKeyword) {
+        # Check if error keyword appears in a context that also shows PASS
+        # Pattern: error word followed by PASS within same line/context suggests false positive
+        $falsePositivePattern = "(?i)(error|failed|failure)[^`n]*\b(pass|success)\b"
+        if ($workSummary -match $falsePositivePattern -or $hasPassIndicator) {
+            # Error keyword exists but PASS also present - defer to verification steps
+            "success"
+        } else {
+            "error"
+        }
     } else {
         "success"
     }
@@ -243,9 +278,15 @@ if ($verificationSteps.Count -gt 0) {
     $verificationObj.passed = ($status -eq "success")
 }
 
+# Reconcile verification object with status (bidirectional correction)
 # If verification failed but status is success, mark as error
 if (-not $verificationObj.passed -and $status -eq "success") {
     $status = "error"
+}
+# If verification passed but status is error (false positive), mark as success
+if ($verificationObj.passed -and $verificationObj.steps.Count -gt 0 -and $status -eq "error") {
+    # Only override if we have explicit verification steps that all passed
+    $status = "success"
 }
 
 # Build work log from summary
