@@ -25,6 +25,9 @@ export function getTaskStatus(task, progressData) {
   if (progress?.status === 'blocked') {
     return 'blocked';
   }
+  if (progress?.status === 'code-review') {
+    return 'code-review';
+  }
   if (progress?.status === 'running') {
     return 'in-progress';
   }
@@ -251,14 +254,17 @@ export function createTaskCard(task, status, progressEntry) {
   const completedClass = status === 'completed' ? 'completed' : '';
 
   return `
-    <div class="task ${completedClass}" onclick="this.classList.toggle('expanded')">
+    <div class="task ${completedClass}" data-task-name="${escapeHtml(task.name)}" onclick="this.classList.toggle('expanded')">
       <div class="task-header">
         <span class="task-name">${escapeHtml(task.name)}</span>
         <span class="task-category category-${task.category}">${escapeHtml(task.category)}</span>
       </div>
       ${timestampsHtml}
       ${tokensHtml}
-      <div class="task-description">${parseMarkdown(task.description || '')}</div>
+      <div class="task-description-section">
+        <div class="task-description-label">Description:</div>
+        <div class="task-description">${parseMarkdown(task.description || '')}</div>
+      </div>
       ${logHtml}
       ${stepsHtml}
       ${filesHtml}

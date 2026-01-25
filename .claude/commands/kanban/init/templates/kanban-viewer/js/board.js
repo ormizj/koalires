@@ -4,6 +4,7 @@
 
 import { formatDate, formatTokens } from './formatters.js';
 import { getTaskStatus, createTaskCard } from './tasks.js';
+import { reapplySearch } from './search.js';
 
 export function renderBoard(boardData, progressData) {
   const tasks = boardData.tasks || [];
@@ -132,4 +133,7 @@ export function renderBoard(boardData, progressData) {
           .map((t) => createTaskCard(t, 'completed', progressObj[t.name]))
           .join('')
       : '<div class="empty-column">No completed tasks</div>';
+
+  // Re-apply search filter after render
+  reapplySearch();
 }

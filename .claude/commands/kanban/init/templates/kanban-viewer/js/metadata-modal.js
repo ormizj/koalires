@@ -2,6 +2,8 @@
  * Metadata modal for viewing task JSON data
  */
 
+import { getTaskStatus as getTaskStatusFromBoard } from './tasks.js';
+
 let modalElement = null;
 let overlayElement = null;
 let currentTaskName = null;
@@ -55,6 +57,17 @@ let isColumnMode = false;
 let currentColumnId = null;
 let columnTasks = [];
 let selectedTaskIndex = 0;
+
+// Sidebar state
+let sidebarCollapsed = false;
+let sidebarWidth = 200;
+let isSidebarResizing = false;
+let sidebarResizeStartX = 0;
+let sidebarStartWidth = 0;
+const SIDEBAR_STATE_KEY = 'kanban-sidebar-state';
+const MIN_SIDEBAR_WIDTH = 120;
+const MAX_SIDEBAR_WIDTH = 400;
+const DEFAULT_SIDEBAR_WIDTH = 200;
 
 /**
  * Initialize metadata modal event listeners
@@ -123,6 +136,9 @@ export function initMetadataModal() {
 
   // Initialize search
   initSearch();
+
+  // Initialize sidebar
+  initSidebar();
 }
 
 /**
@@ -143,6 +159,9 @@ export function showModal(taskName) {
     taskTabsContainer.classList.add('hidden');
     taskTabsContainer.innerHTML = '';
   }
+
+  // Hide sidebar in single task mode
+  hideSidebar();
 
   currentTaskName = taskName;
 
@@ -183,7 +202,7 @@ export function showModal(taskName) {
 /**
  * Show the modal for a column with multiple tasks
  */
-export function showColumnModal(columnId, taskNames) {
+export async function showColumnModal(columnId, taskNames) {
   if (!modalElement || !overlayElement || taskNames.length === 0) return;
 
   isColumnMode = true;
@@ -219,8 +238,28 @@ export function showColumnModal(columnId, taskNames) {
   currentMatchIndex = -1;
   updateSearchCount();
 
-  // Show and render task tabs
-  renderTaskTabs();
+  // Show sidebar and render task list with loading state
+  showSidebar();
+  renderSidebarTasks(taskNames, null, true); // true = loading state
+
+  // Hide horizontal task tabs (replaced by sidebar)
+  const taskTabsContainer = document.getElementById('modal-task-tabs');
+  if (taskTabsContainer) {
+    taskTabsContainer.classList.add('hidden');
+    taskTabsContainer.innerHTML = '';
+  }
+
+  // Fetch progress data immediately (non-blocking for UI)
+  try {
+    const response = await fetch(`../kanban-progress.json?t=${Date.now()}`);
+    if (response.ok) {
+      progressDataCache = await response.json();
+      // Update sidebar with real status
+      updateSidebarTaskStatus(progressDataCache);
+    }
+  } catch (e) {
+    console.warn('Failed to fetch initial progress data:', e);
+  }
 
   // Check tab data availability and load first task
   checkTabDataAvailability();
@@ -333,6 +372,9 @@ export function hideModal() {
     taskTabsContainer.classList.add('hidden');
     taskTabsContainer.innerHTML = '';
   }
+
+  // Hide sidebar
+  hideSidebar();
 
   currentTaskName = null;
   currentTabData = null;
@@ -1257,6 +1299,11 @@ async function refreshCurrentTab() {
       }
     }
   }
+
+  // Update sidebar task status if in column mode
+  if (isColumnMode && progressDataCache) {
+    updateSidebarTaskStatus(progressDataCache);
+  }
 }
 
 /**
@@ -1342,6 +1389,10 @@ function handleMouseMove(e) {
     modalElement.style.top = `${clamped.top}px`;
   }
 
+  if (isSidebarResizing) {
+    handleSidebarResize(e);
+  }
+
   if (isResizing) {
     const deltaX = e.clientX - resizeStartX;
     const deltaY = e.clientY - resizeStartY;
@@ -1387,6 +1438,9 @@ function handleMouseMove(e) {
 function handleMouseUp() {
   if (isResizing) {
     saveModalSize();
+  }
+  if (isSidebarResizing) {
+    endSidebarResize();
   }
   isDragging = false;
   isResizing = false;
@@ -1474,4 +1528,283 @@ function handleWindowResize() {
     modalElement.style.left = `${clamped.left}px`;
     modalElement.style.top = `${clamped.top}px`;
   }
+}
+
+// ===== Sidebar Functions =====
+
+/**
+ * Initialize sidebar functionality
+ */
+function initSidebar() {
+  loadSidebarState();
+  setupSidebarCollapse();
+  setupSidebarResize();
+}
+
+/**
+ * Load sidebar state from localStorage
+ */
+function loadSidebarState() {
+  try {
+    const stored = localStorage.getItem(SIDEBAR_STATE_KEY);
+    if (stored) {
+      const state = JSON.parse(stored);
+      sidebarCollapsed = state.collapsed || false;
+      sidebarWidth = Math.max(
+        MIN_SIDEBAR_WIDTH,
+        Math.min(MAX_SIDEBAR_WIDTH, state.width || DEFAULT_SIDEBAR_WIDTH)
+      );
+    }
+  } catch (e) {
+    // Ignore localStorage errors
+    sidebarCollapsed = false;
+    sidebarWidth = DEFAULT_SIDEBAR_WIDTH;
+  }
+}
+
+/**
+ * Save sidebar state to localStorage
+ */
+function saveSidebarState() {
+  try {
+    localStorage.setItem(
+      SIDEBAR_STATE_KEY,
+      JSON.stringify({
+        collapsed: sidebarCollapsed,
+        width: sidebarWidth,
+      })
+    );
+  } catch (e) {
+    // Ignore localStorage errors
+  }
+}
+
+/**
+ * Apply sidebar state to DOM
+ */
+function applySidebarState() {
+  const sidebar = document.getElementById('modal-sidebar');
+  const expandBtn = document.getElementById('sidebar-expand-btn');
+  const resizer = document.getElementById('sidebar-resizer');
+
+  if (!sidebar) return;
+
+  if (sidebarCollapsed) {
+    sidebar.classList.add('collapsed');
+    expandBtn?.classList.remove('hidden');
+    resizer?.classList.add('hidden');
+  } else {
+    sidebar.classList.remove('collapsed');
+    sidebar.style.width = `${sidebarWidth}px`;
+    expandBtn?.classList.add('hidden');
+    resizer?.classList.remove('hidden');
+  }
+}
+
+/**
+ * Show sidebar (column mode)
+ */
+function showSidebar() {
+  const sidebar = document.getElementById('modal-sidebar');
+  const resizer = document.getElementById('sidebar-resizer');
+
+  if (sidebar) {
+    sidebar.classList.remove('hidden');
+    applySidebarState();
+  }
+  if (resizer && !sidebarCollapsed) {
+    resizer.classList.remove('hidden');
+  }
+}
+
+/**
+ * Hide sidebar (single task mode)
+ */
+function hideSidebar() {
+  const sidebar = document.getElementById('modal-sidebar');
+  const expandBtn = document.getElementById('sidebar-expand-btn');
+  const resizer = document.getElementById('sidebar-resizer');
+
+  sidebar?.classList.add('hidden');
+  expandBtn?.classList.add('hidden');
+  resizer?.classList.add('hidden');
+}
+
+/**
+ * Setup sidebar collapse/expand handlers
+ */
+function setupSidebarCollapse() {
+  const collapseBtn = document.getElementById('sidebar-collapse-btn');
+  const expandBtn = document.getElementById('sidebar-expand-btn');
+
+  collapseBtn?.addEventListener('click', () => {
+    sidebarCollapsed = true;
+    applySidebarState();
+    saveSidebarState();
+  });
+
+  expandBtn?.addEventListener('click', () => {
+    sidebarCollapsed = false;
+    applySidebarState();
+    saveSidebarState();
+  });
+}
+
+/**
+ * Setup sidebar resize handler
+ */
+function setupSidebarResize() {
+  const resizer = document.getElementById('sidebar-resizer');
+
+  resizer?.addEventListener('mousedown', (e) => {
+    isSidebarResizing = true;
+    sidebarResizeStartX = e.clientX;
+    sidebarStartWidth = sidebarWidth;
+    resizer.classList.add('dragging');
+
+    // Disable transition during resize for instant feedback
+    const sidebar = document.getElementById('modal-sidebar');
+    sidebar?.classList.add('resizing');
+
+    e.preventDefault();
+  });
+}
+
+/**
+ * Handle sidebar resize during drag
+ */
+function handleSidebarResize(e) {
+  const deltaX = e.clientX - sidebarResizeStartX;
+  const newWidth = Math.max(
+    MIN_SIDEBAR_WIDTH,
+    Math.min(MAX_SIDEBAR_WIDTH, sidebarStartWidth + deltaX)
+  );
+
+  sidebarWidth = newWidth;
+
+  const sidebar = document.getElementById('modal-sidebar');
+  if (sidebar) {
+    sidebar.style.width = `${newWidth}px`;
+  }
+}
+
+/**
+ * End sidebar resize
+ */
+function endSidebarResize() {
+  isSidebarResizing = false;
+  const resizer = document.getElementById('sidebar-resizer');
+  resizer?.classList.remove('dragging');
+
+  // Re-enable transition after resize
+  const sidebar = document.getElementById('modal-sidebar');
+  sidebar?.classList.remove('resizing');
+
+  saveSidebarState();
+}
+
+/**
+ * Render task list in sidebar
+ */
+function renderSidebarTasks(taskNames, progressData, isLoading = false) {
+  const container = document.getElementById('sidebar-task-list');
+  if (!container) return;
+
+  container.innerHTML = taskNames
+    .map((taskName, index) => {
+      const status = isLoading ? 'loading' : getTaskStatusFromBoard({ name: taskName }, progressData || {});
+      const statusClass = isLoading ? 'loading' : getStatusClass(status);
+      const isActive = index === selectedTaskIndex;
+
+      return `
+        <div class="sidebar-task-item ${isActive ? 'active' : ''}"
+             data-task-index="${index}"
+             data-task-name="${taskName}"
+             title="${taskName}">
+          <svg class="sidebar-task-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+          <span class="sidebar-task-name">${escapeHtml(taskName)}</span>
+          <span class="sidebar-task-status ${statusClass}"></span>
+        </div>
+      `;
+    })
+    .join('');
+
+  // Attach click handlers
+  container.querySelectorAll('.sidebar-task-item').forEach((item) => {
+    item.addEventListener('click', () => {
+      const index = parseInt(item.dataset.taskIndex, 10);
+      const name = item.dataset.taskName;
+      selectSidebarTask(name, index);
+    });
+  });
+}
+
+/**
+ * Get CSS class for status
+ */
+function getStatusClass(status) {
+  const statusMap = {
+    pending: 'pending',
+    'in-progress': 'in-progress',
+    'code-review': 'review',
+    completed: 'completed',
+    blocked: 'blocked',
+  };
+  return statusMap[status] || 'pending';
+}
+
+/**
+ * Update sidebar task status dots
+ */
+function updateSidebarTaskStatus(progressData) {
+  const container = document.getElementById('sidebar-task-list');
+  if (!container) return;
+
+  container.querySelectorAll('.sidebar-task-item').forEach((item) => {
+    const taskName = item.dataset.taskName;
+    const status = getTaskStatusFromBoard({ name: taskName }, progressData || {});
+    const statusClass = getStatusClass(status);
+
+    const statusDot = item.querySelector('.sidebar-task-status');
+    if (statusDot) {
+      statusDot.className = `sidebar-task-status ${statusClass}`;
+    }
+  });
+}
+
+/**
+ * Handle click on sidebar task item
+ */
+function selectSidebarTask(taskName, index) {
+  if (taskName === currentTaskName && index === selectedTaskIndex) return;
+
+  selectedTaskIndex = index;
+  currentTaskName = taskName;
+
+  // Update active state in sidebar
+  const container = document.getElementById('sidebar-task-list');
+  container?.querySelectorAll('.sidebar-task-item').forEach((item, i) => {
+    item.classList.toggle('active', i === index);
+  });
+
+  // Update modal title
+  const titleElement = modalElement?.querySelector('.modal-title');
+  const columnNames = {
+    pending: 'Pending',
+    blocked: 'Hold',
+    progress: 'In Progress',
+    review: 'Code Review',
+    completed: 'Completed',
+  };
+  if (titleElement && isColumnMode) {
+    titleElement.textContent = `Column: ${columnNames[currentColumnId] || currentColumnId} - ${taskName}`;
+  }
+
+  // Clear caches and reload
+  clearCache();
+  checkTabDataAvailability();
+  switchTab(currentTabName || 'board');
 }
