@@ -17,7 +17,7 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "kanban": "start http://localhost:4150/.kanban/kanban-viewer.html && npx serve . -p 4150 --cors"
+    "kanban": "start http://localhost:4150/.kanban/kanban-viewer/ && npx serve . -p 4150 --cors"
   },
   "dependencies": {
     "@libsql/client": "^0.17.0",

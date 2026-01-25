@@ -26,12 +26,23 @@ mkdir -p .kanban/logs
 
 ### 2. Copy Viewer Template (Always Override)
 
-Read the template file from this skill directory and write it to the project:
+Copy the entire viewer directory from this skill to the project:
 
-- Source: `.claude/commands/kanban/init/kanban-viewer.template.html`
-- Destination: `.kanban/kanban-viewer.html`
+- Source: `.claude/commands/kanban/init/kanban-viewer-template/`
+- Destination: `.kanban/kanban-viewer/`
 
-**Always overwrite** the existing file to ensure the latest template is used.
+**Always overwrite** the existing directory to ensure the latest template is used.
+
+Use recursive copy to include all files:
+- `index.html`
+- `styles.css`
+- `js/main.js`
+- `js/state.js`
+- `js/columns.js`
+- `js/formatters.js`
+- `js/tasks.js`
+- `js/board.js`
+- `js/data.js`
 
 ### 3. Initialize Empty Board File (Skip if Exists)
 
@@ -84,7 +95,7 @@ Skip this step if the file already exists to preserve progress state.
 Read `package.json`, add the following script to the `scripts` object:
 
 ```json
-"kanban": "start http://localhost:4150/.kanban/kanban-viewer.html && npx serve . -p 4150 --cors"
+"kanban": "start http://localhost:4150/.kanban/kanban-viewer/ && npx serve . -p 4150 --cors"
 ```
 
 Use the Edit tool to add this script.
@@ -95,7 +106,7 @@ After completing all steps, report:
 
 - Created `.kanban/` directory
 - Created `.kanban/logs/` directory
-- Created `.kanban/kanban-viewer.html`
+- Created `.kanban/kanban-viewer/` directory with modular viewer files
 - Created `.kanban/kanban-board.json`
 - Created `.kanban/kanban-progress.json`
 - Added `kanban` script to package.json
