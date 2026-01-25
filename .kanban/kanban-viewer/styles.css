@@ -927,6 +927,12 @@ body {
     white-space: nowrap;
 }
 
+.modal-header-buttons {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
 .modal-close {
     background: transparent;
     border: none;
@@ -1040,41 +1046,9 @@ body {
     color: #ffa657;
 }
 
-/* Search Container */
+/* Search Container - Legacy (hidden, search moved to JSON viewer) */
 .metadata-search-container {
-    position: absolute;
-    right: 50px;
-    top: 50%;
-    transform: translateY(-50%);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-#metadata-search {
-    background: #0d1117;
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    color: #c9d1d9;
-    padding: 4px 10px;
-    font-size: 13px;
-    width: 180px;
-    outline: none;
-    transition: border-color 0.15s ease;
-}
-
-#metadata-search:focus {
-    border-color: #58a6ff;
-}
-
-#metadata-search::placeholder {
-    color: #6e7681;
-}
-
-#metadata-search-count {
-    color: #6e7681;
-    font-size: 12px;
-    white-space: nowrap;
+    display: none;
 }
 
 /* JSON Tree Structure */
@@ -1120,6 +1094,8 @@ body {
     color: #6e7681;
     transition: transform 0.15s ease;
     user-select: none;
+    text-align: center;
+    transform-origin: center;
 }
 
 .json-toggle:hover {
@@ -1151,10 +1127,7 @@ body {
     padding: 0 2px;
 }
 
-.json-match.current {
-    background-color: rgba(255, 213, 0, 0.6);
-    outline: 1px solid #ffd500;
-}
+/* .json-match.current styles moved to end of file with enhanced version */
 
 /* Resize Handles */
 .resize-handle {
@@ -1224,4 +1197,134 @@ body {
     width: 10px;
     height: 10px;
     cursor: sw-resize;
+}
+
+/* JSON Viewer Search Bar */
+.json-viewer-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: rgba(22, 27, 34, 0.95);
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    /* Sticky top-right positioning */
+    position: sticky;
+    top: 0;
+    margin-left: auto;
+    width: fit-content;
+    z-index: 10;
+    backdrop-filter: blur(8px);
+}
+
+.json-viewer-search input {
+    flex: 1;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    color: #c9d1d9;
+    padding: 6px 10px;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+
+.json-viewer-search input:focus {
+    border-color: #58a6ff;
+}
+
+.json-viewer-search input::placeholder {
+    color: #6e7681;
+}
+
+.search-nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.search-nav button {
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    color: #8b949e;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    transition: all 0.15s ease;
+}
+
+.search-nav button:hover:not(:disabled) {
+    background: #30363d;
+    color: #c9d1d9;
+    border-color: #58a6ff;
+}
+
+.search-nav button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.search-count {
+    color: #6e7681;
+    font-size: 12px;
+    white-space: nowrap;
+    min-width: 40px;
+    text-align: center;
+}
+
+.search-status {
+    color: #8b949e;
+    font-size: 12px;
+    font-style: italic;
+}
+
+/* Current match highlight (enhanced) */
+.json-match.current {
+    background-color: rgba(255, 213, 0, 0.6);
+    outline: 2px solid #ffd500;
+}
+
+/* Maximize Button */
+.modal-maximize {
+    background: transparent;
+    border: none;
+    color: #8b949e;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+    margin-right: 4px;
+}
+
+.modal-maximize:hover {
+    background: #30363d;
+    color: #58a6ff;
+}
+
+/* Maximized Modal State */
+.modal-container.maximized {
+    left: 0 !important;
+    top: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    border-radius: 0;
+    border: none;
+}
+
+.modal-container.maximized .resize-handle {
+    display: none;
+}
+
+.modal-container.maximized .modal-header {
+    cursor: default;
+    border-radius: 0;
 }

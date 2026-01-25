@@ -42,6 +42,13 @@ let currentTabName = null;
 
 // Search state
 let searchDebounceTimer = null;
+let searchAbortController = null;
+let searchMatches = [];
+let currentMatchIndex = -1;
+
+// Maximize state
+let isMaximized = false;
+let preMaximizeState = { width: 0, height: 0, left: 0, top: 0 };
 
 /**
  * Initialize metadata modal event listeners
@@ -64,6 +71,20 @@ export function initMetadataModal() {
     // Close button
     modalElement.querySelector('.modal-close')?.addEventListener('click', hideModal);
 
+    // Maximize button
+    modalElement.querySelector('.modal-maximize')?.addEventListener('click', toggleMaximize);
+
+    // Double-click header to maximize
+    const header = modalElement.querySelector('.modal-header');
+    header?.addEventListener('dblclick', (e) => {
+        if (!e.target.closest('.modal-close') && !e.target.closest('.modal-maximize')) {
+            toggleMaximize();
+        }
+    });
+
+    // Window resize handler
+    window.addEventListener('resize', handleWindowResize);
+
     // Escape key to close
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && overlayElement && !overlayElement.classList.contains('hidden')) {
@@ -71,8 +92,7 @@ export function initMetadataModal() {
         }
     });
 
-    // Drag handling
-    const header = modalElement.querySelector('.modal-header');
+    // Drag handling (header already defined above for dblclick)
     header?.addEventListener('mousedown', startDrag);
 
     // Resize handles
@@ -105,6 +125,9 @@ export function showModal(taskName) {
     // Show overlay and modal
     overlayElement.classList.remove('hidden');
 
+    // Disable body scroll
+    document.body.style.overflow = 'hidden';
+
     // Reset modal position to center
     centerModal();
 
@@ -113,7 +136,9 @@ export function showModal(taskName) {
     if (searchInput) {
         searchInput.value = '';
     }
-    updateSearchCount(null);
+    searchMatches = [];
+    currentMatchIndex = -1;
+    updateSearchCount();
 
     // Check which tabs have data available
     checkTabDataAvailability();
@@ -129,12 +154,23 @@ export function showModal(taskName) {
  * Hide the modal
  */
 export function hideModal() {
+    // Reset maximize state
+    if (isMaximized) {
+        modalElement?.classList.remove('maximized');
+        isMaximized = false;
+        updateMaximizeIcon(false);  // Reset icon to maximize
+    }
+
     // Stop auto-refresh polling
     stopRefreshPolling();
 
     if (overlayElement) {
         overlayElement.classList.add('hidden');
     }
+
+    // Restore body scroll
+    document.body.style.overflow = '';
+
     currentTaskName = null;
     currentTabData = null;
     currentTabName = null;
@@ -294,7 +330,9 @@ async function switchTab(tabName) {
     if (searchInput) {
         searchInput.value = '';
     }
-    updateSearchCount(null);
+    searchMatches = [];
+    currentMatchIndex = -1;
+    updateSearchCount();
 
     // Fetch and display data based on tab
     const data = await fetchTabData(tabName);
@@ -333,15 +371,32 @@ function renderTabContent(data) {
     const contentElement = modalElement?.querySelector('.modal-content');
     if (!contentElement) return;
 
+    // Reset search state
+    searchMatches = [];
+    currentMatchIndex = -1;
+    if (searchAbortController) {
+        searchAbortController.abort();
+        searchAbortController = null;
+    }
+
     if (data === null) {
         contentElement.innerHTML = '<div class="modal-error">No data found for this task</div>';
     } else if (data?.__error) {
         contentElement.innerHTML = `<div class="modal-error">${escapeHtml(data.__error)}</div>`;
     } else {
         contentElement.innerHTML = '';
+
+        // Add search bar
+        const searchBar = createSearchBar();
+        contentElement.appendChild(searchBar);
+
+        // Add JSON tree
         const treeContainer = createJsonTree(data);
         contentElement.appendChild(treeContainer);
         attachTreeEventListeners(treeContainer);
+
+        // Bind search listeners
+        bindSearchListeners(contentElement);
     }
 }
 
@@ -669,65 +724,215 @@ function attachTreeEventListeners(container) {
 // ===== Search Functionality =====
 
 /**
- * Initialize search input listeners
+ * Create search bar HTML inside the json-tree container
  */
-function initSearch() {
-    const searchInput = document.getElementById('metadata-search');
-    if (!searchInput) return;
-
-    searchInput.addEventListener('input', (e) => {
-        // Debounce search
-        clearTimeout(searchDebounceTimer);
-        searchDebounceTimer = setTimeout(() => {
-            const query = e.target.value.trim();
-            const container = document.querySelector('.json-tree');
-            if (container) {
-                const matches = searchJson(container, query);
-                updateSearchCount(matches.length);
-            } else {
-                updateSearchCount(null);
-            }
-        }, 300);
-    });
+function createSearchBar() {
+    const searchBar = document.createElement('div');
+    searchBar.className = 'json-viewer-search';
+    searchBar.innerHTML = `
+        <input type="text" id="metadata-search" placeholder="Search JSON..." />
+        <div class="search-nav">
+            <button id="search-prev" title="Previous (Shift+Enter)" disabled>&#9650;</button>
+            <span class="search-count" id="metadata-search-count"></span>
+            <button id="search-next" title="Next (Enter)" disabled>&#9660;</button>
+        </div>
+        <span class="search-status" id="metadata-search-status"></span>
+    `;
+    return searchBar;
 }
 
 /**
- * Search and highlight matches in the JSON tree
+ * Initialize search input listeners
  */
-function searchJson(container, query) {
-    // Clear previous highlights
-    clearSearchHighlights(container);
+function initSearch() {
+    // Search will be initialized after content renders
+}
 
-    if (!query) {
-        return [];
-    }
+/**
+ * Bind search event listeners after content is rendered
+ */
+function bindSearchListeners(container) {
+    const searchInput = container.querySelector('#metadata-search');
+    const prevBtn = container.querySelector('#search-prev');
+    const nextBtn = container.querySelector('#search-next');
 
-    const matches = [];
-    const searchLower = query.toLowerCase();
+    if (!searchInput) return;
 
-    // Find all searchable elements
-    const searchables = container.querySelectorAll('[data-searchable]');
+    searchInput.addEventListener('input', (e) => {
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(() => {
+            const query = e.target.value.trim();
+            const jsonTree = container.querySelector('.json-tree');
+            if (jsonTree) {
+                searchJsonAsync(jsonTree, query);
+            }
+        }, 300);
+    });
 
-    searchables.forEach(el => {
-        const text = el.dataset.searchable.toLowerCase();
-        if (text.includes(searchLower)) {
-            // Highlight the match
-            const originalHtml = el.innerHTML;
-            const originalText = el.textContent;
-
-            // Find match positions and wrap them
-            const regex = new RegExp(`(${escapeRegex(query)})`, 'gi');
-            const newHtml = originalText.replace(regex, '<span class="json-match">$1</span>');
-            el.innerHTML = newHtml;
-
-            matches.push(el);
+    // Keyboard navigation
+    searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (e.shiftKey) {
+                navigateToPrevMatch();
+            } else {
+                navigateToNextMatch();
+            }
         }
     });
 
-    // Expand ancestors of all matches
-    expandSearchMatches(container, matches);
+    prevBtn?.addEventListener('click', navigateToPrevMatch);
+    nextBtn?.addEventListener('click', navigateToNextMatch);
+}
 
-    return matches;
+/**
+ * Async search with batched processing
+ */
+async function searchJsonAsync(container, query) {
+    // Cancel previous search
+    if (searchAbortController) {
+        searchAbortController.abort();
+    }
+
+    // Clear previous highlights
+    clearSearchHighlights(container);
+    searchMatches = [];
+    currentMatchIndex = -1;
+
+    if (!query) {
+        updateSearchUI(null, 0);
+        return;
+    }
+
+    searchAbortController = new AbortController();
+    const signal = searchAbortController.signal;
+
+    // Show searching status
+    updateSearchStatus('Searching...');
+
+    const searchables = container.querySelectorAll('[data-searchable]');
+    const searchLower = query.toLowerCase();
+    const BATCH_SIZE = 100;
+
+    try {
+        for (let i = 0; i < searchables.length; i += BATCH_SIZE) {
+            if (signal.aborted) return;
+
+            const batch = Array.from(searchables).slice(i, i + BATCH_SIZE);
+
+            batch.forEach(el => {
+                const text = el.dataset.searchable.toLowerCase();
+                if (text.includes(searchLower)) {
+                    highlightMatches(el, query);
+                    searchMatches.push(el);
+                }
+            });
+
+            // Yield to browser
+            await new Promise(resolve => requestAnimationFrame(resolve));
+        }
+
+        if (signal.aborted) return;
+
+        // Expand ancestors of all matches
+        expandSearchMatches(container, searchMatches);
+
+        // Update UI
+        updateSearchUI(searchMatches.length, searchMatches.length);
+
+        // Navigate to first match
+        if (searchMatches.length > 0) {
+            navigateToMatch(0);
+        }
+    } catch (e) {
+        if (e.name !== 'AbortError') {
+            console.error('Search error:', e);
+        }
+    }
+}
+
+/**
+ * Highlight matches in an element
+ */
+function highlightMatches(el, query) {
+    const originalText = el.textContent;
+    const regex = new RegExp(`(${escapeRegex(query)})`, 'gi');
+    const newHtml = originalText.replace(regex, '<span class="json-match">$1</span>');
+    el.innerHTML = newHtml;
+}
+
+/**
+ * Navigate to a specific match
+ */
+function navigateToMatch(index) {
+    if (searchMatches.length === 0) return;
+
+    // Remove current class from previous match
+    const prevCurrent = document.querySelector('.json-match.current');
+    if (prevCurrent) {
+        prevCurrent.classList.remove('current');
+    }
+
+    // Wrap index
+    if (index < 0) index = searchMatches.length - 1;
+    if (index >= searchMatches.length) index = 0;
+
+    currentMatchIndex = index;
+
+    // Find the match span within the element and mark as current
+    const matchEl = searchMatches[index];
+    const matchSpan = matchEl.querySelector('.json-match');
+    if (matchSpan) {
+        matchSpan.classList.add('current');
+        matchSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    updateSearchCount();
+}
+
+function navigateToNextMatch() {
+    navigateToMatch(currentMatchIndex + 1);
+}
+
+function navigateToPrevMatch() {
+    navigateToMatch(currentMatchIndex - 1);
+}
+
+/**
+ * Update search UI elements
+ */
+function updateSearchUI(count, total) {
+    updateSearchCount();
+    updateSearchStatus('');
+
+    const prevBtn = document.getElementById('search-prev');
+    const nextBtn = document.getElementById('search-next');
+
+    if (prevBtn) prevBtn.disabled = !searchMatches.length;
+    if (nextBtn) nextBtn.disabled = !searchMatches.length;
+}
+
+function updateSearchCount() {
+    const countEl = document.getElementById('metadata-search-count');
+    if (!countEl) return;
+
+    if (searchMatches.length === 0) {
+        const searchInput = document.getElementById('metadata-search');
+        if (searchInput && searchInput.value.trim()) {
+            countEl.textContent = '0/0';
+        } else {
+            countEl.textContent = '';
+        }
+    } else {
+        countEl.textContent = `${currentMatchIndex + 1}/${searchMatches.length}`;
+    }
+}
+
+function updateSearchStatus(status) {
+    const statusEl = document.getElementById('metadata-search-status');
+    if (statusEl) {
+        statusEl.textContent = status;
+    }
 }
 
 /**
@@ -764,22 +969,6 @@ function expandSearchMatches(container, matches) {
             parent = parent.parentElement?.closest('.json-node');
         }
     });
-}
-
-/**
- * Update the search match count display
- */
-function updateSearchCount(count) {
-    const countEl = document.getElementById('metadata-search-count');
-    if (!countEl) return;
-
-    if (count === null || count === undefined) {
-        countEl.textContent = '';
-    } else if (count === 0) {
-        countEl.textContent = 'No matches';
-    } else {
-        countEl.textContent = `${count} ${count === 1 ? 'match' : 'matches'}`;
-    }
 }
 
 // ===== Auto-Refresh Polling =====
@@ -832,8 +1021,7 @@ async function refreshCurrentTab() {
         if (searchInput && searchInput.value.trim()) {
             const container = document.querySelector('.json-tree');
             if (container) {
-                const matches = searchJson(container, searchInput.value.trim());
-                updateSearchCount(matches.length);
+                searchJsonAsync(container, searchInput.value.trim());
             }
         }
     }
@@ -843,8 +1031,11 @@ async function refreshCurrentTab() {
  * Start dragging the modal
  */
 function startDrag(e) {
-    // Don't drag if clicking close button
-    if (e.target.closest('.modal-close')) return;
+    // Don't drag if maximized
+    if (isMaximized) return;
+
+    // Don't drag if clicking close button or maximize button
+    if (e.target.closest('.modal-close') || e.target.closest('.modal-maximize')) return;
 
     isDragging = true;
     dragStartX = e.clientX;
@@ -861,6 +1052,9 @@ function startDrag(e) {
  * Start resizing the modal
  */
 function startResize(e) {
+    // Don't resize if maximized
+    if (isMaximized) return;
+
     isResizing = true;
 
     // Get resize direction from handle class
@@ -881,22 +1075,15 @@ function startResize(e) {
 }
 
 /**
- * Clamp modal position to keep at least 50px of header visible within viewport
+ * Clamp modal position to keep modal completely within viewport
  */
 function clampPosition(left, top, width, height) {
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
-    const minVisible = 50; // At least 50px of header must remain visible
 
-    // Clamp horizontal: ensure minVisible pixels of modal are visible on each side
-    const minLeft = minVisible - width;
-    const maxLeft = viewportWidth - minVisible;
-    const clampedLeft = Math.max(minLeft, Math.min(maxLeft, left));
-
-    // Clamp vertical: keep header visible (top can't go above viewport, bottom limited)
-    const minTop = 0;
-    const maxTop = viewportHeight - minVisible;
-    const clampedTop = Math.max(minTop, Math.min(maxTop, top));
+    // Modal must stay completely within viewport
+    const clampedLeft = Math.max(0, Math.min(viewportWidth - width, left));
+    const clampedTop = Math.max(0, Math.min(viewportHeight - height, top));
 
     return { left: clampedLeft, top: clampedTop };
 }
@@ -967,4 +1154,88 @@ function handleMouseUp() {
     }
     isDragging = false;
     isResizing = false;
+}
+
+/**
+ * Toggle maximize/restore state
+ */
+function toggleMaximize() {
+    if (!modalElement) return;
+
+    if (isMaximized) {
+        // Restore
+        modalElement.classList.remove('maximized');
+        modalElement.style.width = `${preMaximizeState.width}px`;
+        modalElement.style.height = `${preMaximizeState.height}px`;
+        modalElement.style.left = `${preMaximizeState.left}px`;
+        modalElement.style.top = `${preMaximizeState.top}px`;
+
+        // Update icon to maximize
+        updateMaximizeIcon(false);
+    } else {
+        // Save current state
+        const rect = modalElement.getBoundingClientRect();
+        preMaximizeState = {
+            width: rect.width,
+            height: rect.height,
+            left: rect.left,
+            top: rect.top
+        };
+
+        // Maximize
+        modalElement.classList.add('maximized');
+
+        // Update icon to restore
+        updateMaximizeIcon(true);
+    }
+
+    isMaximized = !isMaximized;
+}
+
+/**
+ * Update maximize button icon
+ */
+function updateMaximizeIcon(isMaximizedState) {
+    const btn = modalElement?.querySelector('.modal-maximize');
+    if (!btn) return;
+
+    if (isMaximizedState) {
+        // Show restore icon (two overlapping rectangles)
+        btn.innerHTML = `
+            <svg viewBox="0 0 24 24" width="16" height="16">
+                <rect x="5" y="8" width="11" height="11" rx="1" stroke="currentColor" stroke-width="2" fill="none"/>
+                <path d="M8 8V5a1 1 0 011-1h10a1 1 0 011 1v10a1 1 0 01-1 1h-3" stroke="currentColor" stroke-width="2" fill="none"/>
+            </svg>
+        `;
+        btn.title = 'Restore';
+    } else {
+        // Show maximize icon
+        btn.innerHTML = `
+            <svg viewBox="0 0 24 24" width="16" height="16">
+                <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2" fill="none"/>
+            </svg>
+        `;
+        btn.title = 'Maximize';
+    }
+}
+
+/**
+ * Handle window resize
+ */
+function handleWindowResize() {
+    if (!modalElement || overlayElement?.classList.contains('hidden')) return;
+
+    if (isMaximized) {
+        // Already maximized, CSS handles it
+        return;
+    }
+
+    // Re-clamp position if modal is outside viewport
+    const rect = modalElement.getBoundingClientRect();
+    const clamped = clampPosition(rect.left, rect.top, rect.width, rect.height);
+
+    if (clamped.left !== rect.left || clamped.top !== rect.top) {
+        modalElement.style.left = `${clamped.left}px`;
+        modalElement.style.top = `${clamped.top}px`;
+    }
 }
