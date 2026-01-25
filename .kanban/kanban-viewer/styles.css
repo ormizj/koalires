@@ -1328,3 +1328,36 @@ body {
     cursor: default;
     border-radius: 0;
 }
+
+/* Task tabs (main tabs in column mode) */
+.modal-task-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 8px 12px;
+    background: #21262d;
+    border-bottom: 1px solid #30363d;
+    overflow-x: auto;
+}
+
+.modal-task-tabs.hidden { display: none; }
+
+.task-tab {
+    background: transparent;
+    border: 1px solid transparent;
+    color: #8b949e;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-family: monospace;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.task-tab:hover { background: #30363d; color: #c9d1d9; }
+.task-tab.active { background: #58a6ff; border-color: #58a6ff; color: #0d1117; }
+
+.context-menu-item.disabled { opacity: 0.4; pointer-events: none; }

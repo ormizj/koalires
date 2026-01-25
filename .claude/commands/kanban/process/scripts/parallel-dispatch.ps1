@@ -597,33 +597,28 @@ function Start-WorkerJob {
         $startedAt = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
     }
 
-    # Create the job script block
-    $jobScript = {
-        param($ProjectRoot, $Prompt, $LogPath, $JsonLogPath, $TaskName)
+    # Write prompt to a temp file for the worker to use
+    $promptFile = Join-Path $LogsDir "$taskName-prompt.txt"
+    $Prompt | Set-Content -Path $promptFile -Encoding UTF8 -NoNewline
 
-        try {
-            Set-Location $ProjectRoot
+    # Initialize log file (clear any previous content)
+    "" | Set-Content -Path $JsonLogPath -Encoding UTF8 -NoNewline
 
-            # Run claude -p with permissions skipped for autonomous worker execution
-            # Worker creates output file, dispatcher handles progress/board updates
-            # Use --output-format json to capture token usage data
-            $output = & claude -p --dangerously-skip-permissions --output-format json $Prompt 2>&1
+    # Use cmd.exe to properly pipe the file content to claude via type command
+    # This avoids PowerShell pipe issues with the claude.ps1 wrapper
+    $cmdScript = "cd /d `"$ProjectRoot`" && type `"$promptFile`" | claude -p --dangerously-skip-permissions --output-format stream-json 2>`"$JsonLogPath.stderr`" >> `"$JsonLogPath`""
 
-            # Write JSON output for token tracking
-            $output | Out-File -FilePath $JsonLogPath -Encoding UTF8
-        }
-        catch {
-            # Log the error
-            "ERROR: $($_.Exception.Message)" | Out-File -FilePath $LogPath -Encoding UTF8 -Append
-            "ERROR: $($_.Exception.Message)" | Out-File -FilePath $JsonLogPath -Encoding UTF8 -Append
-        }
-    }
+    $processInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $processInfo.FileName = "cmd.exe"
+    $processInfo.Arguments = "/c $cmdScript"
+    $processInfo.UseShellExecute = $false
+    $processInfo.CreateNoWindow = $true
+    $processInfo.WorkingDirectory = $ProjectRoot
 
-    # Start the background job
-    $job = Start-Job -ScriptBlock $jobScript -ArgumentList $ProjectRoot, $Prompt, $LogPath, $JsonLogPath, $taskName
+    $process = [System.Diagnostics.Process]::Start($processInfo)
 
     return @{
-        Job = $job
+        Process = $process
         Task = $Task
         LogPath = $LogPath
         JsonLogPath = $JsonLogPath
@@ -638,9 +633,10 @@ function Wait-WorkerBatch {
 
     $results = @()
 
-    # Wait for all jobs to complete
-    $jobs = $Workers | ForEach-Object { $_.Job }
-    $jobs | Wait-Job | Out-Null
+    # Wait for all processes to complete
+    foreach ($worker in $Workers) {
+        $worker.Process.WaitForExit()
+    }
 
     foreach ($worker in $Workers) {
         $task = $worker.Task
@@ -649,8 +645,7 @@ function Wait-WorkerBatch {
         $jsonLogPath = $worker.JsonLogPath
         $outputFilePath = $worker.OutputFilePath
 
-        # Clean up the job
-        Remove-Job -Job $worker.Job -Force
+        # Process has already exited at this point
 
         # Wait for JSON log file to be ready (with timeout) for token extraction
         $maxWaitMs = 5000  # 5 second timeout
@@ -661,14 +656,22 @@ function Wait-WorkerBatch {
         while ($waitedMs -lt $maxWaitMs -and -not $fileReady) {
             if (Test-Path $jsonLogPath) {
                 $fileInfo = Get-Item $jsonLogPath -ErrorAction SilentlyContinue
-                # File exists and has content - check if it ends with valid JSON
+                # File exists and has content - check for JSONL completion marker
                 if ($fileInfo -and $fileInfo.Length -gt 100) {
                     try {
                         $testContent = Get-Content $jsonLogPath -Raw -ErrorAction Stop
-                        $null = $testContent | ConvertFrom-Json -ErrorAction Stop
-                        $fileReady = $true
+                        # For JSONL: Check if any line contains "type":"result" (completion marker)
+                        $lines = $testContent -split "`n" | Where-Object { $_.Trim() -ne "" }
+                        if ($lines.Count -gt 0) {
+                            foreach ($line in $lines) {
+                                if ($line -match '"type"\s*:\s*"result"') {
+                                    $fileReady = $true
+                                    break
+                                }
+                            }
+                        }
                     } catch {
-                        # File not ready yet (incomplete JSON)
+                        # File not ready yet
                     }
                 }
             }

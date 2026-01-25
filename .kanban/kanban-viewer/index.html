@@ -247,8 +247,8 @@
     </div>
 </div>
 
-<!-- Board Context Menu -->
-<div id="board-context-menu" class="context-menu hidden">
+<!-- App Context Menu (Global Board Actions) -->
+<div id="app-context-menu" class="context-menu hidden">
     <div class="context-menu-item" data-action="refresh">
         <span class="context-menu-icon">🔄</span>
         Refresh board
@@ -260,6 +260,22 @@
     <div class="context-menu-item" data-action="expand-all">
         <span class="context-menu-icon">📂</span>
         Expand all tasks
+    </div>
+</div>
+
+<!-- Column Context Menu -->
+<div id="column-context-menu" class="context-menu hidden">
+    <div class="context-menu-item" data-action="column-metadata">
+        <span class="context-menu-icon">📊</span>
+        <span class="context-menu-text">Metadata (<span id="column-task-count">0</span> tasks)</span>
+    </div>
+    <div class="context-menu-item" data-action="column-collapse-all">
+        <span class="context-menu-icon">📁</span>
+        Collapse all in column
+    </div>
+    <div class="context-menu-item" data-action="column-expand-all">
+        <span class="context-menu-icon">📂</span>
+        Expand all in column
     </div>
 </div>
 
@@ -282,6 +298,7 @@
                 </button>
             </div>
         </div>
+        <div class="modal-task-tabs hidden" id="modal-task-tabs"></div>
         <div class="modal-tabs">
             <button class="modal-tab active" data-tab="board">board</button>
             <button class="modal-tab" data-tab="progress">progress</button>

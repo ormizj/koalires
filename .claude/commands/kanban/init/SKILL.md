@@ -34,6 +34,7 @@ Copy the entire viewer directory from this skill to the project:
 **Always overwrite** the existing directory to ensure the latest template is used.
 
 Use recursive copy to include all files:
+
 - `index.html`
 - `styles.css`
 - `js/main.js`

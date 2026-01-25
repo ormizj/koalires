@@ -5,6 +5,7 @@
 .DESCRIPTION
     Standalone script that reads a worker output JSON file and updates
     kanban-progress.json and kanban-board.json accordingly.
+    Uses file locking with retry logic for safe concurrent updates.
 
 .PARAMETER TaskName
     The name of the task being processed.
@@ -43,6 +44,56 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+# File locking constants
+$MaxRetries = 10
+$RetryDelayMs = 200
+
+function Update-JsonFileWithLock {
+    param(
+        [string]$FilePath,
+        [scriptblock]$UpdateLogic
+    )
+
+    $attempt = 0
+    $success = $false
+    $lastError = $null
+
+    while (-not $success -and $attempt -lt $MaxRetries) {
+        $attempt++
+        try {
+            # Read current content
+            $content = Get-Content $FilePath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+
+            # Apply the update logic
+            $updatedContent = & $UpdateLogic $content
+
+            # Write back atomically via temp file
+            $tempFile = "$FilePath.tmp.$([System.Guid]::NewGuid().ToString('N'))"
+            $updatedContent | ConvertTo-Json -Depth 10 | Set-Content $tempFile -Encoding UTF8 -ErrorAction Stop
+
+            # Move temp file to target (atomic on Windows NTFS)
+            Move-Item -Path $tempFile -Destination $FilePath -Force -ErrorAction Stop
+            $success = $true
+        }
+        catch {
+            $lastError = $_.Exception.Message
+            # Clean up temp file if it exists
+            if ($tempFile -and (Test-Path $tempFile)) {
+                Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
+            }
+            # Wait before retry with random jitter
+            $jitter = Get-Random -Minimum 0 -Maximum 100
+            Start-Sleep -Milliseconds ($RetryDelayMs + $jitter)
+        }
+    }
+
+    return @{
+        Success = $success
+        Error = if (-not $success) { $lastError } else { $null }
+        Attempts = $attempt
+    }
+}
 
 function Write-JsonResult {
     param(
@@ -110,23 +161,7 @@ if (-not (Test-Path $BoardFile)) {
     exit 1
 }
 
-# Read progress file
-try {
-    $progressContent = Get-Content $ProgressFile -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
-}
-catch {
-    Write-JsonResult -Success $false -Error "Failed to parse progress file: $($_.Exception.Message)"
-    exit 1
-}
-
-# Read board file
-try {
-    $boardContent = Get-Content $BoardFile -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
-}
-catch {
-    Write-JsonResult -Success $false -Error "Failed to parse board file: $($_.Exception.Message)"
-    exit 1
-}
+# Note: Files are read inside Update-JsonFileWithLock for atomic updates
 
 # Map worker output status to progress status
 $progressStatus = switch ($outputContent.status) {
@@ -203,16 +238,20 @@ elseif ($outputContent.tokensUsed -and $outputContent.tokensUsed.Count -gt 0) {
     $progressEntry.tokensUsed = @($outputContent.tokensUsed)
 }
 
-# Update progress file
+# Update progress file with locking
 $progressUpdated = $false
-try {
-    # Add or update the task entry
-    $progressContent | Add-Member -NotePropertyName $TaskName -NotePropertyValue ([PSCustomObject]$progressEntry) -Force
-    $progressContent | ConvertTo-Json -Depth 10 | Set-Content $ProgressFile -Encoding UTF8 -ErrorAction Stop
+$progressUpdateLogic = {
+    param($content)
+    $content | Add-Member -NotePropertyName $TaskName -NotePropertyValue ([PSCustomObject]$progressEntry) -Force
+    return $content
+}.GetNewClosure()
+
+$progressResult = Update-JsonFileWithLock -FilePath $ProgressFile -UpdateLogic $progressUpdateLogic
+if ($progressResult.Success) {
     $progressUpdated = $true
 }
-catch {
-    Write-JsonResult -Success $false -Error "Failed to update progress file: $($_.Exception.Message)"
+else {
+    Write-JsonResult -Success $false -Error "Failed to update progress file: $($progressResult.Error)"
     exit 1
 }
 
@@ -225,28 +264,23 @@ if ($outputContent.verification -and $outputContent.verification.PSObject.Proper
 }
 
 if ($shouldUpdateBoard) {
-    try {
-        # Find and update the task in board
-        $taskFound = $false
-        for ($i = 0; $i -lt $boardContent.tasks.Count; $i++) {
-            if ($boardContent.tasks[$i].name -eq $TaskName) {
-                $boardContent.tasks[$i] | Add-Member -NotePropertyName "passes" -NotePropertyValue $true -Force
-                $taskFound = $true
+    $boardUpdateLogic = {
+        param($content)
+        for ($i = 0; $i -lt $content.tasks.Count; $i++) {
+            if ($content.tasks[$i].name -eq $TaskName) {
+                $content.tasks[$i] | Add-Member -NotePropertyName "passes" -NotePropertyValue $true -Force
                 break
             }
         }
+        return $content
+    }.GetNewClosure()
 
-        if ($taskFound) {
-            $boardContent | ConvertTo-Json -Depth 10 | Set-Content $BoardFile -Encoding UTF8 -ErrorAction Stop
-            $boardUpdated = $true
-        }
-        else {
-            # Task not found in board - not a critical error, just log it
-            Write-Host "Warning: Task '$TaskName' not found in board file" -ForegroundColor Yellow
-        }
+    $boardResult = Update-JsonFileWithLock -FilePath $BoardFile -UpdateLogic $boardUpdateLogic
+    if ($boardResult.Success) {
+        $boardUpdated = $true
     }
-    catch {
-        Write-JsonResult -Success $false -Error "Failed to update board file: $($_.Exception.Message)" -ProgressUpdated $progressUpdated
+    else {
+        Write-JsonResult -Success $false -Error "Failed to update board file: $($boardResult.Error)" -ProgressUpdated $progressUpdated
         exit 1
     }
 }
