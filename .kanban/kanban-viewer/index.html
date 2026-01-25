@@ -237,10 +237,11 @@
 
 <!-- Task Context Menu -->
 <div id="task-context-menu" class="context-menu hidden">
-    <div class="context-menu-item" data-action="show-details">
-        <span class="context-menu-icon">📋</span>
-        Show task details
+    <div class="context-menu-header">
+        <span class="context-menu-header-icon">📌</span>
+        <span class="context-menu-header-text" id="task-menu-title">Task</span>
     </div>
+    <div class="context-menu-divider"></div>
     <div class="context-menu-item" data-action="view-metadata">
         <span class="context-menu-icon">🔍</span>
         View metadata
@@ -249,9 +250,14 @@
 
 <!-- App Context Menu (Global Board Actions) -->
 <div id="app-context-menu" class="context-menu hidden">
-    <div class="context-menu-item" data-action="refresh">
-        <span class="context-menu-icon">🔄</span>
-        Refresh board
+    <div class="context-menu-header">
+        <span class="context-menu-header-icon">📋</span>
+        <span class="context-menu-header-text">Board</span>
+    </div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item" data-action="board-metadata">
+        <span class="context-menu-icon">🔍</span>
+        <span class="context-menu-text">Metadata (<span id="board-task-count">0</span> tasks)</span>
     </div>
     <div class="context-menu-item" data-action="collapse-all">
         <span class="context-menu-icon">📁</span>
@@ -265,8 +271,13 @@
 
 <!-- Column Context Menu -->
 <div id="column-context-menu" class="context-menu hidden">
+    <div class="context-menu-header">
+        <span class="context-menu-header-icon">📊</span>
+        <span class="context-menu-header-text" id="column-menu-title">Column</span>
+    </div>
+    <div class="context-menu-divider"></div>
     <div class="context-menu-item" data-action="column-metadata">
-        <span class="context-menu-icon">📊</span>
+        <span class="context-menu-icon">🔍</span>
         <span class="context-menu-text">Metadata (<span id="column-task-count">0</span> tasks)</span>
     </div>
     <div class="context-menu-item" data-action="column-collapse-all">

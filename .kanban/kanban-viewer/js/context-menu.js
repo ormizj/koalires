@@ -4,6 +4,7 @@
 
 import { showModal, showColumnModal } from './metadata-modal.js';
 import { getBoardData, getProgressData } from './data.js';
+import { getTaskStatus } from './tasks.js';
 
 let activeMenu = null;
 let targetTaskElement = null;
@@ -61,6 +62,13 @@ function handleContextMenu(event) {
 function showTaskContextMenu(event, taskElement) {
   targetTaskElement = taskElement;
   const menu = document.getElementById('task-context-menu');
+
+  // Update header with task name
+  const taskName =
+    taskElement.querySelector('.task-name')?.textContent || 'Task';
+  const titleEl = document.getElementById('task-menu-title');
+  if (titleEl) titleEl.textContent = taskName;
+
   positionMenu(menu, event.clientX, event.clientY);
   menu.classList.remove('hidden');
   activeMenu = menu;
@@ -68,6 +76,13 @@ function showTaskContextMenu(event, taskElement) {
 
 function showAppContextMenu(event) {
   const menu = document.getElementById('app-context-menu');
+
+  // Update task count in menu
+  const boardData = getBoardData();
+  const taskCount = boardData?.tasks?.length || 0;
+  const countSpan = document.getElementById('board-task-count');
+  if (countSpan) countSpan.textContent = taskCount;
+
   positionMenu(menu, event.clientX, event.clientY);
   menu.classList.remove('hidden');
   activeMenu = menu;
@@ -78,6 +93,17 @@ function showColumnContextMenu(event, columnId, columnElement) {
   targetColumnId = columnId;
 
   const menu = document.getElementById('column-context-menu');
+
+  // Update header with column name
+  const columnNames = {
+    pending: 'Pending',
+    blocked: 'Hold',
+    progress: 'In Progress',
+    review: 'Code Review',
+    completed: 'Completed',
+  };
+  const titleEl = document.getElementById('column-menu-title');
+  if (titleEl) titleEl.textContent = columnNames[columnId] || columnId;
 
   // Update task count in menu
   const taskCount = getTasksInColumn(columnId).length;
@@ -100,6 +126,7 @@ function showColumnContextMenu(event, columnId, columnElement) {
  */
 function getTasksInColumn(columnId) {
   const boardData = getBoardData();
+  const progressData = getProgressData();
   if (!boardData?.tasks) return [];
 
   // Map column IDs to status values
@@ -113,16 +140,10 @@ function getTasksInColumn(columnId) {
 
   const targetStatus = statusMap[columnId] || columnId;
 
-  // Get progress data to check task status
-  const progressData = getProgressData();
-  const progressMap = new Map();
-  if (progressData?.tasks) {
-    progressData.tasks.forEach((t) => progressMap.set(t.name, t.status));
-  }
-
   return boardData.tasks
     .filter((task) => {
-      const status = progressMap.get(task.name) || task.status || 'pending';
+      // Use the same getTaskStatus function as board.js
+      const status = getTaskStatus(task, progressData);
       return status === targetStatus;
     })
     .map((t) => t.name);
@@ -168,15 +189,6 @@ function handleTaskMenuClick(event) {
   const action = menuItem.dataset.action;
 
   switch (action) {
-    case 'show-details':
-      if (targetTaskElement) {
-        targetTaskElement.classList.toggle('expanded');
-        targetTaskElement.scrollIntoView({
-          behavior: 'smooth',
-          block: 'nearest',
-        });
-      }
-      break;
     case 'view-metadata':
       if (targetTaskElement) {
         const taskName =
@@ -196,10 +208,12 @@ function handleAppMenuClick(event) {
   const action = menuItem.dataset.action;
 
   switch (action) {
-    case 'refresh':
-      // Call the global fetchAndRender
-      if (window.refreshBoard) {
-        window.refreshBoard();
+    case 'board-metadata':
+      // Get all task names and show column modal with all tasks
+      const boardData = getBoardData();
+      if (boardData?.tasks?.length > 0) {
+        const allTaskNames = boardData.tasks.map((t) => t.name);
+        showColumnModal('all', allTaskNames);
       }
       break;
     case 'collapse-all':
@@ -232,9 +246,11 @@ function handleColumnMenuClick(event) {
       break;
     case 'column-collapse-all':
       if (targetColumnElement) {
-        targetColumnElement.querySelectorAll('.task.expanded').forEach((task) => {
-          task.classList.remove('expanded');
-        });
+        targetColumnElement
+          .querySelectorAll('.task.expanded')
+          .forEach((task) => {
+            task.classList.remove('expanded');
+          });
       }
       break;
     case 'column-expand-all':

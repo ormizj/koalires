@@ -872,6 +872,38 @@ body {
     text-align: center;
 }
 
+/* Context Menu Header - Compact */
+.context-menu-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px 4px 12px;
+    color: #6e7681;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    font-weight: 500;
+}
+
+.context-menu-header-icon {
+    font-size: 10px;
+    width: 12px;
+    text-align: center;
+}
+
+.context-menu-header-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 140px;
+}
+
+.context-menu-divider {
+    height: 1px;
+    background: #21262d;
+    margin: 2px 8px 4px 8px;
+}
+
 /* Metadata Modal Styles */
 .modal-overlay {
     position: fixed;
