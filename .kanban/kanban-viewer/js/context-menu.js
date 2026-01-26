@@ -1,0 +1,320 @@
+/**
+ * Context menu handling for kanban board
+ */
+
+import { showModal, showColumnModal } from './metadata-modal.js';
+import { getBoardData, getProgressData } from './data.js';
+import { getTaskStatus } from './tasks.js';
+
+let activeMenu = null;
+let targetTaskElement = null;
+let targetColumnElement = null;
+let targetColumnId = null;
+
+/**
+ * Initialize context menu handlers
+ */
+export function initContextMenu() {
+  // Prevent default context menu on entire page
+  document.addEventListener('contextmenu', handleContextMenu);
+
+  // Close menu on click outside, escape, or scroll
+  document.addEventListener('click', hideContextMenu);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') hideContextMenu();
+  });
+  document.addEventListener('scroll', hideContextMenu, true);
+
+  // Attach menu item click handlers
+  document
+    .getElementById('task-context-menu')
+    ?.addEventListener('click', handleTaskMenuClick);
+  document
+    .getElementById('app-context-menu')
+    ?.addEventListener('click', handleAppMenuClick);
+  document
+    .getElementById('column-context-menu')
+    ?.addEventListener('click', handleColumnMenuClick);
+}
+
+function handleContextMenu(event) {
+  event.preventDefault();
+  hideContextMenu();
+
+  // Check if right-clicked on a task card
+  const taskElement = event.target.closest('.task');
+  if (taskElement) {
+    showTaskContextMenu(event, taskElement);
+    return;
+  }
+
+  // Check if right-clicked on a status badge in the table
+  const statusBadge = event.target.closest('.table-status-badge');
+  if (statusBadge) {
+    const statusToColumnMap = {
+      pending: 'pending',
+      'in-progress': 'progress',
+      'code-review': 'review',
+      completed: 'completed',
+      blocked: 'blocked',
+    };
+    // Find which status class the badge has
+    const statusClass = Object.keys(statusToColumnMap).find((status) =>
+      statusBadge.classList.contains(status)
+    );
+    if (statusClass) {
+      const columnId = statusToColumnMap[statusClass];
+      const columnElement = document.querySelector(
+        `.column[data-column="${columnId}"]`
+      );
+      showColumnContextMenu(event, columnId, columnElement);
+      return;
+    }
+  }
+
+  // Check if right-clicked on a table row
+  const tableRow = event.target.closest('.task-table tbody tr');
+  if (tableRow) {
+    showTableRowContextMenu(event, tableRow);
+    return;
+  }
+
+  // Check if right-clicked on a column
+  const columnElement = event.target.closest('.column');
+  if (columnElement) {
+    showColumnContextMenu(event, columnElement.dataset.column, columnElement);
+    return;
+  }
+
+  // Default: show app context menu
+  showAppContextMenu(event);
+}
+
+function showTaskContextMenu(event, taskElement) {
+  targetTaskElement = taskElement;
+  const menu = document.getElementById('task-context-menu');
+
+  // Update header with task name
+  const taskName =
+    taskElement.querySelector('.task-name')?.textContent || 'Task';
+  const titleEl = document.getElementById('task-menu-title');
+  if (titleEl) titleEl.textContent = taskName;
+
+  positionMenu(menu, event.clientX, event.clientY);
+  menu.classList.remove('hidden');
+  activeMenu = menu;
+}
+
+function showTableRowContextMenu(event, tableRow) {
+  // Create a fake task element wrapper for compatibility with handleTaskMenuClick
+  const taskName = tableRow.dataset.taskName || 'Task';
+  targetTaskElement = {
+    querySelector: (selector) => {
+      if (selector === '.task-name') {
+        return { textContent: taskName };
+      }
+      return null;
+    },
+  };
+
+  const menu = document.getElementById('task-context-menu');
+
+  // Update header with task name
+  const titleEl = document.getElementById('task-menu-title');
+  if (titleEl) titleEl.textContent = taskName;
+
+  positionMenu(menu, event.clientX, event.clientY);
+  menu.classList.remove('hidden');
+  activeMenu = menu;
+}
+
+function showAppContextMenu(event) {
+  const menu = document.getElementById('app-context-menu');
+
+  // Update task count in menu
+  const boardData = getBoardData();
+  const taskCount = boardData?.tasks?.length || 0;
+  const countSpan = document.getElementById('board-task-count');
+  if (countSpan) countSpan.textContent = taskCount;
+
+  positionMenu(menu, event.clientX, event.clientY);
+  menu.classList.remove('hidden');
+  activeMenu = menu;
+}
+
+function showColumnContextMenu(event, columnId, columnElement) {
+  targetColumnElement = columnElement;
+  targetColumnId = columnId;
+
+  const menu = document.getElementById('column-context-menu');
+
+  // Update header with column name
+  const columnNames = {
+    pending: 'Pending',
+    blocked: 'Hold',
+    progress: 'In Progress',
+    review: 'Code Review',
+    completed: 'Completed',
+  };
+  const titleEl = document.getElementById('column-menu-title');
+  if (titleEl) titleEl.textContent = columnNames[columnId] || columnId;
+
+  // Update task count in menu
+  const taskCount = getTasksInColumn(columnId).length;
+  const countSpan = document.getElementById('column-task-count');
+  if (countSpan) countSpan.textContent = taskCount;
+
+  // Disable metadata if no tasks
+  const metadataItem = menu.querySelector('[data-action="column-metadata"]');
+  if (metadataItem) {
+    metadataItem.classList.toggle('disabled', taskCount === 0);
+  }
+
+  positionMenu(menu, event.clientX, event.clientY);
+  menu.classList.remove('hidden');
+  activeMenu = menu;
+}
+
+/**
+ * Get task names in a specific column based on their status
+ */
+function getTasksInColumn(columnId) {
+  const boardData = getBoardData();
+  const progressData = getProgressData();
+  if (!boardData?.tasks) return [];
+
+  // Map column IDs to status values
+  const statusMap = {
+    pending: 'pending',
+    blocked: 'blocked',
+    progress: 'in-progress',
+    review: 'code-review',
+    completed: 'completed',
+  };
+
+  const targetStatus = statusMap[columnId] || columnId;
+
+  return boardData.tasks
+    .filter((task) => {
+      // Use the same getTaskStatus function as board.js
+      const status = getTaskStatus(task, progressData);
+      return status === targetStatus;
+    })
+    .map((t) => t.name);
+}
+
+function positionMenu(menu, x, y) {
+  // Temporarily show to get dimensions
+  menu.style.visibility = 'hidden';
+  menu.classList.remove('hidden');
+
+  const menuRect = menu.getBoundingClientRect();
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+
+  // Adjust position if menu would overflow viewport
+  if (x + menuRect.width > viewportWidth) {
+    x = viewportWidth - menuRect.width - 10;
+  }
+  if (y + menuRect.height > viewportHeight) {
+    y = viewportHeight - menuRect.height - 10;
+  }
+
+  menu.style.left = `${x}px`;
+  menu.style.top = `${y}px`;
+  menu.style.visibility = 'visible';
+  menu.classList.add('hidden'); // Will be removed by caller
+}
+
+export function hideContextMenu() {
+  if (activeMenu) {
+    activeMenu.classList.add('hidden');
+    activeMenu = null;
+  }
+  targetTaskElement = null;
+  targetColumnElement = null;
+  targetColumnId = null;
+}
+
+function handleTaskMenuClick(event) {
+  const menuItem = event.target.closest('.context-menu-item');
+  if (!menuItem) return;
+
+  const action = menuItem.dataset.action;
+
+  switch (action) {
+    case 'view-metadata':
+      if (targetTaskElement) {
+        const taskName =
+          targetTaskElement.querySelector('.task-name')?.textContent;
+        if (taskName) showModal(taskName);
+      }
+      break;
+  }
+
+  hideContextMenu();
+}
+
+function handleAppMenuClick(event) {
+  const menuItem = event.target.closest('.context-menu-item');
+  if (!menuItem) return;
+
+  const action = menuItem.dataset.action;
+
+  switch (action) {
+    case 'board-metadata':
+      // Get all task names and show column modal with all tasks
+      const boardData = getBoardData();
+      if (boardData?.tasks?.length > 0) {
+        const allTaskNames = boardData.tasks.map((t) => t.name);
+        showColumnModal('all', allTaskNames);
+      }
+      break;
+    case 'collapse-all':
+      document.querySelectorAll('.task.expanded').forEach((task) => {
+        task.classList.remove('expanded');
+      });
+      break;
+    case 'expand-all':
+      document.querySelectorAll('.task').forEach((task) => {
+        task.classList.add('expanded');
+      });
+      break;
+  }
+
+  hideContextMenu();
+}
+
+function handleColumnMenuClick(event) {
+  const menuItem = event.target.closest('.context-menu-item');
+  if (!menuItem || menuItem.classList.contains('disabled')) return;
+
+  const action = menuItem.dataset.action;
+
+  switch (action) {
+    case 'column-metadata':
+      const taskNames = getTasksInColumn(targetColumnId);
+      if (taskNames.length > 0) {
+        showColumnModal(targetColumnId, taskNames);
+      }
+      break;
+    case 'column-collapse-all':
+      if (targetColumnElement) {
+        targetColumnElement
+          .querySelectorAll('.task.expanded')
+          .forEach((task) => {
+            task.classList.remove('expanded');
+          });
+      }
+      break;
+    case 'column-expand-all':
+      if (targetColumnElement) {
+        targetColumnElement.querySelectorAll('.task').forEach((task) => {
+          task.classList.add('expanded');
+        });
+      }
+      break;
+  }
+
+  hideContextMenu();
+}

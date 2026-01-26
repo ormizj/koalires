@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kanban Board Viewer</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="header">
+      <div class="header-controls">
+        <button
+          class="view-toggle-btn"
+          id="view-toggle"
+          title="Switch to Table View"
+        >
+          <svg class="view-icon" viewBox="0 0 24 24">
+            <rect x="3" y="3" width="5" height="18" rx="1" />
+            <rect x="10" y="3" width="5" height="12" rx="1" />
+            <rect x="17" y="3" width="4" height="15" rx="1" />
+          </svg>
+        </button>
+        <div class="task-search">
+          <input
+            type="text"
+            id="task-search-input"
+            placeholder="Search tasks..."
+          />
+          <span class="search-count" id="task-search-count"></span>
+          <button class="search-clear" id="task-search-clear" type="button">
+            &times;
+          </button>
+        </div>
+      </div>
+      <h1 id="project-title">Loading...</h1>
+      <div class="project-meta">
+        <span id="project-type"></span>
+        <span class="project-meta-separator"></span>
+        <span class="project-created" id="project-created"></span>
+      </div>
+      <div class="stats-container">
+        <div class="stats-section">
+          <div class="stats-title">Task Statistics</div>
+          <div class="stats">
+            <div class="stat stat-pending">
+              <div class="stat-value" id="stat-pending">0</div>
+              <div class="stat-label">Pending</div>
+            </div>
+            <div class="stat stat-blocked">
+              <div class="stat-value" id="stat-blocked">0</div>
+              <div class="stat-label">Hold</div>
+            </div>
+            <div class="stat stat-progress">
+              <div class="stat-value" id="stat-progress">0</div>
+              <div class="stat-label">In Progress</div>
+            </div>
+            <div class="stat stat-review">
+              <div class="stat-value" id="stat-review">0</div>
+              <div class="stat-label">Code Review</div>
+            </div>
+            <div class="stat stat-completed">
+              <div class="stat-value" id="stat-completed">0</div>
+              <div class="stat-label">Completed</div>
+            </div>
+          </div>
+        </div>
+        <div class="stats-separator"></div>
+        <div class="stats-section">
+          <div class="stats-title">Token Statistics</div>
+          <div class="stats">
+            <div class="stat stat-min">
+              <div class="stat-value" id="stat-min">0</div>
+              <div class="stat-label">Minimum</div>
+            </div>
+            <div class="stat stat-max">
+              <div class="stat-value" id="stat-max">0</div>
+              <div class="stat-label">Maximum</div>
+            </div>
+            <div class="stat stat-avg">
+              <div class="stat-value" id="stat-avg">0</div>
+              <div class="stat-label">Average</div>
+            </div>
+            <div class="stat stat-tokens">
+              <div class="stat-value" id="stat-tokens">0</div>
+              <div class="stat-label">Total</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+      </div>
+    </div>
+
+    <div class="board">
+      <div
+        class="column column-pending"
+        data-column="pending"
+        onclick="handleColumnClick(event, this)"
+      >
+        <div class="column-header">
+          <span class="column-title">Pending</span>
+          <span class="column-count" id="count-pending">0</span>
+          <div class="column-controls">
+            <button
+              class="control-btn minimize-btn"
+              title="Minimize"
+              onclick="toggleMinimize(event, 'pending')"
+            >
+              <svg viewBox="0 0 24 24">
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </button>
+            <button
+              class="control-btn maximize-btn"
+              title="Maximize"
+              onclick="toggleMaximize(event, 'pending')"
+            >
+              <svg viewBox="0 0 24 24">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="tasks" id="tasks-pending"></div>
+      </div>
+
+      <div
+        class="column column-blocked"
+        data-column="blocked"
+        onclick="handleColumnClick(event, this)"
+      >
+        <div class="column-header">
+          <span class="column-title">Hold</span>
+          <span class="column-count" id="count-blocked">0</span>
+          <div class="column-controls">
+            <button
+              class="control-btn minimize-btn"
+              title="Minimize"
+              onclick="toggleMinimize(event, 'blocked')"
+            >
+              <svg viewBox="0 0 24 24">
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </button>
+            <button
+              class="control-btn maximize-btn"
+              title="Maximize"
+              onclick="toggleMaximize(event, 'blocked')"
+            >
+              <svg viewBox="0 0 24 24">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="tasks" id="tasks-blocked"></div>
+      </div>
+
+      <div
+        class="column column-progress"
+        data-column="progress"
+        onclick="handleColumnClick(event, this)"
+      >
+        <div class="column-header">
+          <span class="column-title">In Progress</span>
+          <span class="column-count" id="count-progress">0</span>
+          <div class="column-controls">
+            <button
+              class="control-btn minimize-btn"
+              title="Minimize"
+              onclick="toggleMinimize(event, 'progress')"
+            >
+              <svg viewBox="0 0 24 24">
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </button>
+            <button
+              class="control-btn maximize-btn"
+              title="Maximize"
+              onclick="toggleMaximize(event, 'progress')"
+            >
+              <svg viewBox="0 0 24 24">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="tasks" id="tasks-progress"></div>
+      </div>
+
+      <div
+        class="column column-review"
+        data-column="review"
+        onclick="handleColumnClick(event, this)"
+      >
+        <div class="column-header">
+          <span class="column-title">Code Review</span>
+          <span class="column-count" id="count-review">0</span>
+          <div class="column-controls">
+            <button
+              class="control-btn minimize-btn"
+              title="Minimize"
+              onclick="toggleMinimize(event, 'review')"
+            >
+              <svg viewBox="0 0 24 24">
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </button>
+            <button
+              class="control-btn maximize-btn"
+              title="Maximize"
+              onclick="toggleMaximize(event, 'review')"
+            >
+              <svg viewBox="0 0 24 24">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="tasks" id="tasks-review"></div>
+      </div>
+
+      <div
+        class="column column-completed"
+        data-column="completed"
+        onclick="handleColumnClick(event, this)"
+      >
+        <div class="column-header">
+          <span class="column-title">Completed</span>
+          <span class="column-count" id="count-completed">0</span>
+          <div class="column-controls">
+            <button
+              class="control-btn minimize-btn"
+              title="Minimize"
+              onclick="toggleMinimize(event, 'completed')"
+            >
+              <svg viewBox="0 0 24 24">
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </button>
+            <button
+              class="control-btn maximize-btn"
+              title="Maximize"
+              onclick="toggleMaximize(event, 'completed')"
+            >
+              <svg viewBox="0 0 24 24">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="tasks" id="tasks-completed"></div>
+      </div>
+    </div>
+
+    <div id="table-view" class="table-view hidden">
+      <table class="task-table">
+        <thead>
+          <tr>
+            <th data-sort="name">Name <span class="sort-icon"></span></th>
+            <th data-sort="category">
+              Category <span class="sort-icon"></span>
+            </th>
+            <th data-sort="status">Status <span class="sort-icon"></span></th>
+            <th data-sort="started">Started <span class="sort-icon"></span></th>
+            <th data-sort="ended">Ended <span class="sort-icon"></span></th>
+            <th data-sort="duration">
+              Duration <span class="sort-icon"></span>
+            </th>
+            <th data-sort="tokens">Tokens <span class="sort-icon"></span></th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+
+    <div class="status-bar">
+      <!-- Tasks section - contains all modals in one list -->
+      <div class="taskbar-modals" id="taskbar-modals"></div>
+
+      <!-- Toggle arrow -->
+      <button class="taskbar-toggle" id="taskbar-toggle" title="Expand/Collapse task list">
+        <svg class="toggle-arrow" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+      </button>
+
+      <!-- Single divider -->
+      <div class="status-bar-divider" id="status-divider"></div>
+
+      <!-- Status indicator (right) -->
+      <div class="status-indicator">
+        <span>Status:</span>
+        <div class="status-circle" id="status-circle"></div>
+      </div>
+    </div>
+
+    <!-- Task Context Menu -->
+    <div id="task-context-menu" class="context-menu hidden">
+      <div class="context-menu-header">
+        <span class="context-menu-header-icon">📌</span>
+        <span class="context-menu-header-text" id="task-menu-title">Task</span>
+      </div>
+      <div class="context-menu-divider"></div>
+      <div class="context-menu-item" data-action="view-metadata">
+        <span class="context-menu-icon">🔍</span>
+        View metadata
+      </div>
+    </div>
+
+    <!-- App Context Menu (Global Board Actions) -->
+    <div id="app-context-menu" class="context-menu hidden">
+      <div class="context-menu-header">
+        <span class="context-menu-header-icon">📋</span>
+        <span class="context-menu-header-text">Board</span>
+      </div>
+      <div class="context-menu-divider"></div>
+      <div class="context-menu-item" data-action="board-metadata">
+        <span class="context-menu-icon">🔍</span>
+        <span class="context-menu-text"
+          >Metadata (<span id="board-task-count">0</span> tasks)</span
+        >
+      </div>
+      <div class="context-menu-item" data-action="collapse-all">
+        <span class="context-menu-icon">📁</span>
+        Collapse all tasks
+      </div>
+      <div class="context-menu-item" data-action="expand-all">
+        <span class="context-menu-icon">📂</span>
+        Expand all tasks
+      </div>
+    </div>
+
+    <!-- Column Context Menu -->
+    <div id="column-context-menu" class="context-menu hidden">
+      <div class="context-menu-header">
+        <span class="context-menu-header-icon">📊</span>
+        <span class="context-menu-header-text" id="column-menu-title"
+          >Column</span
+        >
+      </div>
+      <div class="context-menu-divider"></div>
+      <div class="context-menu-item" data-action="column-metadata">
+        <span class="context-menu-icon">🔍</span>
+        <span class="context-menu-text"
+          >Metadata (<span id="column-task-count">0</span> tasks)</span
+        >
+      </div>
+      <div class="context-menu-item" data-action="column-collapse-all">
+        <span class="context-menu-icon">📁</span>
+        Collapse all in column
+      </div>
+      <div class="context-menu-item" data-action="column-expand-all">
+        <span class="context-menu-icon">📂</span>
+        Expand all in column
+      </div>
+    </div>
+
+    <!-- Metadata Modal -->
+    <div id="metadata-modal-overlay" class="modal-overlay hidden">
+      <div id="metadata-modal" class="modal-container">
+        <div class="modal-header">
+          <span class="modal-title">Metadata</span>
+          <div class="modal-header-buttons">
+            <button class="modal-minimize" title="Minimize">
+              <svg viewBox="0 0 24 24" width="16" height="16">
+                <line
+                  x1="5"
+                  y1="12"
+                  x2="19"
+                  y2="12"
+                  stroke="currentColor"
+                  stroke-width="2"
+                />
+              </svg>
+            </button>
+            <button class="modal-maximize" title="Maximize">
+              <svg viewBox="0 0 24 24" width="16" height="16">
+                <rect
+                  x="3"
+                  y="3"
+                  width="18"
+                  height="18"
+                  rx="2"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  fill="none"
+                />
+              </svg>
+            </button>
+            <button class="modal-close" title="Close">
+              <svg viewBox="0 0 24 24" width="16" height="16">
+                <line
+                  x1="18"
+                  y1="6"
+                  x2="6"
+                  y2="18"
+                  stroke="currentColor"
+                  stroke-width="2"
+                />
+                <line
+                  x1="6"
+                  y1="6"
+                  x2="18"
+                  y2="18"
+                  stroke="currentColor"
+                  stroke-width="2"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="modal-body-wrapper">
+          <div class="modal-sidebar hidden" id="modal-sidebar">
+            <div class="sidebar-header">
+              <span class="sidebar-title">Tasks</span>
+              <button
+                class="sidebar-collapse-btn"
+                id="sidebar-collapse-btn"
+                title="Collapse sidebar"
+              >
+                <svg viewBox="0 0 24 24" width="14" height="14">
+                  <polyline
+                    points="15,18 9,12 15,6"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    fill="none"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </button>
+            </div>
+            <div class="sidebar-content" id="sidebar-task-list"></div>
+          </div>
+          <button
+            class="sidebar-expand-btn hidden"
+            id="sidebar-expand-btn"
+            title="Expand sidebar"
+          >
+            <svg viewBox="0 0 24 24" width="12" height="12">
+              <polyline
+                points="9,18 15,12 9,6"
+                stroke="currentColor"
+                stroke-width="2"
+                fill="none"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+          <div class="sidebar-resizer hidden" id="sidebar-resizer"></div>
+          <div class="modal-main">
+            <div class="modal-task-tabs hidden" id="modal-task-tabs"></div>
+            <div class="modal-tabs">
+              <button class="modal-tab active" data-tab="board">board</button>
+              <button class="modal-tab" data-tab="progress">progress</button>
+              <button class="modal-tab" data-tab="prompt">worker-prompt</button>
+              <button class="modal-tab" data-tab="log">worker-raw</button>
+              <button class="modal-tab" data-tab="output">worker-output</button>
+              <div class="qa-toggle-wrapper">
+                <button
+                  class="qa-toggle"
+                  id="qa-toggle"
+                  title="Toggle QA (test-creation) data"
+                >
+                  <span class="qa-toggle-label">QA</span>
+                  <span class="qa-toggle-indicator"></span>
+                </button>
+              </div>
+            </div>
+            <div class="modal-content">
+              <div class="modal-loading">Loading...</div>
+            </div>
+          </div>
+        </div>
+        <!-- Resize handles -->
+        <div class="resize-handle resize-n"></div>
+        <div class="resize-handle resize-s"></div>
+        <div class="resize-handle resize-e"></div>
+        <div class="resize-handle resize-w"></div>
+        <div class="resize-handle resize-ne"></div>
+        <div class="resize-handle resize-nw"></div>
+        <div class="resize-handle resize-se"></div>
+        <div class="resize-handle resize-sw"></div>
+      </div>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>
