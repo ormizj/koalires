@@ -177,7 +177,7 @@ export function initMetadataModal() {
 /**
  * Show the modal for a specific task
  */
-export function showModal(taskName) {
+export function showModal(taskName, openedAt = null) {
   if (!modalElement || !overlayElement) return;
 
   // If this task is already minimized, remove it from minimized list
@@ -252,14 +252,14 @@ export function showModal(taskName) {
   // Start auto-refresh polling
   startRefreshPolling();
 
-  // Track open modal for taskbar
+  // Track open modal for taskbar (use provided openedAt or current time for new modals)
   openModalInfo = {
     key: taskName,
     title: taskName,
     mode: 'single',
     columnId: null,
     taskNames: null,
-    openedAt: Date.now(),
+    openedAt: openedAt || Date.now(),
     taskName: taskName,
   };
   renderTaskbarModals();
@@ -268,7 +268,7 @@ export function showModal(taskName) {
 /**
  * Show the modal for a column with multiple tasks
  */
-export async function showColumnModal(columnId, taskNames) {
+export async function showColumnModal(columnId, taskNames, openedAt = null) {
   if (!modalElement || !overlayElement || taskNames.length === 0) return;
 
   const newModalKey = `column-${columnId}`;
@@ -358,14 +358,14 @@ export async function showColumnModal(columnId, taskNames) {
   // Start auto-refresh
   startRefreshPolling();
 
-  // Track open modal for taskbar (reuse columnNames from above)
+  // Track open modal for taskbar (reuse columnNames from above, use provided openedAt or current time)
   openModalInfo = {
     key: `column-${columnId}`,
     title: `Column: ${columnNames[columnId] || columnId}`,
     mode: 'column',
     columnId: columnId,
     taskNames: [...taskNames],
-    openedAt: Date.now(),
+    openedAt: openedAt || Date.now(),
     taskName: taskNames[0],
   };
   renderTaskbarModals();
@@ -1917,14 +1917,12 @@ function restoreModal(modalKey) {
   const preservedOpenedAt = state.openedAt;
   minimizedModals.delete(modalKey);
 
-  // Re-show modal with saved state (openedAt will be set fresh, we need to fix it after)
+  // Re-show modal with saved state, passing the preserved openedAt
   if (state.mode === 'column') {
-    showColumnModal(state.columnId, state.taskNames);
+    showColumnModal(state.columnId, state.taskNames, preservedOpenedAt);
   } else {
-    showModal(state.taskName);
+    showModal(state.taskName, preservedOpenedAt);
   }
-  // Restore the original openedAt timestamp
-  if (openModalInfo) openModalInfo.openedAt = preservedOpenedAt;
 }
 
 /**
