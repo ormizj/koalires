@@ -1944,8 +1944,12 @@ function renderTaskbarModals() {
     toggleBtn.style.display = hasAnyModals ? 'flex' : 'none';
   }
 
+  // Hide taskbar modals container when no modals exist (removes gap space)
+  // Use 'hidden' class instead of inline style to not interfere with collapsed state
+  taskbarModals.classList.toggle('hidden', !hasAnyModals);
+
   // Apply collapsed state to taskbar modals container
-  taskbarModals.classList.toggle('collapsed', taskbarCollapsed);
+  taskbarModals.classList.toggle('collapsed', taskbarCollapsed && hasAnyModals);
 
   // Collect all modals with their keys for consistent ordering
   const allModals = [];
@@ -2028,11 +2032,8 @@ function renderTaskbarModals() {
 
     // Click handler
     if (isOpen) {
-      item.addEventListener('click', () => {
-        if (modalElement) {
-          modalElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      });
+      // Clicking an open modal minimizes it
+      item.addEventListener('click', () => minimizeModal());
     } else {
       item.addEventListener('click', () => restoreModal(key));
     }

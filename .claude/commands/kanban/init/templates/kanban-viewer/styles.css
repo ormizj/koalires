@@ -11,7 +11,7 @@ body {
   background: #0d1117;
   color: #c9d1d9;
   min-height: 100vh;
-  padding: 1.25rem;
+  padding: 1rem;
 }
 
 .header {
@@ -715,8 +715,8 @@ body {
 /* Status Bar Container */
 .status-bar {
   position: fixed;
-  bottom: 1.25rem;
-  right: 1.25rem;
+  bottom: 1rem;
+  left: 1rem;
   background: #21262d;
   border: 1px solid #30363d;
   padding: 0.5rem 0.75rem;
@@ -823,6 +823,11 @@ body {
   display: none;
 }
 
+/* Hide taskbar modals when no modals exist */
+.taskbar-modals.hidden {
+  display: none;
+}
+
 /* Open modal item - highlighted/active */
 .open-modal-item {
   display: flex;
@@ -915,12 +920,12 @@ body {
 
 /* Arrow pointing left when expanded (click to collapse) */
 .taskbar-toggle.expanded .toggle-arrow {
-  transform: rotate(0deg);
+  transform: rotate(180deg);
 }
 
 /* Arrow pointing right when collapsed (click to expand) */
 .taskbar-toggle.collapsed .toggle-arrow {
-  transform: rotate(180deg);
+  transform: rotate(0deg);
 }
 
 /* Divider between taskbar and status */
@@ -930,6 +935,7 @@ body {
   background: #484f58;
   display: none;
   flex-shrink: 0;
+  margin-left: 4px;
 }
 
 /* Status Indicator */
@@ -937,6 +943,12 @@ body {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.status-indicator span {
+  line-height: 1;
+  display: flex;
+  align-items: center;
 }
 
 .status-circle {
