@@ -193,6 +193,7 @@ export function showModal(taskName) {
       columnId: openModalInfo.columnId,
       taskNames: openModalInfo.taskNames,
       taskName: openModalInfo.taskName,
+      openedAt: openModalInfo.openedAt,
     });
     openModalInfo = null;
   }
@@ -258,6 +259,7 @@ export function showModal(taskName) {
     mode: 'single',
     columnId: null,
     taskNames: null,
+    openedAt: Date.now(),
     taskName: taskName,
   };
   renderTaskbarModals();
@@ -284,6 +286,7 @@ export async function showColumnModal(columnId, taskNames) {
       columnId: openModalInfo.columnId,
       taskNames: openModalInfo.taskNames,
       taskName: openModalInfo.taskName,
+      openedAt: openModalInfo.openedAt,
     });
     openModalInfo = null;
   }
@@ -362,6 +365,7 @@ export async function showColumnModal(columnId, taskNames) {
     mode: 'column',
     columnId: columnId,
     taskNames: [...taskNames],
+    openedAt: Date.now(),
     taskName: taskNames[0],
   };
   renderTaskbarModals();
@@ -1858,13 +1862,14 @@ function minimizeModal() {
   // Generate a unique key for this modal instance
   const modalKey = isColumnMode ? `column-${currentColumnId}` : currentTaskName;
 
-  // Store modal state
+  // Store modal state (preserve openedAt from openModalInfo)
   minimizedModals.set(modalKey, {
     title: isColumnMode ? `Column: ${columnNames[currentColumnId] || currentColumnId}` : currentTaskName,
     mode: isColumnMode ? 'column' : 'single',
     columnId: isColumnMode ? currentColumnId : null,
     taskNames: isColumnMode ? [...columnTasks] : null,
     taskName: currentTaskName,
+    openedAt: openModalInfo?.openedAt || Date.now(),
   });
 
   // Stop auto-refresh polling for minimized modal
@@ -1903,18 +1908,23 @@ function restoreModal(modalKey) {
       columnId: openModalInfo.columnId,
       taskNames: openModalInfo.taskNames,
       taskName: openModalInfo.taskName,
+      openedAt: openModalInfo.openedAt,
     });
     openModalInfo = null;
   }
 
+  // Preserve openedAt for the modal being restored
+  const preservedOpenedAt = state.openedAt;
   minimizedModals.delete(modalKey);
 
-  // Re-show modal with saved state
+  // Re-show modal with saved state (openedAt will be set fresh, we need to fix it after)
   if (state.mode === 'column') {
     showColumnModal(state.columnId, state.taskNames);
   } else {
     showModal(state.taskName);
   }
+  // Restore the original openedAt timestamp
+  if (openModalInfo) openModalInfo.openedAt = preservedOpenedAt;
 }
 
 /**
@@ -1964,8 +1974,26 @@ function renderTaskbarModals() {
     allModals.push({ key, state, isOpen: false });
   });
 
-  // Sort by key for consistent ordering
-  allModals.sort((a, b) => a.key.localeCompare(b.key));
+  // Sort: columns first (in defined order), then tasks (by openedAt)
+  const columnOrder = ['all', 'pending', 'blocked', 'progress', 'review', 'completed'];
+  allModals.sort((a, b) => {
+    const aIsColumn = a.state.mode === 'column';
+    const bIsColumn = b.state.mode === 'column';
+
+    // Columns come before tasks
+    if (aIsColumn && !bIsColumn) return -1;
+    if (!aIsColumn && bIsColumn) return 1;
+
+    // Both are columns: sort by defined column order
+    if (aIsColumn && bIsColumn) {
+      const aIndex = columnOrder.indexOf(a.state.columnId);
+      const bIndex = columnOrder.indexOf(b.state.columnId);
+      return aIndex - bIndex;
+    }
+
+    // Both are tasks: sort by openedAt (oldest first)
+    return (a.state.openedAt || 0) - (b.state.openedAt || 0);
+  });
 
   // Render all modals in order
   allModals.forEach(({ key, state, isOpen }) => {
