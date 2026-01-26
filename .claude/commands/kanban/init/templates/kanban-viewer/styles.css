@@ -718,24 +718,61 @@ body {
 
 /* Individual Minimized Modal Item */
 .minimized-modal-item {
+    display: flex;
+    align-items: stretch;
     background: #30363d;
     border: 1px solid #484f58;
     color: #c9d1d9;
-    padding: 0.25rem 0.5rem;
+    padding: 0;
     border-radius: 4px;
     font-size: 0.75rem;
     cursor: pointer;
     transition: all 0.15s ease;
-    max-width: 150px;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
 .minimized-modal-item:hover {
-    background: #484f58;
+    background: #3d444d;
     border-color: #58a6ff;
+}
+
+.minimized-modal-item:hover .minimized-modal-name {
     color: #58a6ff;
+}
+
+/* Minimized modal task name - no truncation */
+.minimized-modal-name {
+    color: #c9d1d9;
+    padding: 0.25rem 0.5rem;
+    transition: color 0.15s ease;
+}
+
+/* Separator between name and delete button */
+.minimized-modal-separator {
+    width: 1px;
+    background: #484f58;
+    align-self: stretch;
+}
+
+/* Minimized modal delete button - fills height */
+.minimized-modal-delete {
+    background: transparent;
+    border: none;
+    color: #8b949e;
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    font-size: 14px;
+    line-height: 1;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.minimized-modal-delete:hover {
+    background: #21262d;
+    color: #f85149;
 }
 
 /* Divider between minimized modals and status */
@@ -1705,6 +1742,46 @@ body {
     color: #8b949e;
 }
 
+/* Sidebar task status container - holds both status dot and search icon */
+.sidebar-task-status-container {
+    position: relative;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Search icon in sidebar - hidden by default, shown on hover */
+.sidebar-search-icon {
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    padding: 2px;
+    border-radius: 4px;
+    transition: all 0.15s ease;
+    background: transparent;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.sidebar-task-status-container:hover .sidebar-search-icon {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.sidebar-task-status-container:hover .sidebar-search-icon:hover {
+    background: #30363d;
+    color: #58a6ff;
+}
+
+/* Hide status dot when hovering over container */
+.sidebar-task-status-container:hover .sidebar-task-status {
+    opacity: 0;
+}
+
 .sidebar-task-name {
     flex: 1;
     font-size: 0.875rem;
@@ -1726,6 +1803,7 @@ body {
     border-radius: 50%;
     flex-shrink: 0;
     background: #8b949e;
+    transition: opacity 0.15s ease;
 }
 
 .sidebar-task-status.pending {

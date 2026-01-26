@@ -1771,8 +1771,31 @@ function renderMinimizedModals() {
   minimizedModals.forEach((state, modalKey) => {
     const item = document.createElement('button');
     item.className = 'minimized-modal-item';
-    item.textContent = truncateTaskName(state.title, 20);
     item.title = state.title;
+
+    // Task name span (full name, no truncation)
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'minimized-modal-name';
+    nameSpan.textContent = state.title;
+
+    // Separator between name and delete button
+    const separator = document.createElement('span');
+    separator.className = 'minimized-modal-separator';
+
+    // Delete button
+    const deleteBtn = document.createElement('span');
+    deleteBtn.className = 'minimized-modal-delete';
+    deleteBtn.innerHTML = '×';
+    deleteBtn.title = 'Close';
+    deleteBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      minimizedModals.delete(modalKey);
+      renderMinimizedModals();
+    });
+
+    item.appendChild(nameSpan);
+    item.appendChild(separator);
+    item.appendChild(deleteBtn);
     item.addEventListener('click', () => restoreModal(modalKey));
     container.appendChild(item);
   });
@@ -1979,9 +2002,18 @@ function renderSidebarTasks(taskNames, progressData, isLoading = false) {
           <svg class="sidebar-task-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
             <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+            <polyline points="10 9 9 9 8 9"/>
           </svg>
           <span class="sidebar-task-name">${escapeHtml(taskName)}</span>
-          <span class="sidebar-task-status ${statusClass}"></span>
+          <div class="sidebar-task-status-container">
+            <span class="sidebar-task-status ${statusClass}"></span>
+            <svg class="sidebar-search-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="7" cy="7" r="4.5"/>
+              <path d="M10.5 10.5L14 14"/>
+            </svg>
+          </div>
         </div>
       `;
     })
@@ -1989,11 +2021,35 @@ function renderSidebarTasks(taskNames, progressData, isLoading = false) {
 
   // Attach click handlers
   container.querySelectorAll('.sidebar-task-item').forEach((item) => {
-    item.addEventListener('click', () => {
+    // Click on task name or item selects the task
+    item.addEventListener('click', (e) => {
+      // Don't select if clicking on search icon
+      if (e.target.closest('.sidebar-search-icon')) return;
+
       const index = parseInt(item.dataset.taskIndex, 10);
       const name = item.dataset.taskName;
       selectSidebarTask(name, index);
     });
+
+    // Click on search icon minimizes modal and searches for the task
+    const searchIcon = item.querySelector('.sidebar-search-icon');
+    if (searchIcon) {
+      searchIcon.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const taskName = item.dataset.taskName;
+
+        // Minimize the modal
+        minimizeModal();
+
+        // Populate the task search input and trigger search
+        const searchInput = document.getElementById('task-search-input');
+        if (searchInput) {
+          searchInput.value = taskName;
+          searchInput.dispatchEvent(new Event('input'));
+          searchInput.focus();
+        }
+      });
+    }
   });
 }
 
@@ -2023,7 +2079,8 @@ function updateSidebarTaskStatus(progressData) {
     const status = getTaskStatusFromBoard({ name: taskName }, progressData || {});
     const statusClass = getStatusClass(status);
 
-    const statusDot = item.querySelector('.sidebar-task-status');
+    // Status dot is now inside the status container
+    const statusDot = item.querySelector('.sidebar-task-status-container .sidebar-task-status');
     if (statusDot) {
       statusDot.className = `sidebar-task-status ${statusClass}`;
     }
