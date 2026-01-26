@@ -138,30 +138,32 @@ export function createTaskCard(task, status, progressEntry) {
 
   // Handle agent as string (new format) or array (old format for backwards compat)
   const agentData = progressEntry?.agent;
+  const tddAgent = progressEntry?.tddAgent;
   let agentsHtml = '';
 
-  if (agentData) {
+  if (agentData || tddAgent) {
+    let badgesHtml = '';
+
+    // Implementation agent badge
     if (typeof agentData === 'string') {
-      // New format: single agent string
-      agentsHtml = `
-          <div class="task-agents">
-            <div class="task-agents-label">Agent:</div>
-            <div class="task-agents-list">
-              <span class="task-agent">${escapeHtml(agentData)}</span>
-            </div>
-          </div>
-        `;
+      badgesHtml += `<span class="task-agent">${escapeHtml(agentData)}</span>`;
     } else if (Array.isArray(agentData) && agentData.length > 0) {
-      // Old format: array of agents
-      agentsHtml = `
-          <div class="task-agents">
-            <div class="task-agents-label">Agents (${agentData.length}):</div>
-            <div class="task-agents-list">
-              ${agentData.map((a) => `<span class="task-agent">${escapeHtml(a)}</span>`).join('')}
-            </div>
-          </div>
-        `;
+      badgesHtml += agentData.map((a) => `<span class="task-agent">${escapeHtml(a)}</span>`).join('');
     }
+
+    // QA/TDD agent badge (purple)
+    if (tddAgent) {
+      badgesHtml += `<span class="task-agent task-agent-qa">${escapeHtml(tddAgent)}</span>`;
+    }
+
+    agentsHtml = `
+      <div class="task-agents">
+        <div class="task-agents-label">Agents:</div>
+        <div class="task-agents-list">
+          ${badgesHtml}
+        </div>
+      </div>
+    `;
   }
 
   // Handle workLog as array

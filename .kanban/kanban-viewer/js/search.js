@@ -82,6 +82,7 @@ function clearSearch() {
 function filterTasks(term) {
   currentSearchTerm = term.toLowerCase().trim();
 
+  // Filter board tasks
   const allTasks = document.querySelectorAll('.task');
   let visibleCount = 0;
   const totalCount = allTasks.length;
@@ -97,6 +98,21 @@ function filterTasks(term) {
       visibleCount++;
     } else {
       task.classList.add('search-hidden');
+    }
+  });
+
+  // Filter table rows
+  const tableRows = document.querySelectorAll('.task-table tbody tr');
+  tableRows.forEach((row) => {
+    const taskName = row.getAttribute('data-task-name') || '';
+    const matches =
+      currentSearchTerm === '' ||
+      taskName.toLowerCase().includes(currentSearchTerm);
+
+    if (matches) {
+      row.classList.remove('search-hidden');
+    } else {
+      row.classList.add('search-hidden');
     }
   });
 
