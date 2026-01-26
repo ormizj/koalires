@@ -180,8 +180,13 @@ export function initMetadataModal() {
 export function showModal(taskName) {
   if (!modalElement || !overlayElement) return;
 
+  // If this task is already minimized, remove it from minimized list
+  if (minimizedModals.has(taskName)) {
+    minimizedModals.delete(taskName);
+  }
+
   // If there's currently an open modal for a different task, minimize it first
-  if (openModalInfo && openModalInfo.taskName !== taskName) {
+  if (openModalInfo && openModalInfo.key !== taskName) {
     minimizedModals.set(openModalInfo.key, {
       title: openModalInfo.title,
       mode: openModalInfo.mode,
@@ -265,6 +270,11 @@ export async function showColumnModal(columnId, taskNames) {
   if (!modalElement || !overlayElement || taskNames.length === 0) return;
 
   const newModalKey = `column-${columnId}`;
+
+  // If this column is already minimized, remove it from minimized list
+  if (minimizedModals.has(newModalKey)) {
+    minimizedModals.delete(newModalKey);
+  }
 
   // If there's currently an open modal for a different key, minimize it first
   if (openModalInfo && openModalInfo.key !== newModalKey) {
@@ -1833,12 +1843,21 @@ function applyTaskbarToggleState() {
 function minimizeModal() {
   if (!currentTaskName || !modalElement || !overlayElement) return;
 
+  // Column names mapping
+  const columnNames = {
+    pending: 'Pending',
+    blocked: 'Hold',
+    progress: 'In Progress',
+    review: 'Code Review',
+    completed: 'Completed',
+  };
+
   // Generate a unique key for this modal instance
   const modalKey = isColumnMode ? `column-${currentColumnId}` : currentTaskName;
 
   // Store modal state
   minimizedModals.set(modalKey, {
-    title: isColumnMode ? `Column: ${currentColumnId}` : currentTaskName,
+    title: isColumnMode ? `Column: ${columnNames[currentColumnId] || currentColumnId}` : currentTaskName,
     mode: isColumnMode ? 'column' : 'single',
     columnId: isColumnMode ? currentColumnId : null,
     taskNames: isColumnMode ? [...columnTasks] : null,
