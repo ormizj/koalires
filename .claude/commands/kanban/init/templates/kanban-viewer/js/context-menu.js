@@ -48,6 +48,37 @@ function handleContextMenu(event) {
     return;
   }
 
+  // Check if right-clicked on a status badge in the table
+  const statusBadge = event.target.closest('.table-status-badge');
+  if (statusBadge) {
+    const statusToColumnMap = {
+      pending: 'pending',
+      'in-progress': 'progress',
+      'code-review': 'review',
+      completed: 'completed',
+      blocked: 'blocked',
+    };
+    // Find which status class the badge has
+    const statusClass = Object.keys(statusToColumnMap).find((status) =>
+      statusBadge.classList.contains(status)
+    );
+    if (statusClass) {
+      const columnId = statusToColumnMap[statusClass];
+      const columnElement = document.querySelector(
+        `.column[data-column="${columnId}"]`
+      );
+      showColumnContextMenu(event, columnId, columnElement);
+      return;
+    }
+  }
+
+  // Check if right-clicked on a table row
+  const tableRow = event.target.closest('.task-table tbody tr');
+  if (tableRow) {
+    showTableRowContextMenu(event, tableRow);
+    return;
+  }
+
   // Check if right-clicked on a column
   const columnElement = event.target.closest('.column');
   if (columnElement) {
@@ -66,6 +97,29 @@ function showTaskContextMenu(event, taskElement) {
   // Update header with task name
   const taskName =
     taskElement.querySelector('.task-name')?.textContent || 'Task';
+  const titleEl = document.getElementById('task-menu-title');
+  if (titleEl) titleEl.textContent = taskName;
+
+  positionMenu(menu, event.clientX, event.clientY);
+  menu.classList.remove('hidden');
+  activeMenu = menu;
+}
+
+function showTableRowContextMenu(event, tableRow) {
+  // Create a fake task element wrapper for compatibility with handleTaskMenuClick
+  const taskName = tableRow.dataset.taskName || 'Task';
+  targetTaskElement = {
+    querySelector: (selector) => {
+      if (selector === '.task-name') {
+        return { textContent: taskName };
+      }
+      return null;
+    },
+  };
+
+  const menu = document.getElementById('task-context-menu');
+
+  // Update header with task name
   const titleEl = document.getElementById('task-menu-title');
   if (titleEl) titleEl.textContent = taskName;
 

@@ -124,6 +124,13 @@ export function initMetadataModal() {
   // Window resize handler
   window.addEventListener('resize', handleWindowResize);
 
+  // Click on overlay (outside modal) to minimize
+  overlayElement?.addEventListener('click', (e) => {
+    if (e.target === overlayElement) {
+      minimizeModal();
+    }
+  });
+
   // Escape key to close
   document.addEventListener('keydown', (e) => {
     if (
@@ -759,7 +766,9 @@ async function fetchLogData() {
       );
       if (!response.ok) {
         if (response.status === 404) {
-          throw new Error(`Log file not found: worker-logs/${currentTaskName}${suffix}.json`);
+          throw new Error(
+            `Log file not found: worker-logs/${currentTaskName}${suffix}.json`
+          );
         }
         throw new Error(`Failed to load log file (${response.status})`);
       }
@@ -798,7 +807,9 @@ async function fetchLogData() {
       if (e.message.includes('not found') || e.message.includes('404')) {
         throw e;
       }
-      throw new Error(`Log file not found: worker-logs/${currentTaskName}${suffix}.json`);
+      throw new Error(
+        `Log file not found: worker-logs/${currentTaskName}${suffix}.json`
+      );
     }
   }
 
@@ -1990,7 +2001,9 @@ function renderSidebarTasks(taskNames, progressData, isLoading = false) {
 
   container.innerHTML = taskNames
     .map((taskName, index) => {
-      const status = isLoading ? 'loading' : getTaskStatusFromBoard({ name: taskName }, progressData || {});
+      const status = isLoading
+        ? 'loading'
+        : getTaskStatusFromBoard({ name: taskName }, progressData || {});
       const statusClass = isLoading ? 'loading' : getStatusClass(status);
       const isActive = index === selectedTaskIndex;
 
@@ -2076,11 +2089,16 @@ function updateSidebarTaskStatus(progressData) {
 
   container.querySelectorAll('.sidebar-task-item').forEach((item) => {
     const taskName = item.dataset.taskName;
-    const status = getTaskStatusFromBoard({ name: taskName }, progressData || {});
+    const status = getTaskStatusFromBoard(
+      { name: taskName },
+      progressData || {}
+    );
     const statusClass = getStatusClass(status);
 
     // Status dot is now inside the status container
-    const statusDot = item.querySelector('.sidebar-task-status-container .sidebar-task-status');
+    const statusDot = item.querySelector(
+      '.sidebar-task-status-container .sidebar-task-status'
+    );
     if (statusDot) {
       statusDot.className = `sidebar-task-status ${statusClass}`;
     }
