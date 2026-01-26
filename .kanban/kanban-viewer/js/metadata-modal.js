@@ -297,6 +297,7 @@ export async function showColumnModal(columnId, taskNames) {
   // Update modal title
   const titleElement = modalElement.querySelector('.modal-title');
   const columnNames = {
+    all: 'All',
     pending: 'Pending',
     blocked: 'Hold',
     progress: 'In Progress',
@@ -418,6 +419,7 @@ function switchToTask(taskName, index) {
   // Update modal title for column mode
   const titleElement = modalElement?.querySelector('.modal-title');
   const columnNames = {
+    all: 'All',
     pending: 'Pending',
     blocked: 'Hold',
     progress: 'In Progress',
@@ -1845,6 +1847,7 @@ function minimizeModal() {
 
   // Column names mapping
   const columnNames = {
+    all: 'All',
     pending: 'Pending',
     blocked: 'Hold',
     progress: 'In Progress',
@@ -2349,6 +2352,7 @@ function selectSidebarTask(taskName, index) {
   // Update modal title
   const titleElement = modalElement?.querySelector('.modal-title');
   const columnNames = {
+    all: 'All',
     pending: 'Pending',
     blocked: 'Hold',
     progress: 'In Progress',
