@@ -351,6 +351,54 @@ test/it/func:
 
 ---
 
+## Test Directory Mapping
+
+When creating tests, place them in the centralized `tests/` directory structure created by `kanban:init`:
+
+| Source Type | Source Location | Test Location |
+|-------------|-----------------|---------------|
+| Pinia stores | `client/shared/stores/` | `tests/unit/client/stores/` |
+| Composables | `client/features/*/model/` | `tests/unit/client/composables/` |
+| Vue components | `client/**/ui/` | `tests/unit/client/components/` |
+| Client utils | `client/shared/lib/` | `tests/unit/client/utils/` |
+| API endpoints | `server/api/` | `tests/unit/server/api/` |
+| Server utils | `server/utils/` | `tests/unit/server/utils/` |
+| Repositories | `server/database/repositories/` | `tests/unit/server/repositories/` |
+| Integration tests | Cross-module | `tests/integration/` |
+
+### Naming Convention
+
+- Source: `auth.ts` → Test: `auth.test.ts`
+- Source: `useAuth.ts` → Test: `useAuth.test.ts`
+- Source: `login.post.ts` → Test: `login.post.test.ts`
+- Source: `UserStore.ts` → Test: `UserStore.test.ts`
+
+### Directory Structure
+
+```
+tests/
+├── unit/
+│   ├── client/
+│   │   ├── stores/       # Pinia store tests
+│   │   ├── composables/  # Composable tests
+│   │   ├── components/   # Vue component tests
+│   │   └── utils/        # Client utility tests
+│   └── server/
+│       ├── api/          # API endpoint tests
+│       ├── utils/        # Server utility tests
+│       └── repositories/ # Database repository tests
+└── integration/          # Integration tests
+```
+
+### Placement Rules
+
+1. **Check if centralized structure exists** - Look for `tests/unit/` directory first
+2. **Use centralized structure** - If `tests/` exists, place tests there
+3. **Fall back to co-location** - If no centralized structure, place tests next to source
+4. **Mirror source path** - Test file path should mirror source location within the test directory
+
+---
+
 ## Output Format
 
 After creating test files, always report:

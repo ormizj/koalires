@@ -60,6 +60,13 @@ let preMaximizeState = { width: 0, height: 0, left: 0, top: 0 };
 // Minimize state
 const minimizedModals = new Map(); // taskName -> { title, mode, columnId, taskNames }
 
+// Open modal state (for taskbar display)
+let openModalInfo = null; // { key, title, mode, columnId, taskNames, taskName }
+
+// Taskbar collapsed state
+let taskbarCollapsed = false;
+const TASKBAR_STATE_KEY = 'kanban-taskbar-collapsed';
+
 // Column mode state
 let isColumnMode = false;
 let currentColumnId = null;
@@ -162,6 +169,9 @@ export function initMetadataModal() {
 
   // Initialize QA toggle
   initQaToggle();
+
+  // Initialize taskbar toggle
+  initTaskbarToggle();
 }
 
 /**
@@ -169,6 +179,18 @@ export function initMetadataModal() {
  */
 export function showModal(taskName) {
   if (!modalElement || !overlayElement) return;
+
+  // If there's currently an open modal for a different task, minimize it first
+  if (openModalInfo && openModalInfo.taskName !== taskName) {
+    minimizedModals.set(openModalInfo.key, {
+      title: openModalInfo.title,
+      mode: openModalInfo.mode,
+      columnId: openModalInfo.columnId,
+      taskNames: openModalInfo.taskNames,
+      taskName: openModalInfo.taskName,
+    });
+    openModalInfo = null;
+  }
 
   // Reset column mode state (single task mode)
   isColumnMode = false;
@@ -223,6 +245,17 @@ export function showModal(taskName) {
 
   // Start auto-refresh polling
   startRefreshPolling();
+
+  // Track open modal for taskbar
+  openModalInfo = {
+    key: taskName,
+    title: taskName,
+    mode: 'single',
+    columnId: null,
+    taskNames: null,
+    taskName: taskName,
+  };
+  renderTaskbarModals();
 }
 
 /**
@@ -230,6 +263,20 @@ export function showModal(taskName) {
  */
 export async function showColumnModal(columnId, taskNames) {
   if (!modalElement || !overlayElement || taskNames.length === 0) return;
+
+  const newModalKey = `column-${columnId}`;
+
+  // If there's currently an open modal for a different key, minimize it first
+  if (openModalInfo && openModalInfo.key !== newModalKey) {
+    minimizedModals.set(openModalInfo.key, {
+      title: openModalInfo.title,
+      mode: openModalInfo.mode,
+      columnId: openModalInfo.columnId,
+      taskNames: openModalInfo.taskNames,
+      taskName: openModalInfo.taskName,
+    });
+    openModalInfo = null;
+  }
 
   isColumnMode = true;
   currentColumnId = columnId;
@@ -296,6 +343,17 @@ export async function showColumnModal(columnId, taskNames) {
 
   // Start auto-refresh
   startRefreshPolling();
+
+  // Track open modal for taskbar (reuse columnNames from above)
+  openModalInfo = {
+    key: `column-${columnId}`,
+    title: `Column: ${columnNames[columnId] || columnId}`,
+    mode: 'column',
+    columnId: columnId,
+    taskNames: [...taskNames],
+    taskName: taskNames[0],
+  };
+  renderTaskbarModals();
 }
 
 /**
@@ -408,6 +466,10 @@ export function hideModal() {
   currentTaskName = null;
   currentTabData = null;
   currentTabName = null;
+
+  // Clear open modal tracking
+  openModalInfo = null;
+  renderTaskbarModals();
 }
 
 /**
@@ -1705,6 +1767,64 @@ function initQaToggle() {
   });
 }
 
+// ===== Taskbar Toggle Functions =====
+
+/**
+ * Initialize taskbar toggle button
+ */
+function initTaskbarToggle() {
+  // Load saved state
+  loadTaskbarState();
+
+  const toggleBtn = document.getElementById('taskbar-toggle');
+  if (!toggleBtn) return;
+
+  // Apply initial state to toggle button
+  applyTaskbarToggleState();
+
+  // Click handler
+  toggleBtn.addEventListener('click', () => {
+    taskbarCollapsed = !taskbarCollapsed;
+    saveTaskbarState();
+    applyTaskbarToggleState();
+    renderTaskbarModals();
+  });
+}
+
+/**
+ * Load taskbar collapsed state from localStorage
+ */
+function loadTaskbarState() {
+  try {
+    taskbarCollapsed = localStorage.getItem(TASKBAR_STATE_KEY) === 'true';
+  } catch (e) {
+    taskbarCollapsed = false;
+  }
+}
+
+/**
+ * Save taskbar collapsed state to localStorage
+ */
+function saveTaskbarState() {
+  try {
+    localStorage.setItem(TASKBAR_STATE_KEY, taskbarCollapsed ? 'true' : 'false');
+  } catch (e) {
+    // Ignore localStorage errors
+  }
+}
+
+/**
+ * Apply taskbar toggle state to the button
+ */
+function applyTaskbarToggleState() {
+  const toggleBtn = document.getElementById('taskbar-toggle');
+  if (!toggleBtn) return;
+
+  // Update button class for arrow direction
+  toggleBtn.classList.toggle('collapsed', taskbarCollapsed);
+  toggleBtn.classList.toggle('expanded', !taskbarCollapsed);
+}
+
 // ===== Minimize Functions =====
 
 /**
@@ -1739,8 +1859,11 @@ function minimizeModal() {
     updateMaximizeIcon(false);
   }
 
+  // Clear open modal tracking (it's now minimized)
+  openModalInfo = null;
+
   // Update status bar
-  renderMinimizedModals();
+  renderTaskbarModals();
 }
 
 /**
@@ -1750,8 +1873,19 @@ function restoreModal(modalKey) {
   const state = minimizedModals.get(modalKey);
   if (!state) return;
 
+  // If there's currently an open modal, minimize it first (add to minimized list)
+  if (openModalInfo && openModalInfo.key !== modalKey) {
+    minimizedModals.set(openModalInfo.key, {
+      title: openModalInfo.title,
+      mode: openModalInfo.mode,
+      columnId: openModalInfo.columnId,
+      taskNames: openModalInfo.taskNames,
+      taskName: openModalInfo.taskName,
+    });
+    openModalInfo = null;
+  }
+
   minimizedModals.delete(modalKey);
-  renderMinimizedModals();
 
   // Re-show modal with saved state
   if (state.mode === 'column') {
@@ -1762,53 +1896,126 @@ function restoreModal(modalKey) {
 }
 
 /**
- * Render minimized modal items in the status bar
+ * Render taskbar modals (both open and minimized) in the status bar
  */
-function renderMinimizedModals() {
-  const container = document.getElementById('minimized-modals');
+function renderTaskbarModals() {
+  const taskbarModals = document.getElementById('taskbar-modals');
   const divider = document.getElementById('status-divider');
+  const toggleBtn = document.getElementById('taskbar-toggle');
 
-  if (!container) return;
+  if (!taskbarModals) return;
 
-  container.innerHTML = '';
+  // Clear container
+  taskbarModals.innerHTML = '';
 
-  if (minimizedModals.size === 0) {
-    if (divider) divider.style.display = 'none';
-    return;
+  const hasOpenModal = openModalInfo !== null;
+  const hasMinimizedModals = minimizedModals.size > 0;
+  const hasAnyModals = hasOpenModal || hasMinimizedModals;
+
+  // Show/hide divider based on whether there are any modals (same as toggle)
+  if (divider) {
+    divider.style.display = hasAnyModals ? 'block' : 'none';
   }
 
-  if (divider) divider.style.display = 'block';
+  // Show/hide toggle button based on whether there are any modals
+  if (toggleBtn) {
+    toggleBtn.style.display = hasAnyModals ? 'flex' : 'none';
+  }
 
-  minimizedModals.forEach((state, modalKey) => {
+  // Apply collapsed state to taskbar modals container
+  taskbarModals.classList.toggle('collapsed', taskbarCollapsed);
+
+  // Collect all modals with their keys for consistent ordering
+  const allModals = [];
+
+  // Add open modal
+  if (openModalInfo) {
+    allModals.push({ key: openModalInfo.key, state: openModalInfo, isOpen: true });
+  }
+
+  // Add minimized modals
+  minimizedModals.forEach((state, key) => {
+    allModals.push({ key, state, isOpen: false });
+  });
+
+  // Sort by key for consistent ordering
+  allModals.sort((a, b) => a.key.localeCompare(b.key));
+
+  // Render all modals in order
+  allModals.forEach(({ key, state, isOpen }) => {
     const item = document.createElement('button');
-    item.className = 'minimized-modal-item';
-    item.title = state.title;
+    item.className = isOpen ? 'open-modal-item' : 'minimized-modal-item';
 
-    // Task name span (full name, no truncation)
+    // Get display name (remove "Column: " prefix since icon will indicate type)
+    const displayName = state.mode === 'column'
+      ? state.title.replace(/^Column:\s*/, '')
+      : state.title;
+    item.title = isOpen ? `${state.title} (Open)` : state.title;
+
+    // Icon based on modal type
+    const iconSpan = document.createElement('span');
+    iconSpan.className = isOpen ? 'open-modal-icon' : 'minimized-modal-icon';
+    if (state.mode === 'column') {
+      // Kanban icon for column modals
+      iconSpan.innerHTML = `<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+        <rect x="3" y="3" width="5" height="18" rx="1" />
+        <rect x="10" y="3" width="5" height="12" rx="1" />
+        <rect x="17" y="3" width="4" height="15" rx="1" />
+      </svg>`;
+    } else {
+      // File icon for single task modals
+      iconSpan.innerHTML = `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+      </svg>`;
+    }
+
+    // Separator after icon
+    const iconSeparator = document.createElement('span');
+    iconSeparator.className = isOpen ? 'open-modal-separator' : 'minimized-modal-separator';
+
+    // Name span
     const nameSpan = document.createElement('span');
-    nameSpan.className = 'minimized-modal-name';
-    nameSpan.textContent = state.title;
+    nameSpan.className = isOpen ? 'open-modal-name' : 'minimized-modal-name';
+    nameSpan.textContent = displayName;
 
-    // Separator between name and delete button
+    // Separator before close
     const separator = document.createElement('span');
-    separator.className = 'minimized-modal-separator';
+    separator.className = isOpen ? 'open-modal-separator' : 'minimized-modal-separator';
 
-    // Delete button
-    const deleteBtn = document.createElement('span');
-    deleteBtn.className = 'minimized-modal-delete';
-    deleteBtn.innerHTML = '×';
-    deleteBtn.title = 'Close';
-    deleteBtn.addEventListener('click', (e) => {
+    // Close/Delete button
+    const closeBtn = document.createElement('span');
+    closeBtn.className = isOpen ? 'open-modal-close' : 'minimized-modal-delete';
+    closeBtn.innerHTML = '×';
+    closeBtn.title = 'Close';
+    closeBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      minimizedModals.delete(modalKey);
-      renderMinimizedModals();
+      if (isOpen) {
+        hideModal();
+      } else {
+        minimizedModals.delete(key);
+        renderTaskbarModals();
+      }
     });
 
+    item.appendChild(iconSpan);
+    item.appendChild(iconSeparator);
     item.appendChild(nameSpan);
     item.appendChild(separator);
-    item.appendChild(deleteBtn);
-    item.addEventListener('click', () => restoreModal(modalKey));
-    container.appendChild(item);
+    item.appendChild(closeBtn);
+
+    // Click handler
+    if (isOpen) {
+      item.addEventListener('click', () => {
+        if (modalElement) {
+          modalElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      });
+    } else {
+      item.addEventListener('click', () => restoreModal(key));
+    }
+
+    taskbarModals.appendChild(item);
   });
 }
 
