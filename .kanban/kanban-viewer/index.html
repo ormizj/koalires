@@ -235,9 +235,13 @@
     </div>
 </div>
 
-<div class="refresh-indicator">
-    <span>Status:</span>
-    <div class="status-circle" id="status-circle"></div>
+<div class="status-bar">
+    <div class="minimized-modals" id="minimized-modals"></div>
+    <div class="status-bar-divider" id="status-divider"></div>
+    <div class="status-indicator">
+        <span>Status:</span>
+        <div class="status-circle" id="status-circle"></div>
+    </div>
 </div>
 
 <!-- Task Context Menu -->
@@ -301,6 +305,11 @@
         <div class="modal-header">
             <span class="modal-title">Metadata</span>
             <div class="modal-header-buttons">
+                <button class="modal-minimize" title="Minimize">
+                    <svg viewBox="0 0 24 24" width="16" height="16">
+                        <line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                </button>
                 <button class="modal-maximize" title="Maximize">
                     <svg viewBox="0 0 24 24" width="16" height="16">
                         <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2" fill="none"/>
@@ -337,8 +346,15 @@
                 <div class="modal-tabs">
                     <button class="modal-tab active" data-tab="board">board</button>
                     <button class="modal-tab" data-tab="progress">progress</button>
+                    <button class="modal-tab" data-tab="prompt">worker-prompt</button>
                     <button class="modal-tab" data-tab="log">worker-raw</button>
                     <button class="modal-tab" data-tab="output">worker-output</button>
+                    <div class="qa-toggle-wrapper">
+                        <button class="qa-toggle" id="qa-toggle" title="Toggle QA (test-creation) data">
+                            <span class="qa-toggle-label">QA</span>
+                            <span class="qa-toggle-indicator"></span>
+                        </button>
+                    </div>
                 </div>
                 <div class="modal-content">
                     <div class="modal-loading">Loading...</div>

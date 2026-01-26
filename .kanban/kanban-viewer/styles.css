@@ -692,16 +692,62 @@ body {
     overflow-y: auto;
 }
 
-.refresh-indicator {
+/* Status Bar Container */
+.status-bar {
     position: fixed;
     bottom: 1.25rem;
     right: 1.25rem;
     background: #21262d;
     border: 1px solid #30363d;
-    padding: 0.625rem 1rem;
+    padding: 0.5rem 0.75rem;
     border-radius: 8px;
     font-size: 0.8rem;
     color: #8b949e;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    z-index: 100;
+}
+
+/* Minimized Modals Container */
+.minimized-modals {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+/* Individual Minimized Modal Item */
+.minimized-modal-item {
+    background: #30363d;
+    border: 1px solid #484f58;
+    color: #c9d1d9;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.minimized-modal-item:hover {
+    background: #484f58;
+    border-color: #58a6ff;
+    color: #58a6ff;
+}
+
+/* Divider between minimized modals and status */
+.status-bar-divider {
+    width: 1px;
+    height: 18px;
+    background: #484f58;
+    display: none;
+}
+
+/* Status Indicator */
+.status-indicator {
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -1078,6 +1124,25 @@ body {
 .modal-close:hover {
     background: #30363d;
     color: #f85149;
+}
+
+/* Minimize Button */
+.modal-minimize {
+    background: transparent;
+    border: none;
+    color: #8b949e;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+}
+
+.modal-minimize:hover {
+    background: #30363d;
+    color: #c9d1d9;
 }
 
 .modal-tabs {
@@ -1726,4 +1791,62 @@ body {
     left: -2px;
     right: -2px;
     bottom: 0;
+}
+
+/* QA Toggle Styles */
+.qa-toggle-wrapper {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+}
+
+.qa-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    color: #8b949e;
+    transition: all 0.2s;
+}
+
+.qa-toggle:hover {
+    background: #30363d;
+}
+
+.qa-toggle.active {
+    background: #58a6ff;
+    color: white;
+    border-color: #58a6ff;
+}
+
+.qa-toggle-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #8b949e;
+    transition: background 0.2s;
+}
+
+.qa-toggle.active .qa-toggle-indicator {
+    background: white;
+}
+
+/* Prompt Text Display */
+.prompt-text {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 16px;
+    background: #161b22;
+    border-radius: 4px;
+    margin: 0;
+    overflow: auto;
+    color: #c9d1d9;
 }

@@ -13,6 +13,10 @@ let boardDataCache = null;
 let progressDataCache = null;
 const logDataCache = new Map();
 const outputDataCache = new Map();
+const promptDataCache = new Map();
+
+// QA mode state
+let isQaMode = false;
 
 // Drag state
 let isDragging = false;
@@ -36,6 +40,7 @@ const MIN_HEIGHT = 400;
 const DEFAULT_WIDTH = 700;
 const DEFAULT_HEIGHT = 600;
 const MODAL_SIZE_KEY = 'kanban-metadata-modal-size';
+const FULLSCREEN_STATE_KEY = 'kanban-modal-fullscreen';
 
 // Auto-refresh state
 let refreshInterval = null;
@@ -51,6 +56,9 @@ let currentMatchIndex = -1;
 // Maximize state
 let isMaximized = false;
 let preMaximizeState = { width: 0, height: 0, left: 0, top: 0 };
+
+// Minimize state
+const minimizedModals = new Map(); // taskName -> { title, mode, columnId, taskNames }
 
 // Column mode state
 let isColumnMode = false;
@@ -91,6 +99,11 @@ export function initMetadataModal() {
   modalElement
     .querySelector('.modal-close')
     ?.addEventListener('click', hideModal);
+
+  // Minimize button
+  modalElement
+    .querySelector('.modal-minimize')
+    ?.addEventListener('click', minimizeModal);
 
   // Maximize button
   modalElement
@@ -139,6 +152,9 @@ export function initMetadataModal() {
 
   // Initialize sidebar
   initSidebar();
+
+  // Initialize QA toggle
+  initQaToggle();
 }
 
 /**
@@ -179,6 +195,9 @@ export function showModal(taskName) {
 
   // Reset modal position to center
   centerModal();
+
+  // Apply fullscreen state if preference is set
+  applyFullscreenState();
 
   // Clear search
   const searchInput = document.getElementById('metadata-search');
@@ -230,6 +249,9 @@ export async function showColumnModal(columnId, taskNames) {
 
   // Reset modal position
   centerModal();
+
+  // Apply fullscreen state if preference is set
+  applyFullscreenState();
 
   // Clear search
   const searchInput = document.getElementById('metadata-search');
@@ -343,15 +365,15 @@ function switchToTask(taskName, index) {
  * Hide the modal
  */
 export function hideModal() {
-  // Reset maximize state
+  // Stop auto-refresh polling
+  stopRefreshPolling();
+
+  // Reset maximize state (visual only, preference preserved)
   if (isMaximized) {
     modalElement?.classList.remove('maximized');
     isMaximized = false;
-    updateMaximizeIcon(false); // Reset icon to maximize
+    updateMaximizeIcon(false);
   }
-
-  // Stop auto-refresh polling
-  stopRefreshPolling();
 
   if (overlayElement) {
     overlayElement.classList.add('hidden');
@@ -389,6 +411,14 @@ export function clearCache() {
   progressDataCache = null;
   logDataCache.clear();
   outputDataCache.clear();
+  promptDataCache.clear();
+}
+
+/**
+ * Get the file suffix based on QA mode
+ */
+function getWorkerFileSuffix() {
+  return isQaMode ? '-test-creation' : '';
 }
 
 /**
@@ -400,6 +430,7 @@ async function checkTabDataAvailability() {
   const tabs = {
     board: modalElement.querySelector('[data-tab="board"]'),
     progress: modalElement.querySelector('[data-tab="progress"]'),
+    prompt: modalElement.querySelector('[data-tab="prompt"]'),
     log: modalElement.querySelector('[data-tab="log"]'),
     output: modalElement.querySelector('[data-tab="output"]'),
   };
@@ -408,9 +439,12 @@ async function checkTabDataAvailability() {
   const availability = {
     board: false,
     progress: false,
+    prompt: false,
     log: false,
     output: false,
   };
+
+  const suffix = getWorkerFileSuffix();
 
   // Check board data
   try {
@@ -428,10 +462,20 @@ async function checkTabDataAvailability() {
     availability.progress = false;
   }
 
+  // Check prompt data (worker-prompt)
+  try {
+    const response = await fetch(
+      `../worker-logs/${currentTaskName}${suffix}-prompt.txt?t=${Date.now()}`
+    );
+    availability.prompt = response.ok;
+  } catch {
+    availability.prompt = false;
+  }
+
   // Check log data (worker-raw)
   try {
     const response = await fetch(
-      `../logs/${currentTaskName}.json?t=${Date.now()}`
+      `../worker-logs/${currentTaskName}${suffix}.json?t=${Date.now()}`
     );
     availability.log = response.ok;
   } catch {
@@ -441,7 +485,7 @@ async function checkTabDataAvailability() {
   // Check output data (worker-output)
   try {
     const response = await fetch(
-      `../logs/${currentTaskName}-output.json?t=${Date.now()}`
+      `../worker-logs/${currentTaskName}${suffix}-output.json?t=${Date.now()}`
     );
     availability.output = response.ok;
   } catch {
@@ -497,6 +541,54 @@ function loadModalSize() {
     // Ignore localStorage errors
   }
   return { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT };
+}
+
+/**
+ * Load fullscreen state from localStorage
+ */
+function loadFullscreenState() {
+  try {
+    return localStorage.getItem(FULLSCREEN_STATE_KEY) === 'true';
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Save fullscreen state to localStorage
+ */
+function saveFullscreenState(isFullscreen) {
+  try {
+    localStorage.setItem(FULLSCREEN_STATE_KEY, isFullscreen ? 'true' : 'false');
+  } catch (e) {
+    // Ignore localStorage errors
+  }
+}
+
+/**
+ * Apply fullscreen state to modal on open
+ */
+function applyFullscreenState() {
+  const shouldBeFullscreen = loadFullscreenState();
+
+  if (shouldBeFullscreen && !isMaximized) {
+    // Save current state for restore
+    const rect = modalElement.getBoundingClientRect();
+    preMaximizeState = {
+      width: rect.width,
+      height: rect.height,
+      left: rect.left,
+      top: rect.top,
+    };
+
+    modalElement.classList.add('maximized');
+    isMaximized = true;
+    updateMaximizeIcon(true);
+  } else if (!shouldBeFullscreen && isMaximized) {
+    modalElement.classList.remove('maximized');
+    isMaximized = false;
+    updateMaximizeIcon(false);
+  }
 }
 
 /**
@@ -561,6 +653,8 @@ async function fetchTabData(tabName) {
         return await fetchProgressData();
       case 'board':
         return await fetchBoardData();
+      case 'prompt':
+        return await fetchPromptData();
       case 'log':
         return await fetchLogData();
       case 'output':
@@ -593,6 +687,13 @@ function renderTabContent(data) {
       '<div class="modal-error">No data found for this task</div>';
   } else if (data?.__error) {
     contentElement.innerHTML = `<div class="modal-error">${escapeHtml(data.__error)}</div>`;
+  } else if (currentTabName === 'prompt' && typeof data === 'string') {
+    // Render prompt as plain text
+    contentElement.innerHTML = '';
+    const pre = document.createElement('pre');
+    pre.className = 'prompt-text';
+    pre.textContent = data;
+    contentElement.appendChild(pre);
   } else {
     contentElement.innerHTML = '';
 
@@ -620,10 +721,8 @@ async function fetchProgressData() {
     progressDataCache = await response.json();
   }
 
-  // Find task in progress data
-  const taskEntry = progressDataCache.tasks?.find(
-    (t) => t.name === currentTaskName
-  );
+  // Find task in progress data (data is keyed by task name)
+  const taskEntry = progressDataCache[currentTaskName];
   return taskEntry || null;
 }
 
@@ -645,19 +744,22 @@ async function fetchBoardData() {
 }
 
 /**
- * Fetch logs/{taskName}.json (supports both JSON and JSONL formats)
+ * Fetch worker-logs/{taskName}.json (supports both JSON and JSONL formats)
  */
 async function fetchLogData() {
   if (!currentTaskName) return null;
 
-  if (!logDataCache.has(currentTaskName)) {
+  const suffix = getWorkerFileSuffix();
+  const cacheKey = `${currentTaskName}${suffix}`;
+
+  if (!logDataCache.has(cacheKey)) {
     try {
       const response = await fetch(
-        `../logs/${currentTaskName}.json?t=${Date.now()}`
+        `../worker-logs/${currentTaskName}${suffix}.json?t=${Date.now()}`
       );
       if (!response.ok) {
         if (response.status === 404) {
-          throw new Error(`Log file not found: logs/${currentTaskName}.json`);
+          throw new Error(`Log file not found: worker-logs/${currentTaskName}${suffix}.json`);
         }
         throw new Error(`Failed to load log file (${response.status})`);
       }
@@ -691,34 +793,35 @@ async function fetchLogData() {
         data = entries;
       }
 
-      logDataCache.set(currentTaskName, data);
+      logDataCache.set(cacheKey, data);
     } catch (e) {
       if (e.message.includes('not found') || e.message.includes('404')) {
         throw e;
       }
-      throw new Error(`Log file not found: logs/${currentTaskName}.json`);
+      throw new Error(`Log file not found: worker-logs/${currentTaskName}${suffix}.json`);
     }
   }
 
-  return logDataCache.get(currentTaskName);
+  return logDataCache.get(cacheKey);
 }
 
 /**
- * Fetch logs/{taskName}-output.json
+ * Fetch worker-logs/{taskName}-output.json
  */
 async function fetchOutputData() {
   if (!currentTaskName) return null;
 
-  const cacheKey = `${currentTaskName}-output`;
+  const suffix = getWorkerFileSuffix();
+  const cacheKey = `${currentTaskName}${suffix}-output`;
   if (!outputDataCache.has(cacheKey)) {
     try {
       const response = await fetch(
-        `../logs/${currentTaskName}-output.json?t=${Date.now()}`
+        `../worker-logs/${currentTaskName}${suffix}-output.json?t=${Date.now()}`
       );
       if (!response.ok) {
         if (response.status === 404) {
           throw new Error(
-            `Output file not found: logs/${currentTaskName}-output.json`
+            `Output file not found: worker-logs/${currentTaskName}${suffix}-output.json`
           );
         }
         throw new Error(`Failed to load output file (${response.status})`);
@@ -729,12 +832,48 @@ async function fetchOutputData() {
         throw e;
       }
       throw new Error(
-        `Output file not found: logs/${currentTaskName}-output.json`
+        `Output file not found: worker-logs/${currentTaskName}${suffix}-output.json`
       );
     }
   }
 
   return outputDataCache.get(cacheKey);
+}
+
+/**
+ * Fetch worker-logs/{taskName}-prompt.txt
+ */
+async function fetchPromptData() {
+  if (!currentTaskName) return null;
+
+  const suffix = getWorkerFileSuffix();
+  const cacheKey = `${currentTaskName}${suffix}-prompt`;
+
+  if (!promptDataCache.has(cacheKey)) {
+    try {
+      const response = await fetch(
+        `../worker-logs/${currentTaskName}${suffix}-prompt.txt?t=${Date.now()}`
+      );
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error(
+            `Prompt file not found: worker-logs/${currentTaskName}${suffix}-prompt.txt`
+          );
+        }
+        throw new Error(`Failed to load prompt file (${response.status})`);
+      }
+      promptDataCache.set(cacheKey, await response.text());
+    } catch (e) {
+      if (e.message.includes('not found') || e.message.includes('404')) {
+        throw e;
+      }
+      throw new Error(
+        `Prompt file not found: worker-logs/${currentTaskName}${suffix}-prompt.txt`
+      );
+    }
+  }
+
+  return promptDataCache.get(cacheKey);
 }
 
 /**
@@ -1480,6 +1619,7 @@ function toggleMaximize() {
   }
 
   isMaximized = !isMaximized;
+  saveFullscreenState(isMaximized);
 }
 
 /**
@@ -1528,6 +1668,121 @@ function handleWindowResize() {
     modalElement.style.left = `${clamped.left}px`;
     modalElement.style.top = `${clamped.top}px`;
   }
+}
+
+// ===== QA Toggle Functions =====
+
+/**
+ * Initialize QA toggle button
+ */
+function initQaToggle() {
+  const toggle = document.getElementById('qa-toggle');
+  toggle?.addEventListener('click', () => {
+    isQaMode = !isQaMode;
+    toggle.classList.toggle('active', isQaMode);
+
+    // Clear worker-related caches
+    logDataCache.clear();
+    outputDataCache.clear();
+    promptDataCache.clear();
+
+    // Re-check tab availability and reload current tab
+    checkTabDataAvailability();
+    if (['log', 'output', 'prompt'].includes(currentTabName)) {
+      switchTab(currentTabName);
+    }
+  });
+}
+
+// ===== Minimize Functions =====
+
+/**
+ * Minimize the current modal to the status bar
+ */
+function minimizeModal() {
+  if (!currentTaskName || !modalElement || !overlayElement) return;
+
+  // Generate a unique key for this modal instance
+  const modalKey = isColumnMode ? `column-${currentColumnId}` : currentTaskName;
+
+  // Store modal state
+  minimizedModals.set(modalKey, {
+    title: isColumnMode ? `Column: ${currentColumnId}` : currentTaskName,
+    mode: isColumnMode ? 'column' : 'single',
+    columnId: isColumnMode ? currentColumnId : null,
+    taskNames: isColumnMode ? [...columnTasks] : null,
+    taskName: currentTaskName,
+  });
+
+  // Stop auto-refresh polling for minimized modal
+  stopRefreshPolling();
+
+  // Hide modal
+  overlayElement.classList.add('hidden');
+  document.body.style.overflow = '';
+
+  // Reset maximize state visually (will be restored via applyFullscreenState on reopen)
+  if (isMaximized) {
+    modalElement.classList.remove('maximized');
+    isMaximized = false;
+    updateMaximizeIcon(false);
+  }
+
+  // Update status bar
+  renderMinimizedModals();
+}
+
+/**
+ * Restore a minimized modal from the status bar
+ */
+function restoreModal(modalKey) {
+  const state = minimizedModals.get(modalKey);
+  if (!state) return;
+
+  minimizedModals.delete(modalKey);
+  renderMinimizedModals();
+
+  // Re-show modal with saved state
+  if (state.mode === 'column') {
+    showColumnModal(state.columnId, state.taskNames);
+  } else {
+    showModal(state.taskName);
+  }
+}
+
+/**
+ * Render minimized modal items in the status bar
+ */
+function renderMinimizedModals() {
+  const container = document.getElementById('minimized-modals');
+  const divider = document.getElementById('status-divider');
+
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  if (minimizedModals.size === 0) {
+    if (divider) divider.style.display = 'none';
+    return;
+  }
+
+  if (divider) divider.style.display = 'block';
+
+  minimizedModals.forEach((state, modalKey) => {
+    const item = document.createElement('button');
+    item.className = 'minimized-modal-item';
+    item.textContent = truncateTaskName(state.title, 20);
+    item.title = state.title;
+    item.addEventListener('click', () => restoreModal(modalKey));
+    container.appendChild(item);
+  });
+}
+
+/**
+ * Truncate task name for display in status bar
+ */
+function truncateTaskName(name, maxLength) {
+  return name.length > maxLength ? name.slice(0, maxLength - 3) + '...' : name;
 }
 
 // ===== Sidebar Functions =====
