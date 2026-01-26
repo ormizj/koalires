@@ -117,6 +117,9 @@ if (Test-Path $PackageJsonPath) {
 }
 
 Write-Host ""
+Write-Host "Test infrastructure verification will run next..." -ForegroundColor Yellow
+Write-Host "  The verify-tests sub-skill ensures TDD workflow is ready" -ForegroundColor Gray
+Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "KANBAN INIT COMPLETE" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan

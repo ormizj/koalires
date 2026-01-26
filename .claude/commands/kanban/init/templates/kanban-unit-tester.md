@@ -52,18 +52,18 @@ Before creating tests, you MUST detect the project's test infrastructure. Do not
 
 Scan for test configuration files to identify the test framework:
 
-| Framework | Detection Files | Test Command |
-| --------- | --------------- | ------------ |
-| **Vitest** | `vitest.config.{ts,js,mts,mjs}` | `npm run test` or `npx vitest` |
-| **Jest** | `jest.config.{ts,js,cjs,mjs}`, `jest` in package.json | `npm test` or `npx jest` |
-| **Mocha** | `.mocharc.{js,json,yaml}`, `mocha` in package.json | `npm test` or `npx mocha` |
-| **pytest** | `pytest.ini`, `pyproject.toml` with `[tool.pytest]`, `conftest.py` | `pytest` |
-| **Go test** | `*_test.go` files exist | `go test ./...` |
-| **PHPUnit** | `phpunit.xml`, `phpunit.xml.dist` | `./vendor/bin/phpunit` |
-| **RSpec** | `.rspec`, `spec/` directory with `*_spec.rb` | `bundle exec rspec` |
-| **JUnit** | `pom.xml` with junit, `build.gradle` with junit | `mvn test` or `gradle test` |
-| **Playwright** | `playwright.config.{ts,js}` | `npx playwright test` |
-| **Cypress** | `cypress.config.{ts,js}` | `npx cypress run` |
+| Framework      | Detection Files                                                    | Test Command                   |
+| -------------- | ------------------------------------------------------------------ | ------------------------------ |
+| **Vitest**     | `vitest.config.{ts,js,mts,mjs}`                                    | `npm run test` or `npx vitest` |
+| **Jest**       | `jest.config.{ts,js,cjs,mjs}`, `jest` in package.json              | `npm test` or `npx jest`       |
+| **Mocha**      | `.mocharc.{js,json,yaml}`, `mocha` in package.json                 | `npm test` or `npx mocha`      |
+| **pytest**     | `pytest.ini`, `pyproject.toml` with `[tool.pytest]`, `conftest.py` | `pytest`                       |
+| **Go test**    | `*_test.go` files exist                                            | `go test ./...`                |
+| **PHPUnit**    | `phpunit.xml`, `phpunit.xml.dist`                                  | `./vendor/bin/phpunit`         |
+| **RSpec**      | `.rspec`, `spec/` directory with `*_spec.rb`                       | `bundle exec rspec`            |
+| **JUnit**      | `pom.xml` with junit, `build.gradle` with junit                    | `mvn test` or `gradle test`    |
+| **Playwright** | `playwright.config.{ts,js}`                                        | `npx playwright test`          |
+| **Cypress**    | `cypress.config.{ts,js}`                                           | `npx cypress run`              |
 
 **Detection commands:**
 
@@ -137,6 +137,7 @@ Use detected patterns to generate tests. Examples below show language-agnostic s
 Focus: Database schemas, models, types, stores
 
 **Test patterns:**
+
 - Model/schema existence
 - Field types and constraints
 - Relationships and foreign keys
@@ -158,6 +159,7 @@ describe('ModelName Model')
 Focus: Server endpoints, request handling, responses
 
 **Test patterns:**
+
 - HTTP status codes (200, 201, 400, 401, 403, 404, 500)
 - Request body validation
 - Authentication requirements
@@ -179,6 +181,7 @@ describe('HTTP_METHOD /path/to/endpoint')
 Focus: Components, views, user interactions
 
 **Test patterns:**
+
 - Component mounting/rendering
 - Props validation and defaults
 - Event emission/callbacks
@@ -201,6 +204,7 @@ describe('ComponentName')
 Focus: Service connections, API clients, data flow
 
 **Test patterns:**
+
 - API call parameters
 - Response transformation
 - Error propagation
@@ -221,6 +225,7 @@ describe('ServiceName')
 Focus: Configuration loading, environment variables
 
 **Test patterns:**
+
 - Default configuration values
 - Environment variable overrides
 - Required setting validation
@@ -243,23 +248,24 @@ Each verification step in the task should become at least one test case.
 
 ### Verification Step Patterns
 
-| Step Pattern                    | Test Type                                    |
-| ------------------------------- | -------------------------------------------- |
-| "Verify X exists"               | Existence/definition test                    |
-| "Check X has Y"                 | Property/field test                          |
-| "Run command"                   | Build/generation test (often implicit)       |
-| "Test X with Y"                 | Functional test with specific input          |
-| "Ensure X handles Y"            | Error/edge case test                         |
-| "Confirm X displays/shows"      | UI rendering test                            |
-| "Validate X when Y"             | Conditional behavior test                    |
-| "Click/Submit/Enter"            | User interaction test                        |
-| "API returns X"                 | Response assertion test                      |
-| "Error appears when"            | Error state test                             |
+| Step Pattern               | Test Type                              |
+| -------------------------- | -------------------------------------- |
+| "Verify X exists"          | Existence/definition test              |
+| "Check X has Y"            | Property/field test                    |
+| "Run command"              | Build/generation test (often implicit) |
+| "Test X with Y"            | Functional test with specific input    |
+| "Ensure X handles Y"       | Error/edge case test                   |
+| "Confirm X displays/shows" | UI rendering test                      |
+| "Validate X when Y"        | Conditional behavior test              |
+| "Click/Submit/Enter"       | User interaction test                  |
+| "API returns X"            | Response assertion test                |
+| "Error appears when"       | Error state test                       |
 
 ### Mapping Example
 
 **Task**: `user-profile-schema`
 **Steps**:
+
 1. "Verify UserProfile model exists"
 2. "Check model has name, email, avatar fields"
 3. "Ensure email is unique"
@@ -293,6 +299,7 @@ describe('UserProfile Schema')
 - **Ruby**: `[name]_spec.rb`
 
 Use descriptive test names that explain behavior:
+
 - "should return empty array when input is empty"
 - "raises ValueError when email is invalid"
 - "renders loading spinner while fetching"
@@ -316,6 +323,7 @@ test/it/func:
 ### Mocking Guidelines
 
 **Mock these:**
+
 - External APIs and network calls
 - Database operations
 - File system access
@@ -323,6 +331,7 @@ test/it/func:
 - Third-party services
 
 **Don't mock:**
+
 - Pure functions
 - The code under test itself
 - Simple data transformations

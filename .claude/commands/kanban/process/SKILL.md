@@ -63,10 +63,10 @@ New approach: Dispatcher parses the raw session log as the single source of trut
 
 All kanban files are in the `.kanban/` directory:
 
-| Path                              | Purpose                                            |
-| --------------------------------- | -------------------------------------------------- |
-| `.kanban/kanban-board.json`       | Task definitions with passes field                 |
-| `.kanban/kanban-progress.json`    | Status tracking, work logs, affected files, agents |
+| Path                                     | Purpose                                            |
+| ---------------------------------------- | -------------------------------------------------- |
+| `.kanban/kanban-board.json`              | Task definitions with passes field                 |
+| `.kanban/kanban-progress.json`           | Status tracking, work logs, affected files, agents |
 | `.kanban/worker-logs/`                   | Worker output logs                                 |
 | `.kanban/worker-logs/{task}.json`        | Raw worker session log (JSON format)               |
 | `.kanban/worker-logs/{task}-output.json` | Parsed/normalized output (created by dispatcher)   |
@@ -111,14 +111,14 @@ Each wave completes before the next begins, ensuring dependent tasks have their 
 
 Workers are assigned agents based on task category:
 
-| Category    | Agent             |
-| ----------- | ----------------- |
-| data        | backend-developer |
-| config      | backend-developer |
-| api         | backend-developer |
-| integration | backend-developer |
-| ui          | vue-expert        |
-| testing     | kanban-unit-tester       |
+| Category    | Agent              |
+| ----------- | ------------------ |
+| data        | backend-developer  |
+| config      | backend-developer  |
+| api         | backend-developer  |
+| integration | backend-developer  |
+| ui          | vue-expert         |
+| testing     | kanban-unit-tester |
 
 ---
 

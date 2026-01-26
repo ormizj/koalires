@@ -353,10 +353,10 @@ function Invoke-ProcessWorkerOutput {
     }
 }
 
-function Set-TaskRunning {
+function Set-TaskTddRunning {
     param(
         [string]$TaskName,
-        [string]$AgentName
+        [string]$TddAgentName
     )
 
     $startedAt = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
@@ -367,13 +367,50 @@ function Set-TaskRunning {
         $runningEntry = @{
             status = "running"
             startedAt = $startedAt
-            agent = $AgentName
+            tddAgent = $TddAgentName
         }
 
         $progressContent | Add-Member -NotePropertyName $TaskName -NotePropertyValue ([PSCustomObject]$runningEntry) -Force
         $progressContent | ConvertTo-Json -Depth 10 | Set-Content $ProgressFile -Encoding UTF8 -ErrorAction Stop
 
         return $startedAt
+    }
+    catch {
+        Write-Host "       [Error] Failed to mark task '$TaskName' as running (TDD): $($_.Exception.Message)" -ForegroundColor Red
+        return $null
+    }
+}
+
+function Set-TaskRunning {
+    param(
+        [string]$TaskName,
+        [string]$AgentName
+    )
+
+    try {
+        $progressContent = Get-Content $ProgressFile -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+
+        # Check if task already has a progress entry (from TDD phase)
+        $existingEntry = $progressContent.PSObject.Properties[$TaskName]
+
+        if ($existingEntry) {
+            # Preserve existing fields (startedAt, tddAgent, status) and add implementation agent
+            $existingEntry.Value | Add-Member -NotePropertyName "agent" -NotePropertyValue $AgentName -Force
+            $progressContent | ConvertTo-Json -Depth 10 | Set-Content $ProgressFile -Encoding UTF8 -ErrorAction Stop
+            return $existingEntry.Value.startedAt
+        }
+        else {
+            # No TDD phase - create new entry (for testing category tasks that skip Phase 1)
+            $startedAt = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+            $runningEntry = @{
+                status = "running"
+                startedAt = $startedAt
+                agent = $AgentName
+            }
+            $progressContent | Add-Member -NotePropertyName $TaskName -NotePropertyValue ([PSCustomObject]$runningEntry) -Force
+            $progressContent | ConvertTo-Json -Depth 10 | Set-Content $ProgressFile -Encoding UTF8 -ErrorAction Stop
+            return $startedAt
+        }
     }
     catch {
         Write-Host "       [Error] Failed to mark task '$TaskName' as running: $($_.Exception.Message)" -ForegroundColor Red
@@ -590,6 +627,13 @@ function Start-TestCreationJob {
     $taskName = $Task.name
     $agentName = "kanban-unit-tester"
 
+    # Mark task as "running" when TDD test creation starts (Phase 1)
+    $startedAt = Set-TaskTddRunning -TaskName $taskName -TddAgentName $agentName
+    if (-not $startedAt) {
+        Write-Host "       [Warning] Could not mark task '$taskName' as running" -ForegroundColor Yellow
+        $startedAt = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+    }
+
     # Write prompt to a temp file
     $promptFile = Join-Path $LogsDir "$taskName-test-creation-prompt.txt"
     $Prompt | Set-Content -Path $promptFile -Encoding UTF8 -NoNewline
@@ -614,6 +658,7 @@ function Start-TestCreationJob {
         Task = $Task
         JsonLogPath = $JsonLogPath
         AgentName = $agentName
+        StartedAt = $startedAt
     }
 }
 
@@ -1324,7 +1369,7 @@ function Main {
             # ============================================================
             # PHASE 1: TDD TEST CREATION (for non-testing categories)
             # ============================================================
-            $tddBatch = $batch | Where-Object { $TddCategories -contains $_.category }
+            $tddBatch = @($batch | Where-Object { $TddCategories -contains $_.category })
 
             if ($tddBatch.Count -gt 0) {
                 Write-Host ""

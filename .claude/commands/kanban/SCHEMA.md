@@ -6,11 +6,11 @@ Strict, unambiguous schema definitions for all kanban data files. No interpolati
 
 ## File Locations
 
-| Path                                   | Purpose                                    | Required           |
-| -------------------------------------- | ------------------------------------------ | ------------------ |
-| `.kanban/kanban-board.json`            | Task definitions with passes field         | Yes                |
-| `.kanban/kanban-progress.json`         | Status tracking, work logs, affected files | Yes                |
-| `.kanban/kanban-viewer.html`           | Interactive viewer UI                      | Yes                |
+| Path                                          | Purpose                                    | Required           |
+| --------------------------------------------- | ------------------------------------------ | ------------------ |
+| `.kanban/kanban-board.json`                   | Task definitions with passes field         | Yes                |
+| `.kanban/kanban-progress.json`                | Status tracking, work logs, affected files | Yes                |
+| `.kanban/kanban-viewer.html`                  | Interactive viewer UI                      | Yes                |
 | `.kanban/worker-logs/`                        | Worker output logs (runtime)               | Created at runtime |
 | `.kanban/worker-logs/{task-name}.json`        | Claude session log for token tracking      | Created at runtime |
 | `.kanban/worker-logs/{task-name}-output.json` | Worker output file with results            | Created by worker  |
@@ -201,14 +201,14 @@ type TaskStatus = 'running' | 'code-review' | 'completed' | 'error' | 'blocked';
 
 ### TaskCategory
 
-| Value         | Agent             | Description                                    |
-| ------------- | ----------------- | ---------------------------------------------- |
-| `data`        | backend-developer | Database schemas, Prisma models, types, stores |
-| `api`         | backend-developer | Server endpoints, business logic               |
-| `ui`          | vue-expert        | Vue components, pages, visual design           |
-| `integration` | backend-developer | Service connections, API clients               |
-| `config`      | backend-developer | Configuration files                            |
-| `testing`     | kanban-unit-tester       | Test files (TDD workflow)                      |
+| Value         | Agent              | Description                                    |
+| ------------- | ------------------ | ---------------------------------------------- |
+| `data`        | backend-developer  | Database schemas, Prisma models, types, stores |
+| `api`         | backend-developer  | Server endpoints, business logic               |
+| `ui`          | vue-expert         | Vue components, pages, visual design           |
+| `integration` | backend-developer  | Service connections, API clients               |
+| `config`      | backend-developer  | Configuration files                            |
+| `testing`     | kanban-unit-tester | Test files (TDD workflow)                      |
 
 ### TaskStatus
 
@@ -274,14 +274,14 @@ The UI/viewer derives task status from `passes` (kanban-board.json) and `status`
 
 Workers are assigned based on task category:
 
-| Category      | Agent               | Focus Areas                                 |
-| ------------- | ------------------- | ------------------------------------------- |
-| `data`        | `backend-developer` | Prisma schemas, repositories, types, stores |
-| `config`      | `backend-developer` | Configuration files, environment setup      |
-| `api`         | `backend-developer` | Server routes, business logic, middleware   |
-| `integration` | `backend-developer` | API clients, service connections            |
-| `ui`          | `vue-expert`        | Vue components, Nuxt pages, composables     |
-| `testing`     | `kanban-unit-tester`       | Unit tests, integration tests               |
+| Category      | Agent                | Focus Areas                                 |
+| ------------- | -------------------- | ------------------------------------------- |
+| `data`        | `backend-developer`  | Prisma schemas, repositories, types, stores |
+| `config`      | `backend-developer`  | Configuration files, environment setup      |
+| `api`         | `backend-developer`  | Server routes, business logic, middleware   |
+| `integration` | `backend-developer`  | API clients, service connections            |
+| `ui`          | `vue-expert`         | Vue components, Nuxt pages, composables     |
+| `testing`     | `kanban-unit-tester` | Unit tests, integration tests               |
 
 ---
 
@@ -330,13 +330,13 @@ PHASE 2: IMPLEMENTATION
 
 The kanban-unit-tester creates test files based on task requirements:
 
-| Task Category | Test File Location                              | Example                                  |
-| ------------- | ----------------------------------------------- | ---------------------------------------- |
-| `data`        | Same directory as implementation + `.test.ts`   | `server/database/schemas/user.test.ts`   |
-| `api`         | Same directory as implementation + `.test.ts`   | `server/api/auth/login.test.ts`          |
-| `ui`          | Same directory as implementation + `.test.ts`   | `client/features/auth/ui/Login.test.ts`  |
-| `integration` | Same directory as implementation + `.test.ts`   | `server/services/email.test.ts`          |
-| `config`      | Same directory as implementation + `.test.ts`   | `config/app.test.ts`                     |
+| Task Category | Test File Location                            | Example                                 |
+| ------------- | --------------------------------------------- | --------------------------------------- |
+| `data`        | Same directory as implementation + `.test.ts` | `server/database/schemas/user.test.ts`  |
+| `api`         | Same directory as implementation + `.test.ts` | `server/api/auth/login.test.ts`         |
+| `ui`          | Same directory as implementation + `.test.ts` | `client/features/auth/ui/Login.test.ts` |
+| `integration` | Same directory as implementation + `.test.ts` | `server/services/email.test.ts`         |
+| `config`      | Same directory as implementation + `.test.ts` | `config/app.test.ts`                    |
 
 ### Worker Prompt with Test Files
 
@@ -364,12 +364,12 @@ The dispatcher extracts test files from kanban-unit-tester logs by detecting:
 
 For each task, the following log files are created:
 
-| File                                      | Purpose                                    |
-| ----------------------------------------- | ------------------------------------------ |
-| `.kanban/worker-logs/{task}-test-creation.json`  | kanban-unit-tester session log                    |
-| `.kanban/worker-logs/{task}-test-creation-prompt.txt` | Prompt sent to kanban-unit-tester            |
-| `.kanban/worker-logs/{task}.json`                | Implementation worker session log          |
-| `.kanban/worker-logs/{task}-output.json`         | Normalized implementation output           |
+| File                                                  | Purpose                           |
+| ----------------------------------------------------- | --------------------------------- |
+| `.kanban/worker-logs/{task}-test-creation.json`       | kanban-unit-tester session log    |
+| `.kanban/worker-logs/{task}-test-creation-prompt.txt` | Prompt sent to kanban-unit-tester |
+| `.kanban/worker-logs/{task}.json`                     | Implementation worker session log |
+| `.kanban/worker-logs/{task}-output.json`              | Normalized implementation output  |
 
 ---
 

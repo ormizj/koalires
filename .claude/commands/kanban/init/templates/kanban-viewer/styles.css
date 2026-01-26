@@ -676,6 +676,11 @@ body {
   font-family: monospace;
 }
 
+.task-agent-qa {
+  color: #a371f7;
+  background: rgba(163, 113, 247, 0.15);
+}
+
 .task-log {
   display: none;
   margin-top: 0.625rem;

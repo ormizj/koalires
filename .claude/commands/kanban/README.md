@@ -5,7 +5,8 @@ Task management system for breaking down features into agent-delegated work.
 ## Quick Start
 
 ```bash
-/kanban:init              # One-time setup
+/kanban:init              # One-time setup (auto-runs verify-tests)
+/kanban:init:verify-tests # Verify/setup test infrastructure
 /kanban:create <feature>  # Create board from feature description
 /kanban:process           # Execute tasks with parallel workers
 /kanban:code-review       # Review and commit completed tasks
@@ -20,7 +21,27 @@ npm run kanban            # Open viewer
 
 ### `/kanban:init`
 
-One-time setup. Creates `.kanban/` directory, copies viewer HTML, adds npm script.
+One-time setup. Creates `.kanban/` directory, copies viewer HTML, adds npm script. Automatically runs `/kanban:init:verify-tests` to ensure test infrastructure is ready for TDD workflow.
+
+### `/kanban:init:verify-tests`
+
+Verifies and sets up testing infrastructure for the kanban TDD workflow. Can be run independently or is auto-invoked by `/kanban:init`.
+
+**Phases:**
+
+1. **Detect** - Scans for existing test framework (Vitest, Jest, pytest, etc.)
+2. **Validate** - Checks config, dependencies, test command works
+3. **Setup** - If missing, recommends and installs appropriate framework based on project type
+
+**Framework Detection:**
+
+| Project Type  | Detection                          | Recommended Framework |
+| ------------- | ---------------------------------- | --------------------- |
+| Nuxt/Vue+Vite | `nuxt.config.*` or `vite.config.*` | Vitest                |
+| React (CRA)   | `react-scripts` in package.json    | Jest                  |
+| Node/Express  | `express` in deps                  | Vitest or Jest        |
+| Python        | `manage.py` or `fastapi`           | pytest                |
+| Go            | `go.mod`                           | go test (built-in)    |
 
 ### `/kanban:create <feature>`
 
@@ -68,20 +89,20 @@ Reviews completed tasks and creates git commits:
 | `.kanban/kanban-progress.json` | Progress tracking (log, affected files, agents) |
 | `.kanban/kanban-viewer.html`   | Interactive board UI                            |
 | `.kanban/workers/`             | Worker status files (parallel dispatch)         |
-| `.kanban/worker-logs/`                | Worker output logs                              |
+| `.kanban/worker-logs/`         | Worker output logs                              |
 
 For strict schema definitions of all data files, see [SCHEMA.md](./SCHEMA.md).
 
 ## Task Categories
 
-| Category      | Agent             | Purpose                  |
-| ------------- | ----------------- | ------------------------ |
-| `data`        | backend-developer | Database schemas, models |
-| `api`         | backend-developer | Endpoints, services      |
-| `ui`          | vue-expert        | Components, styling      |
-| `integration` | backend-developer | Connecting services      |
-| `config`      | backend-developer | Configuration, env setup |
-| `testing`     | kanban-unit-tester       | Test cases (TDD)         |
+| Category      | Agent              | Purpose                  |
+| ------------- | ------------------ | ------------------------ |
+| `data`        | backend-developer  | Database schemas, models |
+| `api`         | backend-developer  | Endpoints, services      |
+| `ui`          | vue-expert         | Components, styling      |
+| `integration` | backend-developer  | Connecting services      |
+| `config`      | backend-developer  | Configuration, env setup |
+| `testing`     | kanban-unit-tester | Test cases (TDD)         |
 
 ## Status Flow
 

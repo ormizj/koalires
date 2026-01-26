@@ -242,6 +242,17 @@ elseif ($outputContent.tokensUsed -and $outputContent.tokensUsed.Count -gt 0) {
 $progressUpdated = $false
 $progressUpdateLogic = {
     param($content)
+
+    # Check if entry already exists (may have tddAgent from TDD phase)
+    $existingEntry = $content.PSObject.Properties[$TaskName]
+
+    if ($existingEntry) {
+        # Preserve tddAgent if it exists
+        if ($existingEntry.Value.tddAgent) {
+            $progressEntry.tddAgent = $existingEntry.Value.tddAgent
+        }
+    }
+
     $content | Add-Member -NotePropertyName $TaskName -NotePropertyValue ([PSCustomObject]$progressEntry) -Force
     return $content
 }.GetNewClosure()

@@ -26,6 +26,20 @@ The script handles:
 - Initializing `kanban-board.json` and `kanban-progress.json`
 - Adding `kanban` npm script to `package.json`
 
+### Step 8: Verify Test Infrastructure
+
+After the PowerShell script completes, always run the verify-tests sub-skill:
+
+```
+/kanban:init:verify-tests
+```
+
+This ensures testing is ready for the kanban TDD workflow. The verify-tests skill will:
+
+1. Detect the existing test framework (Vitest, Jest, pytest, etc.)
+2. Validate the configuration and dependencies
+3. Offer to set up missing infrastructure if needed
+
 ## After Initialization
 
 The user can now:
