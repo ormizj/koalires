@@ -36,7 +36,12 @@
       "Bash(ls -la \"C:\\\\Users\\\\orm\\\\Desktop\\\\Files\\\\My Projects\\\\koalires\\\\.kanban\"\" 2>/dev/null || echo \"No .kanban directory exists yet \")",
       "Bash(find:*)",
       "Bash(findstr:*)",
-      "Bash(npm run db:push:*)"
+      "Bash(npm run db:push:*)",
+      "Bash(tree:*)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\orm\\\\Desktop\\\\Files\\\\My Projects\\\\koalires\\\\.claude\\\\commands\\\\kanban\\\\process\\\\scripts\" -Name)",
+      "Skill(kanban:init:verify-tests)",
+      "Bash(npm run test:*)",
+      "Bash(npm run test:run:*)"
     ]
   }
 }
