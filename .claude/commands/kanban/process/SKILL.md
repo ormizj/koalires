@@ -160,10 +160,15 @@ powershell -ExecutionPolicy Bypass -File ".claude/commands/kanban/process/script
 
 **Optional Parameters**:
 
-| Parameter     | Description                           | Default |
-| ------------- | ------------------------------------- | ------- |
-| `-Parallel N` | Maximum concurrent workers            | 3       |
-| `-DryRun`     | Show what would run without executing | false   |
+| Parameter            | Description                                            | Default |
+| -------------------- | ------------------------------------------------------ | ------- |
+| `-Parallel N`        | Maximum concurrent workers                             | 3       |
+| `-DryRun`            | Show what would run without executing                  | false   |
+| `-AllowDbMigrations` | Run Prisma db push + generate after Wave 1             | false   |
+| `-FailFast`          | Stop immediately if any task fails                     | false   |
+| `-RunVerification`   | Run typecheck/lint/tests after each wave               | false   |
+| `-NonInteractive`    | No prompts (auto-detected in CI)                       | false   |
+| `-DefaultFailAction` | Action on failure in non-interactive (Skip/Retry/Quit) | Skip    |
 
 **Examples**:
 
@@ -176,6 +181,12 @@ powershell -ExecutionPolicy Bypass -File ".claude/commands/kanban/process/script
 
 # Preview without executing
 powershell -ExecutionPolicy Bypass -File ".claude/commands/kanban/process/scripts/parallel-dispatch.ps1" -DryRun
+
+# Run with database migrations and fail-fast
+powershell -ExecutionPolicy Bypass -File ".claude/commands/kanban/process/scripts/parallel-dispatch.ps1" -AllowDbMigrations -FailFast
+
+# Run with full verification (typecheck, lint, tests) after each wave
+powershell -ExecutionPolicy Bypass -File ".claude/commands/kanban/process/scripts/parallel-dispatch.ps1" -RunVerification -FailFast
 ```
 
 ### Phase 3: Monitor and Handle Failures

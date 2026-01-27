@@ -4,6 +4,12 @@ You are a worker process executing a single kanban task. Complete the assigned t
 
 ---
 
+## Project Context
+
+{project.context}
+
+---
+
 ## Task Assignment
 
 **Name**: {task.name}

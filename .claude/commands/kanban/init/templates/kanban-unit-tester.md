@@ -355,16 +355,16 @@ test/it/func:
 
 When creating tests, place them in the centralized `tests/` directory structure created by `kanban:init`:
 
-| Source Type | Source Location | Test Location |
-|-------------|-----------------|---------------|
-| Pinia stores | `client/shared/stores/` | `tests/unit/client/stores/` |
-| Composables | `client/features/*/model/` | `tests/unit/client/composables/` |
-| Vue components | `client/**/ui/` | `tests/unit/client/components/` |
-| Client utils | `client/shared/lib/` | `tests/unit/client/utils/` |
-| API endpoints | `server/api/` | `tests/unit/server/api/` |
-| Server utils | `server/utils/` | `tests/unit/server/utils/` |
-| Repositories | `server/database/repositories/` | `tests/unit/server/repositories/` |
-| Integration tests | Cross-module | `tests/integration/` |
+| Source Type       | Source Location                 | Test Location                     |
+| ----------------- | ------------------------------- | --------------------------------- |
+| Pinia stores      | `client/shared/stores/`         | `tests/unit/client/stores/`       |
+| Composables       | `client/features/*/model/`      | `tests/unit/client/composables/`  |
+| Vue components    | `client/**/ui/`                 | `tests/unit/client/components/`   |
+| Client utils      | `client/shared/lib/`            | `tests/unit/client/utils/`        |
+| API endpoints     | `server/api/`                   | `tests/unit/server/api/`          |
+| Server utils      | `server/utils/`                 | `tests/unit/server/utils/`        |
+| Repositories      | `server/database/repositories/` | `tests/unit/server/repositories/` |
+| Integration tests | Cross-module                    | `tests/integration/`              |
 
 ### Naming Convention
 

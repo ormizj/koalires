@@ -5,6 +5,8 @@
 .DESCRIPTION
     Orchestrates parallel execution of kanban tasks by spawning claude -p workers.
     Tasks are processed in waves based on category dependencies.
+    Injects project context (import aliases, FSD rules) into worker prompts.
+    Optionally runs database migrations after Wave 1 (data/config tasks).
 
 .PARAMETER Parallel
     Maximum number of concurrent workers. Default is 3.
@@ -20,11 +22,24 @@
     Action to take when tasks fail in non-interactive mode.
     Valid values: Skip (default), Retry, Quit.
 
+.PARAMETER AllowDbMigrations
+    Run Prisma database migrations (db push + generate) after Wave 1 completes.
+    Safe for development databases. Does not force-reset data.
+
+.PARAMETER FailFast
+    Stop execution immediately if any task in a wave fails.
+    Prevents cascade failures when dependencies break.
+
+.PARAMETER RunVerification
+    Run independent verification (typecheck, lint, tests) after each wave.
+    Catches issues that workers may have self-reported incorrectly.
+
 .EXAMPLE
     .\parallel-dispatch.ps1
     .\parallel-dispatch.ps1 -Parallel 5
     .\parallel-dispatch.ps1 -DryRun
     .\parallel-dispatch.ps1 -NonInteractive -DefaultFailAction Skip
+    .\parallel-dispatch.ps1 -AllowDbMigrations -FailFast
 #>
 
 param(
@@ -39,7 +54,16 @@ param(
 
     [Parameter()]
     [ValidateSet("Skip", "Retry", "Quit")]
-    [string]$DefaultFailAction = "Skip"
+    [string]$DefaultFailAction = "Skip",
+
+    [Parameter()]
+    [switch]$AllowDbMigrations,
+
+    [Parameter()]
+    [switch]$FailFast,
+
+    [Parameter()]
+    [switch]$RunVerification
 )
 
 # Detect non-interactive environment if not explicitly set
@@ -85,6 +109,278 @@ $AgentMapping = @{
 }
 
 #region Helper Functions
+
+function Invoke-IndependentVerification {
+    <#
+    .SYNOPSIS
+        Run independent verification (typecheck, lint, tests) to validate worker output.
+    .DESCRIPTION
+        After workers complete, run project verification commands independently
+        to catch issues that workers may have self-reported incorrectly.
+    #>
+    param(
+        [string]$ProjectRoot,
+        [array]$AffectedFiles = @()
+    )
+
+    $results = @{
+        typecheck = $null
+        lint = $null
+        tests = $null
+        allPassed = $true
+    }
+
+    # Check if package.json exists to determine available commands
+    $packageJsonPath = Join-Path $ProjectRoot "package.json"
+    if (-not (Test-Path $packageJsonPath)) {
+        Write-Host "[Skip] No package.json found - skipping verification" -ForegroundColor Yellow
+        return $results
+    }
+
+    Write-Host ""
+    Write-Host ("-" * 40) -ForegroundColor Cyan
+    Write-Host "INDEPENDENT VERIFICATION" -ForegroundColor Cyan
+    Write-Host ("-" * 40) -ForegroundColor Cyan
+
+    try {
+        $packageJson = Get-Content $packageJsonPath -Raw | ConvertFrom-Json
+        $scripts = if ($packageJson.scripts) { $packageJson.scripts } else { @{} }
+    }
+    catch {
+        Write-Host "[Error] Failed to read package.json: $($_.Exception.Message)" -ForegroundColor Red
+        return $results
+    }
+
+    # Save current location
+    Push-Location $ProjectRoot
+
+    try {
+        # Run TypeScript type checking if available
+        if ($scripts.typecheck) {
+            Write-Host "[Check] Running typecheck..." -ForegroundColor Gray
+            $typecheckOutput = & npm run typecheck 2>&1
+            $results.typecheck = $LASTEXITCODE -eq 0
+
+            if ($results.typecheck) {
+                Write-Host "[PASS] Typecheck passed" -ForegroundColor Green
+            } else {
+                Write-Host "[FAIL] Typecheck failed" -ForegroundColor Red
+                $results.allPassed = $false
+                # Show first few lines of error
+                $errorLines = ($typecheckOutput | Out-String).Split("`n") | Select-Object -Last 10
+                foreach ($line in $errorLines) {
+                    if ($line.Trim()) {
+                        Write-Host "       $($line.Trim())" -ForegroundColor DarkRed
+                    }
+                }
+            }
+        } else {
+            Write-Host "[Skip] No typecheck script found" -ForegroundColor DarkGray
+        }
+
+        # Run lint if available (only on affected files if possible)
+        if ($scripts.lint) {
+            Write-Host "[Check] Running lint..." -ForegroundColor Gray
+            $lintOutput = & npm run lint 2>&1
+            $results.lint = $LASTEXITCODE -eq 0
+
+            if ($results.lint) {
+                Write-Host "[PASS] Lint passed" -ForegroundColor Green
+            } else {
+                Write-Host "[FAIL] Lint failed" -ForegroundColor Red
+                $results.allPassed = $false
+                # Show first few lines of error
+                $errorLines = ($lintOutput | Out-String).Split("`n") | Select-Object -Last 10
+                foreach ($line in $errorLines) {
+                    if ($line.Trim()) {
+                        Write-Host "       $($line.Trim())" -ForegroundColor DarkRed
+                    }
+                }
+            }
+        } else {
+            Write-Host "[Skip] No lint script found" -ForegroundColor DarkGray
+        }
+
+        # Run tests if available
+        if ($scripts.test) {
+            Write-Host "[Check] Running tests..." -ForegroundColor Gray
+            $testOutput = & npm run test 2>&1
+            $results.tests = $LASTEXITCODE -eq 0
+
+            if ($results.tests) {
+                Write-Host "[PASS] Tests passed" -ForegroundColor Green
+            } else {
+                Write-Host "[FAIL] Tests failed" -ForegroundColor Red
+                $results.allPassed = $false
+                # Show test summary
+                $errorLines = ($testOutput | Out-String).Split("`n") | Select-Object -Last 15
+                foreach ($line in $errorLines) {
+                    if ($line.Trim()) {
+                        Write-Host "       $($line.Trim())" -ForegroundColor DarkRed
+                    }
+                }
+            }
+        } else {
+            Write-Host "[Skip] No test script found" -ForegroundColor DarkGray
+        }
+    }
+    finally {
+        Pop-Location
+    }
+
+    Write-Host ("-" * 40) -ForegroundColor Cyan
+    if ($results.allPassed) {
+        Write-Host "VERIFICATION: ALL PASSED" -ForegroundColor Green
+    } else {
+        Write-Host "VERIFICATION: SOME CHECKS FAILED" -ForegroundColor Red
+    }
+    Write-Host ""
+
+    return $results
+}
+
+function Invoke-DatabaseMigrations {
+    <#
+    .SYNOPSIS
+        Run Prisma database migrations (db push + generate) after Wave 1 completes.
+    #>
+    param([string]$ProjectRoot)
+
+    Write-Host ""
+    Write-Host ("=" * 50) -ForegroundColor Yellow
+    Write-Host "DATABASE MIGRATIONS" -ForegroundColor Yellow
+    Write-Host ("=" * 50) -ForegroundColor Yellow
+
+    # Check if Prisma schema exists
+    $prismaSchemaDir = Join-Path $ProjectRoot "server\database\schemas"
+    if (-not (Test-Path $prismaSchemaDir)) {
+        Write-Host "[Skip] No Prisma schemas directory found at $prismaSchemaDir" -ForegroundColor Gray
+        return $true
+    }
+
+    Write-Host "[Info] Running Prisma database push..." -ForegroundColor Cyan
+
+    try {
+        # Run prisma db push (non-destructive by default)
+        $pushOutput = & npx prisma db push 2>&1
+        $pushExitCode = $LASTEXITCODE
+
+        if ($pushExitCode -ne 0) {
+            Write-Host "[Error] Prisma db push failed:" -ForegroundColor Red
+            Write-Host $pushOutput -ForegroundColor Red
+            return $false
+        }
+
+        Write-Host "[Success] Database schema synchronized" -ForegroundColor Green
+
+        # Run prisma generate
+        Write-Host "[Info] Generating Prisma client..." -ForegroundColor Cyan
+        $generateOutput = & npx prisma generate 2>&1
+        $generateExitCode = $LASTEXITCODE
+
+        if ($generateExitCode -ne 0) {
+            Write-Host "[Error] Prisma generate failed:" -ForegroundColor Red
+            Write-Host $generateOutput -ForegroundColor Red
+            return $false
+        }
+
+        Write-Host "[Success] Prisma client generated" -ForegroundColor Green
+        Write-Host ("=" * 50) -ForegroundColor Yellow
+        Write-Host ""
+
+        return $true
+    }
+    catch {
+        Write-Host "[Error] Database migration failed: $($_.Exception.Message)" -ForegroundColor Red
+        return $false
+    }
+}
+
+function Get-ProjectContext {
+    <#
+    .SYNOPSIS
+        Extracts project context from CLAUDE.md and nuxt.config.ts for worker prompts.
+    #>
+    param([string]$ProjectRoot)
+
+    $contextParts = @()
+
+    # Try to read CLAUDE.md for project-specific conventions
+    $claudeMdPath = Join-Path $ProjectRoot "CLAUDE.md"
+    if (Test-Path $claudeMdPath) {
+        try {
+            $claudeMd = Get-Content $claudeMdPath -Raw -ErrorAction Stop
+
+            # Extract key conventions section if present
+            if ($claudeMd -match '## Key Conventions([\s\S]*?)(?=\n## |$)') {
+                $conventions = $matches[1].Trim()
+                # Take first 10 lines to keep it concise
+                $conventionLines = ($conventions -split "`n" | Select-Object -First 10) -join "`n"
+                $contextParts += "### Key Conventions (from CLAUDE.md)`n$conventionLines"
+            }
+        }
+        catch {
+            # Silently continue if CLAUDE.md can't be read
+        }
+    }
+
+    # Try to read nuxt.config.ts for import aliases
+    $nuxtConfigPath = Join-Path $ProjectRoot "nuxt.config.ts"
+    if (Test-Path $nuxtConfigPath) {
+        try {
+            $nuxtConfig = Get-Content $nuxtConfigPath -Raw -ErrorAction Stop
+
+            # Extract alias section
+            if ($nuxtConfig -match 'alias:\s*\{([^}]+)\}') {
+                $aliasBlock = $matches[1]
+                $contextParts += @"
+### Import Aliases (from nuxt.config.ts)
+
+**IMPORTANT**: Use these aliases for imports between FSD layers:
+$aliasBlock
+
+The ``~`` alias also works in Nuxt and resolves to the srcDir (client/).
+When importing between slices, prefer using public API exports (index.ts).
+"@
+            }
+
+            # Extract srcDir if present
+            if ($nuxtConfig -match "srcDir:\s*['\x22]([^'\x22]+)['\x22]") {
+                $srcDir = $matches[1]
+                $contextParts += "`n**Source Directory**: ``$srcDir/``"
+            }
+        }
+        catch {
+            # Silently continue if nuxt.config.ts can't be read
+        }
+    }
+
+    # Add FSD layer rules as default context
+    $contextParts += @"
+
+### FSD Architecture Rules
+
+Feature-Sliced Design layer hierarchy (imports only allowed downward):
+1. **app** - App-wide concerns, providers, layouts
+2. **pages** - Route pages
+3. **widgets** - Large self-contained UI blocks
+4. **features** - Business features with user actions
+5. **entities** - Business entities (user, file, folder)
+6. **shared** - Reusable utilities, UI components, API clients
+
+**Import Rules**:
+- Widgets can import from: features, entities, shared
+- Features can import from: entities, shared
+- Entities can import from: shared
+- Use public API exports (index.ts) when importing between slices
+"@
+
+    if ($contextParts.Count -eq 0) {
+        return "No project-specific context available. Follow general best practices."
+    }
+
+    return ($contextParts -join "`n`n")
+}
 
 function Test-ProgressEntry {
     param(
@@ -490,11 +786,18 @@ You are a worker process executing a single kanban task. Complete the assigned t
 
 ---
 
+## Project Context
+
+{project.context}
+
+---
+
 ## Task Assignment
 
 **Name**: {task.name}
 **Category**: {task.category}
 **Agent**: {agent-name}
+**Project Type**: {projectType}
 
 ### Description
 
@@ -560,6 +863,9 @@ Complete these steps in order to verify your implementation:
 
     $agentName = Get-AgentForCategory -Category $Task.category
 
+    # Get project-specific context (import aliases, FSD rules, conventions)
+    $projectContext = Get-ProjectContext -ProjectRoot $ProjectRoot
+
     # Replace placeholders using the existing template format
     # The template uses {placeholder} style, need to escape braces for regex
     $prompt = $template
@@ -570,6 +876,7 @@ Complete these steps in order to verify your implementation:
     $prompt = $prompt -replace '\{agent-name\}', $agentName
     $prompt = $prompt -replace '\{projectType\}', $Board.projectType
     $prompt = $prompt -replace '\{test\.files\}', $testFilesText
+    $prompt = $prompt -replace '\{project\.context\}', $projectContext
 
     return $prompt
 }
@@ -1466,6 +1773,14 @@ function Main {
 
             # Handle failures
             if ($summary.FailureCount -gt 0) {
+                # FailFast: Stop if any failures in current wave
+                if ($FailFast) {
+                    Write-Host ""
+                    Write-Host "[FailFast] Wave $waveNum has $($summary.FailureCount) failure(s). Stopping execution." -ForegroundColor Red
+                    Write-Host "Check worker-logs in $LogsDir for failure details." -ForegroundColor Yellow
+                    exit 1
+                }
+
                 $retryTasks = Handle-FailedTasks -FailedResults $summary.FailedTasks
 
                 if ($retryTasks.Count -gt 0) {
@@ -1478,6 +1793,26 @@ function Main {
                     $taskQueue = $newQueue
                     $queueIndex = 0
                 }
+            }
+        }
+
+        # After Wave 1 (data, config) completes, run database migrations
+        if ($waveNum -eq 1 -and $AllowDbMigrations -and -not $DryRun) {
+            $migrationSuccess = Invoke-DatabaseMigrations -ProjectRoot $ProjectRoot
+            if (-not $migrationSuccess -and $FailFast) {
+                Write-Host ""
+                Write-Host "[FailFast] Database migration failed. Stopping execution." -ForegroundColor Red
+                exit 1
+            }
+        }
+
+        # Run independent verification after each wave if enabled
+        if ($RunVerification -and -not $DryRun -and $waveTasks.Count -gt 0) {
+            $verificationResults = Invoke-IndependentVerification -ProjectRoot $ProjectRoot
+            if (-not $verificationResults.allPassed -and $FailFast) {
+                Write-Host ""
+                Write-Host "[FailFast] Independent verification failed after Wave $waveNum. Stopping execution." -ForegroundColor Red
+                exit 1
             }
         }
     }
