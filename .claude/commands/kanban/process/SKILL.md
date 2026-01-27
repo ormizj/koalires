@@ -16,9 +16,10 @@ This skill orchestrates parallel task execution using a wave-based system:
 2. Each wave runs up to N tasks in parallel via `claude -p` workers
 3. Dispatcher marks tasks "running" before spawning workers
 4. Workers implement tasks and output verification results in text
-5. **Dispatcher parses raw worker logs** to create output files
-6. Dispatcher updates `kanban-progress.json` and `kanban-board.json`
-7. Failed tasks can be retried, skipped, or halt execution
+5. Workers receive context from blockedBy task outputs (affectedFiles)
+6. **Dispatcher parses raw worker logs** to create output files
+7. Dispatcher updates `kanban-progress.json` and `kanban-board.json`
+8. Failed tasks can be retried, skipped, or halt execution
 
 ## Architecture
 
@@ -93,6 +94,47 @@ Task status is derived from the `passes` field (kanban-board.json) and `status` 
 | `true`  | `completed`           | **completed**   |
 | `true`  | (no entry)            | **completed**   |
 
+## Dependency Resolution (blockedBy)
+
+Tasks with `blockedBy` dependencies receive context from completed dependencies:
+
+### How It Works
+
+1. **Validate** - Check no circular dependencies exist
+2. **Identify Ready** - Task is ready when all blockedBy tasks are completed (passes: true)
+3. **Gather Context** - Collect affectedFiles from all blockedBy tasks
+4. **Inject Context** - Add file list to worker prompt
+5. **Worker Reads** - Worker reads those files to understand interfaces
+
+### Execution Order
+
+Tasks execute based on:
+
+1. **blockedBy completion** - Primary ordering (explicit dependencies)
+2. **Wave category** - Secondary ordering (implicit dependencies)
+
+A task in Wave 4 (ui) can start early if its blockedBy tasks complete, even if Wave 3 isn't finished.
+
+### Context Injection
+
+Workers receive a "Dependencies (blockedBy)" section in their prompt:
+
+```
+### Dependencies (blockedBy)
+
+The following tasks have completed. Their outputs are available:
+
+**webrtc-connection-store** (completed):
+- client/shared/stores/webrtc.ts
+- client/shared/types/chat.ts
+
+**chat-api** (completed):
+- server/api/chat/messages.ts
+- server/api/chat/[id].ts
+
+**IMPORTANT**: Read files from dependent tasks to understand existing interfaces.
+```
+
 ## Wave System
 
 Tasks are processed in waves based on category dependencies:
@@ -145,10 +187,7 @@ Code Review: X
 Completed: X
 ```
 
-If no pending tasks remain:
-
-- If code-review tasks exist, direct user to run `kanban:code-review`
-- Otherwise, report completion
+If no pending tasks remain, report completion.
 
 ### Phase 2: Dispatch
 
@@ -211,8 +250,6 @@ EXECUTION COMPLETE
 ============================================
 Total Passed:  X
 Total Failed:  X
-
-Run 'kanban:code-review' to review and commit completed tasks.
 ```
 
 ---
@@ -335,13 +372,11 @@ The dispatcher automatically determines which tasks need processing based on cur
 5. **Update** kanban files with extracted data
 6. **Handle** failures with retry/skip/quit options
 7. **Report** final summary when all waves complete
-8. **Direct** user to `kanban:code-review` for commits
 
 ---
 
 ## Notes
 
-- Code review and git commits are handled by the separate `kanban:code-review` skill
 - Workers operate independently and may run concurrently
 - Each worker has full access to project files and CLAUDE.md context
 - Worker logs are preserved in `.kanban/worker-logs/` for debugging

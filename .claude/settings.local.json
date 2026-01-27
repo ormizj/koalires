@@ -35,7 +35,8 @@
       "Bash(grep:*)",
       "Bash(ls -la \"C:\\\\Users\\\\orm\\\\Desktop\\\\Files\\\\My Projects\\\\koalires\\\\.kanban\"\" 2>/dev/null || echo \"No .kanban directory exists yet \")",
       "Bash(find:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(npm run db:push:*)"
     ]
   }
 }

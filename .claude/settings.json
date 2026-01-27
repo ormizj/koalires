@@ -6,6 +6,7 @@
         "hooks": [
           {
             "type": "command",
+            "async": true,
             "command": "jq -r \"[.tool_input.command, .tool_input.description // \\\"No description\\\"] | join(\\\" - \\\")\" >> C:/Users/orm/.claude/bash-command-log.txt"
           }
         ]
@@ -17,6 +18,7 @@
         "hooks": [
           {
             "type": "command",
+            "async": true,
             "command": "npm run lint"
           }
         ]

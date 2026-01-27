@@ -17,6 +17,17 @@ You are a worker process executing a single kanban task. Complete the assigned t
 **Agent**: {agent-name}
 **Project Type**: {projectType}
 
+### Dependencies (blockedBy)
+
+{dependency.context}
+
+**IMPORTANT**:
+
+- Read files from dependent tasks FIRST to understand existing interfaces
+- Do NOT redefine types/stores that already exist in dependency files
+- Your code MUST be compatible with these existing files
+- If types conflict with your implementation, adapt YOUR code
+
 ### Description
 
 {task.description}
@@ -40,23 +51,29 @@ Complete these steps in order to verify your implementation:
    - Tests define the acceptance criteria for your implementation
    - Your goal is to make ALL tests pass
 
-2. **Implement the Task**
+2. **Review Dependency Files** (if dependencies exist above)
+   - Read all files from blockedBy tasks
+   - Understand existing types, interfaces, and exports
+   - Your implementation must integrate with these existing files
+   - Do not recreate or conflict with existing definitions
+
+3. **Implement the Task**
    - Follow the description and any implementation details provided
    - Use existing project patterns and conventions
    - Ensure code is properly typed (TypeScript)
    - Read CLAUDE.md for project-specific conventions
 
-3. **Run Tests** (MANDATORY if test files exist)
+4. **Run Tests** (MANDATORY if test files exist)
    - Run the test suite: `npm run test` or the project's test command
    - All pre-created tests MUST pass
    - Fix your implementation if any tests fail
 
-4. **Verify All Steps**
+5. **Verify All Steps**
    - Execute each verification step in order
    - Document the result of each step (PASS/FAIL)
    - All steps must pass before marking complete
 
-5. **Report Results**
+6. **Report Results**
    - Print test results summary (pass/fail count)
    - Print verification step results: "Step N: PASS" or "Step N: FAIL - reason"
 

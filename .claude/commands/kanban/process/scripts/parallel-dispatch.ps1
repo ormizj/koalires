@@ -382,6 +382,134 @@ Feature-Sliced Design layer hierarchy (imports only allowed downward):
     return ($contextParts -join "`n`n")
 }
 
+function Get-DependencyContext {
+    <#
+    .SYNOPSIS
+        Gathers context from completed blockedBy tasks for worker prompt injection.
+    #>
+    param(
+        [object]$Task,
+        [hashtable]$Progress,
+        [array]$AllTasks
+    )
+
+    $context = @()
+    $blockedBy = $Task.blockedBy
+
+    if (-not $blockedBy -or $blockedBy.Count -eq 0) {
+        return "No dependencies for this task."
+    }
+
+    foreach ($depName in $blockedBy) {
+        $depProgress = $Progress[$depName]
+        $depTask = $AllTasks | Where-Object { $_.name -eq $depName }
+
+        if ($depProgress -and $depTask.passes) {
+            $context += "**$depName** (completed):"
+            if ($depProgress.affectedFiles -and $depProgress.affectedFiles.Count -gt 0) {
+                foreach ($file in $depProgress.affectedFiles) {
+                    $context += "- $file"
+                }
+            } else {
+                $context += "- (no files recorded)"
+            }
+            $context += ""
+        } elseif ($depProgress) {
+            $context += "**$depName** (status: $($depProgress.status)):"
+            $context += "- WARNING: Dependency not yet completed"
+            $context += ""
+        } else {
+            $context += "**$depName** (not started):"
+            $context += "- WARNING: Dependency has not been processed"
+            $context += ""
+        }
+    }
+
+    if ($context.Count -eq 0) {
+        return "No dependency context available."
+    }
+
+    return ($context -join "`n")
+}
+
+function Test-TaskReady {
+    <#
+    .SYNOPSIS
+        Checks if a task's blockedBy dependencies are all completed.
+    #>
+    param(
+        [object]$Task,
+        [hashtable]$Progress,
+        [array]$AllTasks
+    )
+
+    $blockedBy = $Task.blockedBy
+
+    # No dependencies = ready
+    if (-not $blockedBy -or $blockedBy.Count -eq 0) {
+        return $true
+    }
+
+    foreach ($depName in $blockedBy) {
+        $depTask = $AllTasks | Where-Object { $_.name -eq $depName }
+        if (-not $depTask) {
+            Write-Host "       [Warning] blockedBy '$depName' not found in board" -ForegroundColor Yellow
+            continue
+        }
+
+        # Dependency must have passes: true
+        if (-not $depTask.passes) {
+            return $false
+        }
+    }
+
+    return $true
+}
+
+function Test-CircularDependencies {
+    <#
+    .SYNOPSIS
+        Validates no circular dependencies exist in the task graph.
+    #>
+    param([array]$Tasks)
+
+    $visited = @{}
+    $stack = @{}
+
+    function Visit-Task($taskName) {
+        if ($stack[$taskName]) {
+            return $false  # Circular dependency detected
+        }
+        if ($visited[$taskName]) {
+            return $true  # Already validated
+        }
+
+        $visited[$taskName] = $true
+        $stack[$taskName] = $true
+
+        $task = $Tasks | Where-Object { $_.name -eq $taskName }
+        if ($task -and $task.blockedBy) {
+            foreach ($dep in $task.blockedBy) {
+                if (-not (Visit-Task $dep)) {
+                    Write-Host "[Error] Circular dependency detected: $taskName -> $dep" -ForegroundColor Red
+                    return $false
+                }
+            }
+        }
+
+        $stack[$taskName] = $false
+        return $true
+    }
+
+    foreach ($task in $Tasks) {
+        if (-not (Visit-Task $task.name)) {
+            return $false
+        }
+    }
+
+    return $true
+}
+
 function Test-ProgressEntry {
     param(
         [object]$Entry,
@@ -771,7 +899,8 @@ function Build-WorkerPrompt {
         [object]$Task,
         [object]$Board,
         [string]$TemplatePath,
-        [array]$TestFiles = @()
+        [array]$TestFiles = @(),
+        [hashtable]$Progress = @()
     )
 
     # Read template
@@ -866,6 +995,9 @@ Complete these steps in order to verify your implementation:
     # Get project-specific context (import aliases, FSD rules, conventions)
     $projectContext = Get-ProjectContext -ProjectRoot $ProjectRoot
 
+    # Get dependency context from blockedBy tasks
+    $dependencyContext = Get-DependencyContext -Task $Task -Progress $Progress -AllTasks $Board.tasks
+
     # Replace placeholders using the existing template format
     # The template uses {placeholder} style, need to escape braces for regex
     $prompt = $template
@@ -877,6 +1009,7 @@ Complete these steps in order to verify your implementation:
     $prompt = $prompt -replace '\{projectType\}', $Board.projectType
     $prompt = $prompt -replace '\{test\.files\}', $testFilesText
     $prompt = $prompt -replace '\{project\.context\}', $projectContext
+    $prompt = $prompt -replace '\{dependency\.context\}', $dependencyContext
 
     return $prompt
 }
@@ -1150,8 +1283,16 @@ function Get-TasksForWave {
     foreach ($task in $Tasks) {
         if ($categories -contains $task.category) {
             $status = Get-TaskStatus -Task $task -Progress $Progress
+
             if ($status -eq "pending") {
-                $waveTasks += $task
+                # Check if blockedBy dependencies are met
+                $isReady = Test-TaskReady -Task $task -Progress $Progress -AllTasks $Tasks
+
+                if ($isReady) {
+                    $waveTasks += $task
+                } else {
+                    Write-Host "       [Blocked] $($task.name) waiting for dependencies: $($task.blockedBy -join ', ')" -ForegroundColor Yellow
+                }
             }
         }
     }
@@ -1583,6 +1724,13 @@ function Main {
         }
     }
 
+    # Validate no circular dependencies
+    Write-Host "Validating dependencies..." -ForegroundColor Gray
+    if (-not (Test-CircularDependencies -Tasks $board.tasks)) {
+        Write-Host "Error: Circular dependencies detected in kanban board. Fix blockedBy fields." -ForegroundColor Red
+        exit 1
+    }
+
     Write-Host "Project: $($board.project)" -ForegroundColor White
     Write-Host "Total Tasks: $($board.tasks.Count)" -ForegroundColor White
     Write-Host "Max Parallel Workers: $Parallel" -ForegroundColor White
@@ -1621,7 +1769,6 @@ function Main {
         Write-Host "No pending tasks to process." -ForegroundColor Green
         if ($codeReview -gt 0) {
             Write-Host "There are $codeReview tasks awaiting code review." -ForegroundColor Yellow
-            Write-Host "Run 'kanban:code-review' to review and commit changes." -ForegroundColor Yellow
         }
         exit 0
     }
@@ -1739,7 +1886,7 @@ function Main {
                     $testFiles = $taskTestFiles[$task.name]
                 }
 
-                $prompt = Build-WorkerPrompt -Task $task -Board $board -TemplatePath $PromptTemplate -TestFiles $testFiles
+                $prompt = Build-WorkerPrompt -Task $task -Board $board -TemplatePath $PromptTemplate -TestFiles $testFiles -Progress $progress
                 $logPath = Join-Path $LogsDir "$($task.name).log"
                 $jsonLogPath = Join-Path $LogsDir "$($task.name).json"
                 $outputFilePath = Join-Path $LogsDir "$($task.name)-output.json"
@@ -1848,10 +1995,6 @@ function Main {
     Write-Host "Total Passed:  $totalSuccess" -ForegroundColor Green
     Write-Host "Total Failed:  $totalFailure" -ForegroundColor Red
     Write-Host ""
-
-    if ($totalSuccess -gt 0) {
-        Write-Host "Run 'kanban:code-review' to review and commit completed tasks." -ForegroundColor Yellow
-    }
 
     if ($totalFailure -gt 0) {
         Write-Host "Check worker-logs in $LogsDir for failure details." -ForegroundColor Yellow

@@ -9,7 +9,6 @@ Task management system for breaking down features into agent-delegated work.
 /kanban:init:verify-tests # Verify/setup test infrastructure
 /kanban:create <feature>  # Create board from feature description
 /kanban:process           # Execute tasks with parallel workers
-/kanban:code-review       # Review and commit completed tasks
 npm run kanban            # Open viewer
 
 # Reference docs
@@ -66,20 +65,6 @@ Dispatches tasks to parallel `claude -p` workers in dependency waves:
 
 - `-Parallel N` - Max concurrent workers (default: 3)
 - `-DryRun` - Preview without executing
-
-### `/kanban:code-review`
-
-Reviews completed tasks and creates git commits:
-
-1. Shows task summary (name, description, affected files, agents)
-2. Displays git diff for changed files
-3. Prompts user: approve/reject/skip/stop
-4. Creates individual commits for approved tasks
-5. Rejected tasks return to pending for re-work
-
-**Flags:**
-
-- `--batch` - Auto-approve all tasks without prompts
 
 ## Files
 

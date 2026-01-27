@@ -35,6 +35,7 @@ interface Task {
   category: TaskCategory; // REQUIRED - One of the enum values below
   steps: string[]; // REQUIRED - Verification steps array (min 1 step)
   passes: boolean; // REQUIRED - true if verification passed, false otherwise
+  blockedBy: string[]; // REQUIRED - Task names this task depends on (empty = no dependencies)
 }
 
 type TaskCategory =
@@ -58,6 +59,7 @@ type TaskCategory =
       "name": "file-share-schema",
       "description": "## File Share Database Schema\n\nCreate a Prisma schema...",
       "category": "data",
+      "blockedBy": [],
       "steps": [
         "Open server/database/schemas/fileShare.prisma",
         "Verify FileShare model exists",
@@ -71,17 +73,18 @@ type TaskCategory =
 
 ### Field Constraints
 
-| Field                 | Type    | Constraints                                    |
-| --------------------- | ------- | ---------------------------------------------- |
-| `project`             | string  | Non-empty, describes the feature               |
-| `created`             | string  | ISO 8601 format: `YYYY-MM-DDTHH:mm:ssZ`        |
-| `projectType`         | string  | Framework identifier (lowercase)               |
-| `tasks`               | array   | Minimum 1 task                                 |
-| `tasks[].name`        | string  | kebab-case, unique within board                |
-| `tasks[].description` | string  | Markdown format                                |
-| `tasks[].category`    | enum    | See TaskCategory enum                          |
-| `tasks[].steps`       | array   | Minimum 1 step, strings                        |
-| `tasks[].passes`      | boolean | `false` initially, `true` on verification pass |
+| Field                 | Type    | Constraints                                                |
+| --------------------- | ------- | ---------------------------------------------------------- |
+| `project`             | string  | Non-empty, describes the feature                           |
+| `created`             | string  | ISO 8601 format: `YYYY-MM-DDTHH:mm:ssZ`                    |
+| `projectType`         | string  | Framework identifier (lowercase)                           |
+| `tasks`               | array   | Minimum 1 task                                             |
+| `tasks[].name`        | string  | kebab-case, unique within board                            |
+| `tasks[].description` | string  | Markdown format                                            |
+| `tasks[].category`    | enum    | See TaskCategory enum                                      |
+| `tasks[].steps`       | array   | Minimum 1 step, strings                                    |
+| `tasks[].passes`      | boolean | `false` initially, `true` on verification pass             |
+| `tasks[].blockedBy`   | array   | Task names from same board, empty array if no dependencies |
 
 ---
 
@@ -456,3 +459,42 @@ For error/blocked status, include:
    - Read `kanban-board.json`
    - Set `passes: true` for task
    - Write `kanban-board.json`
+
+---
+
+## 9. Task Dependencies (blockedBy)
+
+### Purpose
+
+The `blockedBy` field declares explicit dependencies between tasks:
+
+1. **Ordering** - Task won't run until all blockedBy tasks complete
+2. **Context** - Worker receives affectedFiles from blockedBy tasks
+3. **Integration** - Worker must be compatible with dependency outputs
+
+### Rules
+
+- `blockedBy: []` = no dependencies (can start immediately in its wave)
+- Self-reference not allowed (task cannot block itself)
+- Circular dependencies will cause validation error
+- Tasks without blockedBy fall back to wave-based ordering
+- All referenced task names must exist in the board
+
+### Example
+
+```json
+{
+  "name": "chat-messages-ui",
+  "category": "ui",
+  "blockedBy": ["webrtc-connection-store", "chat-widget-state-machine"],
+  "description": "...",
+  "steps": ["..."],
+  "passes": false
+}
+```
+
+This task depends on `webrtc-connection-store` and `chat-widget-state-machine`. When dispatched:
+
+1. Worker prompt includes files created by these dependencies
+2. Worker reads those files to understand existing interfaces
+3. Worker implements UI compatible with existing types/stores

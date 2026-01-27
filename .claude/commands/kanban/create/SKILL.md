@@ -258,6 +258,45 @@ For each requirement, create a task with this structure:
 }
 ```
 
+### Step 4.5: Identify Dependencies (blockedBy)
+
+For each task, determine its `blockedBy` list by analyzing what types, stores, or APIs it needs:
+
+#### Dependency Analysis Rules
+
+| Task Category | Typically Depends On | blockedBy Examples               |
+| ------------- | -------------------- | -------------------------------- |
+| `data`        | Usually none         | `[]` (foundation layer)          |
+| `config`      | Usually none         | `[]` (foundation layer)          |
+| `api`         | Data schemas         | `["user-schema", "file-schema"]` |
+| `integration` | APIs, data           | `["user-api", "auth-service"]`   |
+| `ui`          | Stores, types, APIs  | `["user-store", "chat-api"]`     |
+| `testing`     | Features to test     | `["user-api", "profile-page"]`   |
+
+#### Analysis Process
+
+For each task:
+
+1. **Identify what the task needs** - What types, stores, or APIs does it use?
+2. **Find which tasks provide those** - Match needs to other task outputs
+3. **Set blockedBy** - List task names that must complete first
+
+#### Example Analysis
+
+For a chat feature with these tasks:
+
+- `webrtc-connection-store` (data) - defines ChatMessage type
+- `chat-api` (api) - uses ChatMessage type
+- `chat-messages-ui` (ui) - displays ChatMessage, uses store
+
+Dependencies:
+
+```json
+{ "name": "webrtc-connection-store", "blockedBy": [] }
+{ "name": "chat-api", "blockedBy": ["webrtc-connection-store"] }
+{ "name": "chat-messages-ui", "blockedBy": ["webrtc-connection-store", "chat-api"] }
+```
+
 #### Task Name Convention
 
 Use descriptive, kebab-case names:
@@ -313,6 +352,7 @@ Ensure `.kanban/` directory exists, then write the task board:
       "name": "task-name",
       "description": "## Description\n\nMarkdown description...",
       "category": "category",
+      "blockedBy": [],
       "steps": ["verification step 1", "verification step 2"],
       "passes": false
     }
@@ -379,6 +419,7 @@ For a "create user profile page" feature:
       "name": "user-profile-api",
       "description": "## User Profile API Endpoint\n\nCreate a GET endpoint at `/api/users/profile` that returns the authenticated user's profile data.\n\n### Requirements\n- Return user data (name, email, avatar URL)\n- Require authentication\n- Handle user not found case",
       "category": "api",
+      "blockedBy": [],
       "steps": [
         "Start the development server with npm run dev",
         "Open a terminal or API testing tool",
@@ -395,6 +436,7 @@ For a "create user profile page" feature:
       "name": "profile-page-ui",
       "description": "## Profile Page Component\n\nCreate a Vue page at `client/pages/profile.vue` displaying user information.\n\n### Layout\n- User avatar (large, centered)\n- User name and email\n- Edit profile button",
       "category": "ui",
+      "blockedBy": ["user-profile-api"],
       "steps": [
         "Start the development server with npm run dev",
         "Log in to the application",
@@ -414,6 +456,7 @@ For a "create user profile page" feature:
       "name": "profile-tests",
       "description": "## Profile Feature Tests\n\nWrite tests for the profile API and page component.",
       "category": "testing",
+      "blockedBy": ["user-profile-api", "profile-page-ui"],
       "steps": [
         "Run npm run test to execute the test suite",
         "Verify all profile API tests pass",
