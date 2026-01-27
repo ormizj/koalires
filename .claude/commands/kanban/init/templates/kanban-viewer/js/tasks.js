@@ -25,6 +25,9 @@ export function getTaskStatus(task, progressData) {
   if (progress?.status === 'blocked') {
     return 'blocked';
   }
+  if (progress?.status === 'error') {
+    return 'blocked';  // Error tasks go to Hold column
+  }
   if (progress?.status === 'code-review') {
     return 'code-review';
   }
