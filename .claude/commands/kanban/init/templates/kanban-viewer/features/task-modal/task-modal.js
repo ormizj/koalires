@@ -29,6 +29,9 @@ let currentColumnId = null;
 let columnTasks = [];
 let selectedTaskIndex = 0;
 
+// Keyboard navigation state
+let keyboardListenerActive = false;
+
 // Auto-refresh state
 let refreshInterval = null;
 
@@ -243,6 +246,9 @@ export function showTaskModal(taskName, openedAt = null) {
 
   // Start auto-refresh polling
   startRefreshPolling();
+
+  // Activate keyboard navigation
+  activateKeyboardNavigation();
 }
 
 /**
@@ -288,6 +294,9 @@ export async function showColumnTaskModal(
 
   // Start auto-refresh
   startRefreshPolling();
+
+  // Activate keyboard navigation
+  activateKeyboardNavigation();
 }
 
 /**
@@ -295,6 +304,9 @@ export async function showColumnTaskModal(
  */
 export function hideTaskModal() {
   if (!taskModal) return;
+
+  // Deactivate keyboard navigation
+  deactivateKeyboardNavigation();
 
   // Stop auto-refresh polling
   stopRefreshPolling();
@@ -322,6 +334,9 @@ function minimizeModal() {
 
   // Stop auto-refresh polling
   stopRefreshPolling();
+
+  // Deactivate keyboard navigation
+  deactivateKeyboardNavigation();
 
   // Minimize via BaseModal
   taskModal.minimize({
@@ -696,6 +711,57 @@ function renderTaskMainContent(task, progress) {
   setTimeout(initSectionToggleHandlers, 0);
 
   return html;
+}
+
+// ===== Keyboard Navigation =====
+
+/**
+ * Handle keyboard navigation for tasks
+ */
+function handleKeyDown(e) {
+  // Skip if modal not visible
+  if (!taskModal?.getIsVisible()) return;
+
+  // Skip if input/textarea is focused
+  const activeTag = document.activeElement?.tagName;
+  if (activeTag === 'INPUT' || activeTag === 'TEXTAREA') return;
+
+  const { key } = e;
+
+  // Task navigation (Arrow Up/Down) - only in column mode with sidebar
+  if ((key === 'ArrowDown' || key === 'ArrowUp') && isColumnMode) {
+    e.preventDefault();
+    const taskCount = columnTasks.length;
+    if (taskCount === 0) return;
+
+    if (key === 'ArrowDown' && selectedTaskIndex < taskCount - 1) {
+      const newIndex = selectedTaskIndex + 1;
+      selectSidebarTask(columnTasks[newIndex], newIndex);
+    } else if (key === 'ArrowUp' && selectedTaskIndex > 0) {
+      const newIndex = selectedTaskIndex - 1;
+      selectSidebarTask(columnTasks[newIndex], newIndex);
+    }
+  }
+}
+
+/**
+ * Activate keyboard navigation listener
+ */
+function activateKeyboardNavigation() {
+  if (!keyboardListenerActive) {
+    document.addEventListener('keydown', handleKeyDown);
+    keyboardListenerActive = true;
+  }
+}
+
+/**
+ * Deactivate keyboard navigation listener
+ */
+function deactivateKeyboardNavigation() {
+  if (keyboardListenerActive) {
+    document.removeEventListener('keydown', handleKeyDown);
+    keyboardListenerActive = false;
+  }
 }
 
 // ===== Sidebar Functions =====
