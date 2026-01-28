@@ -82,6 +82,20 @@ function handleContextMenu(event) {
     return;
   }
 
+  // Check if right-clicked on a detail row (worker/qa) - find associated main row
+  const detailRow = event.target.closest('.task-table tbody tr.table-row-detail');
+  if (detailRow) {
+    // Find the associated main row (previous sibling with table-row-main class)
+    let mainRow = detailRow.previousElementSibling;
+    while (mainRow && !mainRow.classList.contains('table-row-main')) {
+      mainRow = mainRow.previousElementSibling;
+    }
+    if (mainRow) {
+      showTableRowContextMenu(event, mainRow);
+    }
+    return;
+  }
+
   // Check if right-clicked on a column
   const columnElement = event.target.closest('.column');
   if (columnElement) {
