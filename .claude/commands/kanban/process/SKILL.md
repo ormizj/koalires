@@ -405,17 +405,18 @@ After all tasks complete, the dispatcher analyzes affected files and suggests po
 ### How It Works
 
 1. Collects all `affectedFiles` from `kanban-progress.json`
-2. Loads rules from `.kanban/next-steps.json` (or defaults)
+2. Loads `postProcessRules` from `.kanban/config.json`
 3. Matches file patterns against rules using regex
 4. Displays matched commands sorted by priority
 
 ### Customization
 
-Create `.kanban/next-steps.json` to customize rules for your project:
+Edit `.kanban/config.json` to customize rules for your project:
 
 ```json
 {
-  "rules": [
+  "projectType": "nodejs",
+  "postProcessRules": [
     {
       "name": "prisma-push",
       "pattern": "\\.prisma$",
@@ -439,14 +440,15 @@ Create `.kanban/next-steps.json` to customize rules for your project:
 | `priority` | No       | Sort order (lower = higher priority, default 0) |
 | `critical` | No       | If true, shown in red with [CRITICAL] marker    |
 
-### Default Rules
+### Project-Type Rules
 
-The default template includes rules for common scenarios:
+The `kanban:init` script generates `postProcessRules` based on detected project type:
 
-- **Dependency managers**: package.json, composer.json, requirements.txt
-- **Database**: Prisma schemas, Laravel migrations
-- **Quality**: TypeScript type checking, linting
-- **Testing**: Test file modifications
+- **nodejs**: npm-deps, prisma-generate, prisma-push, typecheck, lint, tests
+- **php**: composer-deps, laravel-migrations, lint, tests
+- **python**: pip-deps, pyproject-deps, typecheck, lint, tests
+- **go**: go-mod, lint, tests
+- **rust**: cargo-deps, lint, tests
 
 ---
 

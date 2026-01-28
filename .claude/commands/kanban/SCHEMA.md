@@ -14,7 +14,7 @@ Strict, unambiguous schema definitions for all kanban data files. No interpolati
 | `.kanban/worker-logs/`                        | Worker output logs (runtime)               | Created at runtime |
 | `.kanban/worker-logs/{task-name}.json`        | Claude session log for token tracking      | Created at runtime |
 | `.kanban/worker-logs/{task-name}-output.json` | Worker output file with results            | Created by worker  |
-| `.kanban/next-steps.json`                     | Post-process command rules                 | Optional           |
+| `.kanban/config.json`                         | Project config with postProcessRules       | Yes                |
 
 ---
 
@@ -661,25 +661,39 @@ interface TestRunResult {
 
 ---
 
-## 10. next-steps.json (Post-Process Commands)
+## 10. config.json
 
 ### Purpose
 
-The `next-steps.json` file defines rules for recommending follow-up commands after `kanban:process` completes. It analyzes affected files from all tasks and matches them against patterns to suggest commands like `npm run db:push`, `npm install`, etc.
+The `config.json` file stores project-specific configuration including test commands, verification scripts, and post-process rules for recommending follow-up commands after `kanban:process` completes.
 
 ### TypeScript Interface
 
 ```typescript
-interface NextStepsConfig {
-  rules: NextStepRule[];
+interface KanbanConfig {
+  projectType: string; // REQUIRED - Detected project type (nodejs, php, python, go, rust)
+  testCommand?: string; // OPTIONAL - Command to run tests (e.g., "npm run test:run")
+  testPatterns?: {
+    // OPTIONAL - Regex patterns to parse test output
+    passed: string; // Pattern to extract passed test count
+    failed: string; // Pattern to extract failed test count
+  };
+  verification?: {
+    // OPTIONAL - Verification commands for the project
+    lint?: string; // Lint command
+    lintFix?: string; // Lint auto-fix command
+    typecheck?: string; // Type checking command
+    test?: string; // Test command
+  };
+  postProcessRules: PostProcessRule[]; // REQUIRED - Rules for post-process recommendations
 }
 
-interface NextStepRule {
-  name: string;       // REQUIRED - Unique identifier (prevents duplicate recommendations)
-  pattern: string;    // REQUIRED - Regex pattern to match affected file paths
-  command: string;    // REQUIRED - Shell command to recommend
-  reason: string;     // REQUIRED - Human-readable explanation
-  priority?: number;  // OPTIONAL - Sort order (lower = higher priority, default: 99)
+interface PostProcessRule {
+  name: string; // REQUIRED - Unique identifier (prevents duplicate recommendations)
+  pattern: string; // REQUIRED - Regex pattern to match affected file paths
+  command: string; // REQUIRED - Shell command to recommend
+  reason: string; // REQUIRED - Human-readable explanation
+  priority?: number; // OPTIONAL - Sort order (lower = higher priority, default: 99)
   critical?: boolean; // OPTIONAL - If true, shown in red with [CRITICAL] marker
 }
 ```
@@ -688,7 +702,32 @@ interface NextStepRule {
 
 ```json
 {
-  "rules": [
+  "projectType": "nodejs",
+  "testCommand": "npm run test:run",
+  "testPatterns": {
+    "passed": "(\\d+)\\s+passed",
+    "failed": "(\\d+)\\s+failed"
+  },
+  "verification": {
+    "lintFix": "npm run lint:fix",
+    "typecheck": "npm run typecheck",
+    "lint": "npm run lint"
+  },
+  "postProcessRules": [
+    {
+      "name": "npm-deps",
+      "pattern": "package\\.json$",
+      "command": "npm install",
+      "reason": "package.json was modified",
+      "priority": 0
+    },
+    {
+      "name": "prisma-generate",
+      "pattern": "\\.prisma$",
+      "command": "npm run db:generate",
+      "reason": "Prisma schema changed",
+      "priority": 1
+    },
     {
       "name": "prisma-push",
       "pattern": "\\.prisma$",
@@ -703,6 +742,20 @@ interface NextStepRule {
       "command": "npm run typecheck",
       "reason": "TypeScript files modified",
       "priority": 3
+    },
+    {
+      "name": "lint",
+      "pattern": "\\.(ts|tsx|vue|js|jsx|css|scss)$",
+      "command": "npm run lint:fix",
+      "reason": "Code files modified",
+      "priority": 4
+    },
+    {
+      "name": "tests",
+      "pattern": "(tests?/|spec/|\\.test\\.|_test\\.)",
+      "command": "npm run test",
+      "reason": "Test files created or modified",
+      "priority": 5
     }
   ]
 }
@@ -710,18 +763,32 @@ interface NextStepRule {
 
 ### Field Constraints
 
-| Field      | Type    | Required | Constraints                                    |
-| ---------- | ------- | -------- | ---------------------------------------------- |
-| `name`     | string  | Yes      | Unique within rules array                      |
-| `pattern`  | string  | Yes      | Valid regex pattern                            |
-| `command`  | string  | Yes      | Shell command to execute                       |
-| `reason`   | string  | Yes      | Explanation shown to user                      |
-| `priority` | number  | No       | Lower = higher priority (0 is highest)         |
-| `critical` | boolean | No       | If true, displayed with red [CRITICAL] marker  |
+| Field                         | Type    | Required | Constraints                                   |
+| ----------------------------- | ------- | -------- | --------------------------------------------- |
+| `projectType`                 | string  | Yes      | Project type identifier (nodejs, php, etc.)   |
+| `testCommand`                 | string  | No       | Test execution command                        |
+| `testPatterns.passed`         | string  | No       | Regex to extract passed count from output     |
+| `testPatterns.failed`         | string  | No       | Regex to extract failed count from output     |
+| `verification`                | object  | No       | Map of verification command names to commands |
+| `postProcessRules`            | array   | Yes      | Array of post-process rule objects            |
+| `postProcessRules[].name`     | string  | Yes      | Unique within rules array                     |
+| `postProcessRules[].pattern`  | string  | Yes      | Valid regex pattern                           |
+| `postProcessRules[].command`  | string  | Yes      | Shell command to execute                      |
+| `postProcessRules[].reason`   | string  | Yes      | Explanation shown to user                     |
+| `postProcessRules[].priority` | number  | No       | Lower = higher priority (0 is highest)        |
+| `postProcessRules[].critical` | boolean | No       | If true, displayed with red [CRITICAL] marker |
 
-### Default Rules
+### Project-Type Specific Rules
 
-If `.kanban/next-steps.json` doesn't exist, defaults from `.claude/commands/kanban/process/templates/next-steps-default.json` are used. These include common patterns for npm, composer, pip, Prisma, Laravel, TypeScript, and test files.
+The `kanban:init` script generates `postProcessRules` filtered by the detected project type:
+
+| Project Type | Included Rules                                                 |
+| ------------ | -------------------------------------------------------------- |
+| nodejs       | npm-deps, prisma-generate, prisma-push, typecheck, lint, tests |
+| php          | composer-deps, laravel-migrations, lint, tests                 |
+| python       | pip-deps, pyproject-deps, typecheck, lint, tests               |
+| go           | go-mod, lint, tests                                            |
+| rust         | cargo-deps, lint, tests                                        |
 
 ---
 

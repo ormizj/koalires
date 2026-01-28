@@ -32,7 +32,6 @@ $ErrorActionPreference = "Stop"
 # Load config with defaults
 $config = @{
     testCommand = "npm test -- --run"
-    testTimeout = 120000
     testPatterns = @{
         passed = "(\d+)\s+passed"
         failed = "(\d+)\s+failed"

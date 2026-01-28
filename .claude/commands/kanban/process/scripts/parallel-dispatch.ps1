@@ -999,7 +999,7 @@ function Build-WorkerPrompt {
         [object]$Task,
         [object]$Board,
         [string]$TemplatePath,
-        [array]$TestFiles = @(),
+        [array]$TddAffectedFiles = @(),
         [hashtable]$Progress = @()
     )
 
@@ -1082,9 +1082,9 @@ Complete these steps in order to verify your implementation:
 
     # Build test files section
     $testFilesText = "No pre-created test files for this task."
-    if ($TestFiles -and $TestFiles.Count -gt 0) {
+    if ($TddAffectedFiles -and $TddAffectedFiles.Count -gt 0) {
         $testFilesText = "The following test files have been created for this task. Your implementation MUST pass all tests:`n`n"
-        foreach ($testFile in $TestFiles) {
+        foreach ($testFile in $TddAffectedFiles) {
             $testFilesText += "- ``$testFile```n"
         }
         $testFilesText += "`nRun tests with: ``npm run test`` or the project's test command."
@@ -1255,35 +1255,34 @@ function Wait-TestCreationBatch {
         $outputFilePath = Join-Path $LogsDir "$taskName-test-creation-output.json"
 
         # Parse the raw log to create structured output (consistent with implementation workers)
-        # Pass -IsTdd flag so the parser extracts testFiles from affectedFiles
         Write-Host "       [TDD] Parsing raw log for $taskName..." -ForegroundColor Gray
         $parseResult = Invoke-ParseWorkerLog -TaskName $taskName -JsonLogPath $jsonLogPath -OutputFilePath $outputFilePath -AgentName $agentName -StartedAt $startedAt -IsTdd
 
-        # Extract test files from the output file (not raw log) for consistency
-        $testFiles = @()
+        # Extract affected files from the output file (TDD workers only create test files, so 100% are test files)
+        $tddAffectedFiles = @()
         if ($parseResult -and $parseResult.success -and (Test-Path $outputFilePath)) {
             try {
                 $outputContent = Get-Content $outputFilePath -Raw | ConvertFrom-Json
                 if ($outputContent.affectedFiles) {
-                    $testFiles = @($outputContent.affectedFiles | Where-Object { $_ -match '\.(test|spec)\.(ts|js|tsx|jsx)$' -or $_ -match 'test_.*\.py$' -or $_ -match '.*_test\.(py|go)$' })
+                    $tddAffectedFiles = @($outputContent.affectedFiles)
                 }
             }
             catch {
                 Write-Host "       [TDD] Could not read output file, falling back to raw log parsing" -ForegroundColor Yellow
-                $testFiles = Get-TestFilesFromLog -JsonLogPath $jsonLogPath
+                $tddAffectedFiles = Get-TestFilesFromLog -JsonLogPath $jsonLogPath
             }
         }
         else {
             # Fallback to raw log parsing if output file creation failed
-            $testFiles = Get-TestFilesFromLog -JsonLogPath $jsonLogPath
+            $tddAffectedFiles = Get-TestFilesFromLog -JsonLogPath $jsonLogPath
         }
 
         $results += @{
             Task = $task
             JsonLogPath = $jsonLogPath
             OutputFilePath = $outputFilePath
-            TestFiles = $testFiles
-            Success = ($testFiles.Count -gt 0)
+            TddAffectedFiles = $tddAffectedFiles
+            Success = ($tddAffectedFiles.Count -gt 0)
         }
     }
 
@@ -1553,29 +1552,29 @@ function Wait-WorkerBatch {
         # ============================================================
         # DISPATCHER-SIDE TEST VERIFICATION
         # Run tests directly instead of parsing worker output
-        # Read testFiles from TDD output file (created by parse-worker-log.ps1 with -IsTdd)
+        # Read affectedFiles from TDD output file (TDD workers only create test files)
         # ============================================================
         $tddOutputPath = Join-Path $LogsDir "$taskName-test-creation-output.json"
-        $taskTestFiles = @()
+        $taskTddAffectedFiles = @()
         if (Test-Path $tddOutputPath) {
             try {
                 $tddOutput = Get-Content $tddOutputPath -Raw | ConvertFrom-Json
-                if ($tddOutput.testFiles) {
-                    $taskTestFiles = @($tddOutput.testFiles)
+                if ($tddOutput.affectedFiles) {
+                    $taskTddAffectedFiles = @($tddOutput.affectedFiles)
                 }
             } catch {
                 Write-Host "       [Warning] Could not read TDD output file for ${taskName}: $($_.Exception.Message)" -ForegroundColor Yellow
             }
         }
 
-        if ($taskTestFiles.Count -gt 0) {
-            Write-Host "       [Dispatcher] Verifying $($taskTestFiles.Count) test file(s)..." -ForegroundColor Cyan
+        if ($taskTddAffectedFiles.Count -gt 0) {
+            Write-Host "       [Dispatcher] Verifying $($taskTddAffectedFiles.Count) test file(s)..." -ForegroundColor Cyan
 
             $runTestsScript = Join-Path $ScriptDir "run-tests.ps1"
             $configFile = Join-Path $ProjectRoot ".kanban/config.json"
 
             try {
-                $testResultJson = & powershell -NoProfile -ExecutionPolicy Bypass -File $runTestsScript -TestFiles $taskTestFiles -ConfigFile $configFile -WorkingDir $ProjectRoot 2>&1 | Out-String
+                $testResultJson = & powershell -NoProfile -ExecutionPolicy Bypass -File $runTestsScript -TestFiles $taskTddAffectedFiles -ConfigFile $configFile -WorkingDir $ProjectRoot 2>&1 | Out-String
                 $testResult = $testResultJson.Trim() | ConvertFrom-Json -ErrorAction Stop
 
                 # Update output file with dispatcher's actual test results
@@ -2008,8 +2007,8 @@ function Main {
         $taskQueue = @($waveTasks)
         $queueIndex = 0
 
-        # Track test files created for each task
-        $taskTestFiles = @{}
+        # Track TDD affected files (test files) created for each task
+        $taskTddAffectedFiles = @{}
 
         while ($queueIndex -lt $taskQueue.Count) {
             # Get batch of tasks
@@ -2047,34 +2046,34 @@ function Main {
                 # Wait for test creation to complete
                 $testResults = Wait-TestCreationBatch -Workers $testCreators
 
-                # Display test creation results and store test files
+                # Display test creation results and store TDD affected files
                 Write-Host ""
                 Write-Host "[TDD] Test Creation Results:" -ForegroundColor Magenta
                 foreach ($result in $testResults) {
                     $taskName = $result.Task.name
-                    $testFiles = $result.TestFiles
-                    $taskTestFiles[$taskName] = $testFiles
+                    $tddFiles = $result.TddAffectedFiles
+                    $taskTddAffectedFiles[$taskName] = $tddFiles
 
-                    # Persist testFiles to progress.json for dispatcher verification
-                    if ($testFiles -and $testFiles.Count -gt 0) {
+                    # Persist TDD affected files to progress.json for dispatcher verification
+                    if ($tddFiles -and $tddFiles.Count -gt 0) {
                         try {
                             $progressContent = Get-Content $ProgressFile -Raw | ConvertFrom-Json
                             if ($progressContent.$taskName) {
-                                $progressContent.$taskName | Add-Member -NotePropertyName "testFiles" -NotePropertyValue $testFiles -Force
+                                $progressContent.$taskName | Add-Member -NotePropertyName "tddAffectedFiles" -NotePropertyValue $tddFiles -Force
                                 $progressContent | ConvertTo-Json -Depth 10 | Set-Content $ProgressFile -Encoding UTF8
                             }
                         }
                         catch {
-                            Write-Host "       [Warning] Could not persist testFiles for ${taskName}: $($_.Exception.Message)" -ForegroundColor Yellow
+                            Write-Host "       [Warning] Could not persist tddAffectedFiles for ${taskName}: $($_.Exception.Message)" -ForegroundColor Yellow
                         }
                     }
 
-                    if ($testFiles.Count -gt 0) {
+                    if ($tddFiles.Count -gt 0) {
                         Write-Host "  [PASS] " -ForegroundColor Green -NoNewline
                         Write-Host "$taskName" -ForegroundColor White -NoNewline
-                        Write-Host " - $($testFiles.Count) test file(s) created" -ForegroundColor Gray
-                        foreach ($testFile in $testFiles) {
-                            Write-Host "         - $testFile" -ForegroundColor DarkGray
+                        Write-Host " - $($tddFiles.Count) test file(s) created" -ForegroundColor Gray
+                        foreach ($tddFile in $tddFiles) {
+                            Write-Host "         - $tddFile" -ForegroundColor DarkGray
                         }
                     } else {
                         Write-Host "  [SKIP] " -ForegroundColor Yellow -NoNewline
@@ -2094,13 +2093,13 @@ function Main {
             # Start workers
             $workers = @()
             foreach ($task in $batch) {
-                # Get test files for this task (if any were created)
-                $testFiles = @()
-                if ($taskTestFiles.ContainsKey($task.name)) {
-                    $testFiles = $taskTestFiles[$task.name]
+                # Get TDD affected files for this task (if any were created)
+                $tddFiles = @()
+                if ($taskTddAffectedFiles.ContainsKey($task.name)) {
+                    $tddFiles = $taskTddAffectedFiles[$task.name]
                 }
 
-                $prompt = Build-WorkerPrompt -Task $task -Board $board -TemplatePath $PromptTemplate -TestFiles $testFiles -Progress $progress
+                $prompt = Build-WorkerPrompt -Task $task -Board $board -TemplatePath $PromptTemplate -TddAffectedFiles $tddFiles -Progress $progress
                 $logPath = Join-Path $LogsDir "$($task.name).log"
                 $jsonLogPath = Join-Path $LogsDir "$($task.name).txt"
                 $outputFilePath = Join-Path $LogsDir "$($task.name)-output.json"

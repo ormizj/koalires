@@ -25,7 +25,7 @@ The script handles:
   - `kanban-unit-tester.md` - TDD specialist for pre-implementation tests
   - `kanban-command-updater.md` - Kanban command maintenance specialist
 - Copying viewer template to `.kanban/kanban-viewer/`
-- Initializing `kanban-board.json`, `kanban-progress.json`, `config.json`, and `next-steps.json`
+- Initializing `kanban-board.json`, `kanban-progress.json`, and `config.json` (with `postProcessRules` for the detected project type)
 - Adding kanban script to the project's package manager configuration
 
 ### Step 8: Verify Test Infrastructure
@@ -53,6 +53,9 @@ Claude Code must be restarted to recognize new agents. Exit this session and sta
 
 The user can now:
 
-1. Run `/kanban:create <feature description>` to create a kanban board
+1. Run `/kanban:create <feature description>` to start an **interactive planning session**
+   - This explores the codebase first, then asks clarifying questions
+   - The board is only created after explicit user approval
+   - Multiple iteration rounds are supported
 2. Run `npm run kanban` to open the kanban board viewer
 3. Run `/kanban:process` to start processing tasks

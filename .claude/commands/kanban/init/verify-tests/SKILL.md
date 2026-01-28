@@ -163,7 +163,7 @@ After detecting and validating the framework, update `.kanban/config.json` with 
 
 ### Step 3.1: Read Existing Config
 
-Read `.kanban/config.json` to get current settings (should have `testTimeout` from init).
+Read `.kanban/config.json` to get current settings.
 
 ### Step 3.2: Determine Test Command
 

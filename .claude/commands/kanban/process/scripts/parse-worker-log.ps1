@@ -357,16 +357,6 @@ $output = @{
     durationMs = $durationMs
 }
 
-# For TDD phase, extract testFiles from affectedFiles
-if ($IsTdd) {
-    $testFiles = @($normalizedFiles | Where-Object {
-        $_ -match '\.(test|spec)\.(ts|js|tsx|jsx)$' -or
-        $_ -match 'test_.*\.py$' -or
-        $_ -match '.*_test\.(py|go)$'
-    })
-    $output.testFiles = $testFiles
-}
-
 # Add error details if status is error
 if ($status -eq "error") {
     $errorMessage = if ($workSummary -and $workSummary.Length -gt 0) {

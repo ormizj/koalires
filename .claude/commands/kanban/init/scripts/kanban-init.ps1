@@ -14,7 +14,6 @@ $TemplatesDir = Join-Path $InitDir "templates"
 $ViewerSource = Join-Path $TemplatesDir "kanban-viewer"
 $AgentSource = Join-Path $TemplatesDir "kanban-unit-tester.md"
 $UpdaterAgentSource = Join-Path $TemplatesDir "kanban-command-updater.md"
-$NextStepsDefaultSource = Join-Path $PSScriptRoot "../../process/templates/next-steps-default.json"
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "KANBAN INIT" -ForegroundColor Cyan
@@ -38,7 +37,7 @@ if (-not (Test-Path $UpdaterAgentSource)) {
 }
 
 # Step 1: Create .kanban directory
-Write-Host "[1/11] Creating .kanban directory..." -ForegroundColor Yellow
+Write-Host "[1/10] Creating .kanban directory..." -ForegroundColor Yellow
 if (-not (Test-Path ".kanban")) {
     New-Item -ItemType Directory -Path ".kanban" | Out-Null
     Write-Host "  Created .kanban/" -ForegroundColor Green
@@ -47,7 +46,7 @@ if (-not (Test-Path ".kanban")) {
 }
 
 # Step 2: Create .kanban/worker-logs directory
-Write-Host "[2/11] Creating .kanban/worker-logs directory..." -ForegroundColor Yellow
+Write-Host "[2/10] Creating .kanban/worker-logs directory..." -ForegroundColor Yellow
 if (-not (Test-Path ".kanban/worker-logs")) {
     New-Item -ItemType Directory -Path ".kanban/worker-logs" | Out-Null
     Write-Host "  Created .kanban/worker-logs/" -ForegroundColor Green
@@ -56,7 +55,7 @@ if (-not (Test-Path ".kanban/worker-logs")) {
 }
 
 # Step 3: Create .claude/agents directory (if not exists)
-Write-Host "[3/11] Ensuring .claude/agents directory exists..." -ForegroundColor Yellow
+Write-Host "[3/10] Ensuring .claude/agents directory exists..." -ForegroundColor Yellow
 if (-not (Test-Path ".claude/agents")) {
     New-Item -ItemType Directory -Path ".claude/agents" -Force | Out-Null
     Write-Host "  Created .claude/agents/" -ForegroundColor Green
@@ -65,7 +64,7 @@ if (-not (Test-Path ".claude/agents")) {
 }
 
 # Step 4: Copy kanban agents (always overwrite for latest version)
-Write-Host "[4/11] Copying kanban agents..." -ForegroundColor Yellow
+Write-Host "[4/10] Copying kanban agents..." -ForegroundColor Yellow
 $AgentDest = ".claude/agents/kanban-unit-tester.md"
 Copy-Item -Path $AgentSource -Destination $AgentDest -Force
 Write-Host "  Copied kanban-unit-tester.md to $AgentDest" -ForegroundColor Green
@@ -75,7 +74,7 @@ Copy-Item -Path $UpdaterAgentSource -Destination $UpdaterAgentDest -Force
 Write-Host "  Copied kanban-command-updater.md to $UpdaterAgentDest" -ForegroundColor Green
 
 # Step 5: Copy viewer template (always overwrite for latest version)
-Write-Host "[5/11] Copying viewer template..." -ForegroundColor Yellow
+Write-Host "[5/10] Copying viewer template..." -ForegroundColor Yellow
 $ViewerDest = ".kanban/kanban-viewer"
 if (Test-Path $ViewerDest) {
     Remove-Item -Path $ViewerDest -Recurse -Force
@@ -84,7 +83,7 @@ Copy-Item -Path $ViewerSource -Destination $ViewerDest -Recurse
 Write-Host "  Copied to $ViewerDest/" -ForegroundColor Green
 
 # Step 6: Initialize kanban-board.json (only if not exists)
-Write-Host "[6/11] Initializing kanban-board.json..." -ForegroundColor Yellow
+Write-Host "[6/10] Initializing kanban-board.json..." -ForegroundColor Yellow
 $BoardFile = ".kanban/kanban-board.json"
 if (-not (Test-Path $BoardFile) -or $Force) {
     $BoardContent = @{
@@ -99,7 +98,7 @@ if (-not (Test-Path $BoardFile) -or $Force) {
 }
 
 # Step 7: Initialize kanban-progress.json (only if not exists)
-Write-Host "[7/11] Initializing kanban-progress.json..." -ForegroundColor Yellow
+Write-Host "[7/10] Initializing kanban-progress.json..." -ForegroundColor Yellow
 $ProgressFile = ".kanban/kanban-progress.json"
 if (-not (Test-Path $ProgressFile) -or $Force) {
     [System.IO.File]::WriteAllText($ProgressFile, "{}")
@@ -109,7 +108,7 @@ if (-not (Test-Path $ProgressFile) -or $Force) {
 }
 
 # Step 8: Create config.json with base settings (test config added by verify-tests)
-Write-Host "[8/11] Creating config.json..." -ForegroundColor Yellow
+Write-Host "[8/10] Creating config.json..." -ForegroundColor Yellow
 $ConfigFile = ".kanban/config.json"
 if (-not (Test-Path $ConfigFile) -or $Force) {
     # Detect project type and verification scripts
@@ -180,10 +179,63 @@ if (-not (Test-Path $ConfigFile) -or $Force) {
         $verification.build = "cargo build"
     }
 
+    # Build postProcessRules filtered by project type
+    $postProcessRules = @()
+
+    switch ($projectType) {
+        "nodejs" {
+            $postProcessRules = @(
+                @{ name = "npm-deps"; pattern = "package\.json$"; command = "npm install"; reason = "package.json was modified"; priority = 0 },
+                @{ name = "prisma-generate"; pattern = "\.prisma$"; command = "npm run db:generate"; reason = "Prisma schema changed"; priority = 1 },
+                @{ name = "prisma-push"; pattern = "\.prisma$"; command = "npm run db:push"; reason = "Database schema needs sync"; priority = 2; critical = $true },
+                @{ name = "typecheck"; pattern = "\.(ts|tsx|vue)$"; command = "npm run typecheck"; reason = "TypeScript files modified"; priority = 3 },
+                @{ name = "lint"; pattern = "\.(ts|tsx|vue|js|jsx|css|scss)$"; command = "npm run lint:fix"; reason = "Code files modified"; priority = 4 },
+                @{ name = "tests"; pattern = "(tests?/|spec/|\.test\.|_test\.)"; command = "npm run test"; reason = "Test files created or modified"; priority = 5 }
+            )
+        }
+        "php" {
+            $postProcessRules = @(
+                @{ name = "composer-deps"; pattern = "composer\.json$"; command = "composer install"; reason = "composer.json was modified"; priority = 0 },
+                @{ name = "laravel-migrations"; pattern = "database/migrations/"; command = "php artisan migrate"; reason = "Database migrations added"; priority = 1; critical = $true },
+                @{ name = "lint"; pattern = "\.(php)$"; command = "composer lint:fix"; reason = "PHP files modified"; priority = 3 },
+                @{ name = "tests"; pattern = "(tests?/|spec/|Test\.php$)"; command = "composer test"; reason = "Test files created or modified"; priority = 5 }
+            )
+        }
+        "python" {
+            $postProcessRules = @(
+                @{ name = "pip-deps"; pattern = "requirements\.txt$"; command = "pip install -r requirements.txt"; reason = "requirements.txt was modified"; priority = 0 },
+                @{ name = "pyproject-deps"; pattern = "pyproject\.toml$"; command = "pip install -e ."; reason = "pyproject.toml was modified"; priority = 0 },
+                @{ name = "typecheck"; pattern = "\.py$"; command = "mypy ."; reason = "Python files modified"; priority = 3 },
+                @{ name = "lint"; pattern = "\.py$"; command = "ruff check . --fix"; reason = "Python files modified"; priority = 4 },
+                @{ name = "tests"; pattern = "(tests?/|test_|_test\.py)"; command = "pytest"; reason = "Test files created or modified"; priority = 5 }
+            )
+        }
+        "go" {
+            $postProcessRules = @(
+                @{ name = "go-mod"; pattern = "go\.(mod|sum)$"; command = "go mod tidy"; reason = "Go modules changed"; priority = 0 },
+                @{ name = "lint"; pattern = "\.go$"; command = "go vet ./..."; reason = "Go files modified"; priority = 3 },
+                @{ name = "tests"; pattern = "(test\.go$|_test\.go$)"; command = "go test ./..."; reason = "Test files created or modified"; priority = 5 }
+            )
+        }
+        "rust" {
+            $postProcessRules = @(
+                @{ name = "cargo-deps"; pattern = "Cargo\.(toml|lock)$"; command = "cargo build"; reason = "Cargo dependencies changed"; priority = 0 },
+                @{ name = "lint"; pattern = "\.rs$"; command = "cargo clippy"; reason = "Rust files modified"; priority = 3 },
+                @{ name = "tests"; pattern = "(tests?/|\.rs$)"; command = "cargo test"; reason = "Test files created or modified"; priority = 5 }
+            )
+        }
+        default {
+            # Generic rules for unknown project types
+            $postProcessRules = @(
+                @{ name = "tests"; pattern = "(tests?/|spec/|\.test\.|_test\.)"; command = "echo 'Run your test command'"; reason = "Test files created or modified"; priority = 5 }
+            )
+        }
+    }
+
     $configContent = @{
         projectType = $projectType
-        testTimeout = 120000
         verification = $verification
+        postProcessRules = $postProcessRules
     }
     $configContent | ConvertTo-Json -Depth 5 | Set-Content $ConfigFile -Encoding UTF8
     Write-Host "  Created $ConfigFile" -ForegroundColor Green
@@ -191,12 +243,13 @@ if (-not (Test-Path $ConfigFile) -or $Force) {
     if ($verification.Count -gt 0) {
         Write-Host "    Detected verification commands: $($verification.Keys -join ', ')" -ForegroundColor Gray
     }
+    Write-Host "    Post-process rules: $($postProcessRules.Count) rules for $projectType" -ForegroundColor Gray
 } else {
     Write-Host "  $ConfigFile already exists (preserving)" -ForegroundColor Gray
 }
 
 # Step 9: Add kanban script to package manager (if applicable)
-Write-Host "[9/11] Adding kanban script to package manager..." -ForegroundColor Yellow
+Write-Host "[9/10] Adding kanban script to package manager..." -ForegroundColor Yellow
 
 # Node.js: Add to package.json
 if (Test-Path "package.json") {
@@ -291,7 +344,7 @@ else {
 }
 
 # Step 10: Initialize test directory structure
-Write-Host "[10/11] Setting up test infrastructure..." -ForegroundColor Yellow
+Write-Host "[10/10] Setting up test infrastructure..." -ForegroundColor Yellow
 
 # Detect project environments
 $hasClient = (Test-Path "client") -or (Test-Path "src") -or (Test-Path "app")
@@ -352,21 +405,6 @@ if (-not (Test-Path "tests/integration")) {
 
 Write-Host "  Test infrastructure ready" -ForegroundColor Cyan
 
-# Step 11: Copy next-steps rules template (only if not exists)
-Write-Host "[11/11] Setting up next-steps rules..." -ForegroundColor Yellow
-$NextStepsFile = ".kanban/next-steps.json"
-if (-not (Test-Path $NextStepsFile) -or $Force) {
-    if (Test-Path $NextStepsDefaultSource) {
-        Copy-Item -Path $NextStepsDefaultSource -Destination $NextStepsFile -Force
-        Write-Host "  Created $NextStepsFile with default rules" -ForegroundColor Green
-    } else {
-        Write-Host "  Warning: next-steps-default.json template not found" -ForegroundColor Yellow
-        Write-Host "    Expected at: $NextStepsDefaultSource" -ForegroundColor Gray
-    }
-} else {
-    Write-Host "  $NextStepsFile already exists (preserving)" -ForegroundColor Gray
-}
-
 Write-Host ""
 Write-Host "Test infrastructure verification will run next..." -ForegroundColor Yellow
 Write-Host "  The verify-tests sub-skill ensures TDD workflow is ready" -ForegroundColor Gray
@@ -381,8 +419,7 @@ Write-Host "  - .kanban/worker-logs/" -ForegroundColor Gray
 Write-Host "  - .kanban/kanban-viewer/" -ForegroundColor Gray
 Write-Host "  - .kanban/kanban-board.json" -ForegroundColor Gray
 Write-Host "  - .kanban/kanban-progress.json" -ForegroundColor Gray
-Write-Host "  - .kanban/config.json" -ForegroundColor Gray
-Write-Host "  - .kanban/next-steps.json (post-process commands)" -ForegroundColor Gray
+Write-Host "  - .kanban/config.json (includes postProcessRules)" -ForegroundColor Gray
 Write-Host "  - .claude/agents/kanban-unit-tester.md" -ForegroundColor Gray
 Write-Host "  - .claude/agents/kanban-command-updater.md" -ForegroundColor Gray
 Write-Host "  - tests/unit/client/ (stores, composables, components, utils)" -ForegroundColor Gray

@@ -4,7 +4,7 @@
 
 .DESCRIPTION
     Reads kanban-progress.json to collect affected files from all completed tasks,
-    then matches file patterns against rules to suggest post-processing commands.
+    then matches file patterns against postProcessRules from config.json.
 
 .PARAMETER ProjectRoot
     The root directory of the project. Defaults to current directory.
@@ -21,8 +21,7 @@ function Show-NextSteps {
 
     $KanbanDir = Join-Path $ProjectRoot ".kanban"
     $ProgressFile = Join-Path $KanbanDir "kanban-progress.json"
-    $RulesFile = Join-Path $KanbanDir "next-steps.json"
-    $DefaultRulesTemplate = Join-Path $PSScriptRoot "../templates/next-steps-default.json"
+    $ConfigFile = Join-Path $KanbanDir "config.json"
 
     # Check if progress file exists
     if (-not (Test-Path $ProgressFile)) {
@@ -66,28 +65,14 @@ function Show-NextSteps {
         $normalizedFiles += $normalized
     }
 
-    # Load rules
+    # Load rules from config.json -> postProcessRules
     $rules = @()
 
-    # Try project-specific rules first
-    if (Test-Path $RulesFile) {
+    if (Test-Path $ConfigFile) {
         try {
-            $rulesContent = Get-Content $RulesFile -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
-            if ($rulesContent.rules) {
-                $rules = @($rulesContent.rules)
-            }
-        }
-        catch {
-            # Fall through to default rules
-        }
-    }
-
-    # Fall back to default template
-    if ($rules.Count -eq 0 -and (Test-Path $DefaultRulesTemplate)) {
-        try {
-            $rulesContent = Get-Content $DefaultRulesTemplate -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
-            if ($rulesContent.rules) {
-                $rules = @($rulesContent.rules)
+            $configContent = Get-Content $ConfigFile -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+            if ($configContent.postProcessRules) {
+                $rules = @($configContent.postProcessRules)
             }
         }
         catch {
@@ -166,5 +151,5 @@ function Show-NextSteps {
     Write-Host ("=" * 50) -ForegroundColor Cyan
 }
 
-# Export function for dot-sourcing
-Export-ModuleMember -Function Show-NextSteps -ErrorAction SilentlyContinue
+# Function is available when dot-sourced
+# Usage: . .\show-next-steps.ps1; Show-NextSteps

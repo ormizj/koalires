@@ -1,12 +1,12 @@
 ---
 name: kanban:create
-description: Generate a kanban board of tasks from a feature description. Use when planning new features or breaking down complex requirements into actionable tasks.
-allowed-tools: Read, Write, Glob, Grep, Bash, AskUserQuestion
+description: Interactive planning session to create a kanban board. Explores codebase, asks questions, iterates until approved. Use when planning new features or breaking down complex requirements into actionable tasks.
+allowed-tools: Read, Write, Glob, Grep, Bash, AskUserQuestion, Task
 ---
 
-# Create Kanban Skill
+# Create Kanban Skill (Interactive)
 
-Generate a structured kanban board of tasks from a feature description. This skill analyzes the feature requirements, examines the codebase to understand existing patterns, and produces a comprehensive task breakdown saved to `.kanban/kanban-board.json`.
+This skill conducts an **interactive planning session** to create a structured kanban board. Rather than autonomously generating tasks, it explores the codebase, asks relevant questions, presents findings, and iterates with the user until the board is explicitly approved.
 
 Based on Anthropic's "Effective harnesses for long-running agents" approach for systematic task decomposition.
 
@@ -39,8 +39,8 @@ IF args is empty or only whitespace:
 
 1. **Check if `.kanban/kanban-board.json` exists**
    - Use Glob to check for `.kanban/kanban-board.json`
-   - If file does NOT exist → proceed to workflow (no warning needed)
-   - If file exists → continue to step 2
+   - If file does NOT exist -> proceed to workflow (no warning needed)
+   - If file exists -> continue to step 2
 
 2. **Read existing board and progress files**
    - Read `.kanban/kanban-board.json`
@@ -62,7 +62,7 @@ IF kanban-board.json exists:
 
   IF incomplete_count > 0 OR progress_entries.length > 0:
     THEN:
-      - Output: "⚠️ WARNING: Existing kanban board detected with incomplete work!"
+      - Output: "WARNING: Existing kanban board detected with incomplete work!"
       - Output: ""
       - Output: "Current board: [project name from existing board]"
       - Output: "- Incomplete tasks: [incomplete_count]"
@@ -92,8 +92,8 @@ Before creating a new kanban board, offer to clear the existing logs directory t
 
 1. **Check if `.kanban/worker-logs/` directory exists and has files**
    - Use Glob to check for `.kanban/worker-logs/*`
-   - If directory is empty or doesn't exist → skip this section
-   - If files exist → continue to step 2
+   - If directory is empty or doesn't exist -> skip this section
+   - If files exist -> continue to step 2
 
 2. **Prompt user for clearing**
    - Use AskUserQuestion tool:
@@ -126,6 +126,7 @@ Each task follows this simplified structure:
   "name": string,        // Short name describing the task
   "description": string, // Extended information in markdown format
   "category": string,    // Category of the task (data, api, ui, etc.)
+  "blockedBy": string[], // Task names that must complete first
   "steps": string[],     // Sequential test steps (like manual QA) to verify the task
   "passes": boolean      // Whether the task is done (completed)
 }
@@ -177,22 +178,31 @@ Task status is derived from: `passes` field in kanban-board.json and `status` fi
 | `true`  | Yes              | `completed`     | **completed**   |
 | `true`  | No               | -               | **completed**   |
 
-## Workflow
+---
 
-### Step 1: Validate Feature Description
+## Interactive Workflow
 
-**CRITICAL**: Check if a feature description was provided as an argument.
+This skill follows a 5-phase interactive workflow:
 
-- If NO feature description → Output error message and STOP
-- If feature description exists → Continue to Step 2
+```
+Phase 1: Discovery        -> Explore codebase, understand what exists
+Phase 2: Requirements     -> Ask user questions, gather preferences
+Phase 3: Summary          -> Present findings and proposed approach
+Phase 4: Task Generation  -> Generate specific, deterministic tasks
+Phase 5: Iteration        -> Review with user, refine until approved
+```
 
-### Step 2: Detect Project Type
+**CRITICAL**: Files are ONLY written after explicit user approval in Phase 5. Until then, the board exists only in conversation.
 
-Before generating tasks, understand the project context by examining key files:
+---
 
-#### 2.1 Check for Project Configuration
+### Phase 1: Deep Discovery
 
-Look for these files to detect the project type:
+**Purpose**: Understand the current state of the codebase before planning any changes.
+
+#### 1.1 Detect Project Type
+
+Examine key files to detect the project type:
 
 ```
 # Package manager / language
@@ -206,7 +216,7 @@ Glob: manage.py, app.py, main.py, Gemfile, composer.json
 Read: README.md, CLAUDE.md (if exists)
 ```
 
-#### 2.2 Identify Architecture Patterns
+#### 1.2 Identify Architecture Patterns
 
 ```
 # Frontend patterns
@@ -223,15 +233,194 @@ Glob: src/models/**/* OR models/**/*
 Glob: prisma/**/*.prisma, migrations/**/*.sql, *.schema.ts
 ```
 
-#### 2.3 Check for Related Code
+#### 1.3 Search for Related Existing Code
 
-Use Grep to find code related to the feature:
+Use Grep to find code related to the feature using keywords from the feature description:
 
 ```
 Grep: [relevant keywords from feature description]
 ```
 
-### Step 3: Categorize Feature Requirements
+Look for:
+
+- Similar features already implemented
+- Patterns to follow for consistency
+- Components or utilities that can be reused
+
+#### 1.4 Deep Codebase Analysis with Explore Agent
+
+Use the Task tool with `subagent_type="Explore"` for comprehensive analysis:
+
+```
+Task tool with:
+- subagent_type: "Explore"
+- prompt: "Find all files related to [feature keywords]. Analyze:
+  1. Existing implementations of similar features
+  2. Patterns used for comparable functionality
+  3. Components and utilities available for reuse
+  4. Integration points (stores, APIs, types) the new feature will connect to
+  5. Any partial implementations that should not be duplicated"
+```
+
+#### 1.5 Discovery Output
+
+Compile internal notes about:
+
+- What exists (related code, similar features)
+- Patterns to follow (how similar things are done)
+- Components to reuse (existing utilities, stores, types)
+- Integration points (what the new feature connects to)
+- Partial implementations (to avoid duplication)
+
+---
+
+### Phase 2: Requirements Gathering
+
+**Purpose**: Ask smart, relevant questions to pin down exact implementation details.
+
+**Principle**: Questions are good. Don't be afraid to ask. The more clarity upfront, the more deterministic the output.
+
+#### Question Strategy
+
+- Questions are **dynamically generated** based on discovery findings
+- Only ask what's relevant to THIS specific feature
+- Each question should resolve an ambiguity or decision point
+- Always include "Other - let me specify" as an option where appropriate
+
+#### Question Categories
+
+Ask questions from these categories as relevant to the feature:
+
+**1. Scope and Boundaries**
+
+- What's the MVP vs nice-to-have?
+- Any features explicitly NOT wanted?
+- Time or complexity constraints?
+
+**2. Implementation Approach** (based on discovered options)
+
+- If multiple patterns found: "How should X be implemented? We have Y pattern in fileA and Z pattern in fileB"
+- UI decisions: modal vs page, inline vs separate component
+- Technical decisions: polling vs websockets, local state vs store, client-side vs server-side
+
+**3. Integration Decisions** (based on discovered components)
+
+- Which existing components to reuse vs create new?
+- How should this connect to existing features?
+- Should this extend existing functionality or be standalone?
+
+**4. Data and API Design**
+
+- What fields/properties are needed? (list explicitly)
+- What endpoints with what exact paths?
+- What error cases to handle?
+- Validation rules?
+
+**5. UI/UX Preferences**
+
+- Layout preferences (location, size, arrangement)
+- Interaction patterns (click, hover, drag)
+- Responsive behavior requirements
+- Accessibility requirements
+
+#### Implementation
+
+Use `AskUserQuestion` tool with options. Questions can be batched (2-4 per interaction for efficiency).
+
+Example question format:
+
+```
+Question: "Based on the existing auth flow in `client/features/auth/`, how should login errors be displayed?"
+Options:
+- "Toast notification (like current signup flow)"
+- "Inline error below form field (like password reset)"
+- "Modal dialog"
+- "Other - let me specify"
+```
+
+#### Capturing Answers
+
+Record each answer to form the basis of locked implementation decisions in Phase 4.
+
+---
+
+### Phase 3: Summary and Confirmation
+
+**Purpose**: Ensure alignment before generating tasks by presenting all findings and proposed approach.
+
+#### Present Discovery Summary
+
+Output a structured summary to the user:
+
+```markdown
+## Discovery Summary
+
+### Project Context
+
+- **Type**: [detected project type, e.g., Nuxt 4 with FSD architecture]
+- **Relevant directories**: [key paths discovered]
+
+### What Currently Exists
+
+- [List of related existing code/features found]
+- [Components available for reuse]
+- [Patterns already established]
+
+### How Related Flows Work
+
+- [Brief explanation of relevant existing patterns]
+- [Key integration points identified]
+
+### Proposed Approach
+
+Based on your requirements:
+
+- [Approach decision 1 - from user answers]
+- [Approach decision 2 - from user answers]
+- [Technical choice - from user answers]
+
+### Integration Points
+
+Will integrate with:
+
+- [Component/API 1]
+- [Component/API 2]
+- [Store/Type 3]
+
+### Out of Scope (per your input)
+
+- [Items explicitly excluded]
+```
+
+#### Confirmation
+
+Use AskUserQuestion:
+
+```
+Question: "Does this summary accurately capture your requirements and the proposed approach?"
+Options:
+- "Yes, proceed to task generation"
+- "No, I need to clarify something"
+- "Start over with different requirements"
+```
+
+If "No, I need to clarify something":
+
+- Ask what needs clarification
+- Update the summary
+- Re-present and ask for confirmation again
+
+If "Start over":
+
+- Return to Phase 2 with fresh questions
+
+---
+
+### Phase 4: Task Generation
+
+**Purpose**: Generate specific, deterministic tasks based on locked-in requirements from Phases 1-3.
+
+#### 4.1 Categorize Feature Requirements
 
 Break down the feature into these universal categories:
 
@@ -244,25 +433,31 @@ Break down the feature into these universal categories:
 | `config`      | Configuration, environment, setup                |
 | `testing`     | Test cases and validation                        |
 
-### Step 4: Generate Task List
+#### 4.2 Generate Task List with Locked Details
 
-For each requirement, create a task with this structure:
+For each requirement, create a task with **deterministic naming** and **explicit implementation details**:
 
 ```json
 {
-  "name": "short-task-name",
-  "description": "## Task Description\n\nDetailed description in markdown format.\n\n### Implementation Notes\n- Note 1\n- Note 2",
+  "name": "exact-task-name",
+  "description": "## Task Description\n\n[What to implement]\n\n## Implementation Approach (LOCKED)\n\n- Use pattern from: `exact/path/to/reference/file.ts`\n- Create file at: `exact/path/to/new/file.ts`\n- Follow naming: `exactFunctionName`\n\n## API Contract (LOCKED)\n\n[From user answers in Phase 2]\n\n## Steps\n\n[Sequential verification steps]",
   "category": "data|api|ui|integration|config|testing",
-  "steps": ["Step to verify implementation works", "Another verification step"],
+  "blockedBy": [],
+  "steps": ["Step 1", "Step 2"],
   "passes": false
 }
 ```
 
-### Step 4.5: Identify Dependencies (blockedBy)
+**Key principles for task generation**:
+
+1. **Deterministic Naming**: Task names follow strict conventions based on user answers
+2. **Explicit Implementation Details**: Include specific file paths, function signatures
+3. **Locked API Contracts**: Based on user answers from Phase 2, not AI decisions
+4. **Reference Existing Code**: Point to specific files to follow patterns from
+
+#### 4.3 Identify Dependencies (blockedBy)
 
 For each task, determine its `blockedBy` list by analyzing what types, stores, or APIs it needs:
-
-#### Dependency Analysis Rules
 
 | Task Category | Typically Depends On | blockedBy Examples               |
 | ------------- | -------------------- | -------------------------------- |
@@ -273,33 +468,13 @@ For each task, determine its `blockedBy` list by analyzing what types, stores, o
 | `ui`          | Stores, types, APIs  | `["user-store", "chat-api"]`     |
 | `testing`     | Features to test     | `["user-api", "profile-page"]`   |
 
-#### Analysis Process
-
-For each task:
+**Analysis Process** for each task:
 
 1. **Identify what the task needs** - What types, stores, or APIs does it use?
 2. **Find which tasks provide those** - Match needs to other task outputs
 3. **Set blockedBy** - List task names that must complete first
 
-#### Example Analysis
-
-For a chat feature with these tasks:
-
-- `webrtc-connection-store` (data) - defines ChatMessage type
-- `chat-api` (api) - uses ChatMessage type
-- `chat-messages-ui` (ui) - displays ChatMessage, uses store
-
-Dependencies:
-
-```json
-{ "name": "webrtc-connection-store", "blockedBy": [] }
-{ "name": "chat-api", "blockedBy": ["webrtc-connection-store"] }
-{ "name": "chat-messages-ui", "blockedBy": ["webrtc-connection-store", "chat-api"] }
-```
-
-#### Task Name Convention
-
-Use descriptive, kebab-case names:
+**Task Name Convention**: Use descriptive, kebab-case names:
 
 - `create-user-schema`
 - `user-crud-endpoints`
@@ -308,13 +483,11 @@ Use descriptive, kebab-case names:
 - `setup-database-config`
 - `user-api-tests`
 
-### Step 4.6: Add Explicit API Contracts (CRITICAL)
+#### 4.4 Add Explicit API Contracts (CRITICAL)
 
-**IMPORTANT**: To prevent client-server miscoordination, every API task MUST include an explicit contract section in its description. UI tasks that depend on APIs MUST reference this contract.
+**IMPORTANT**: To prevent client-server miscoordination, every API task MUST include an explicit contract section. UI tasks that depend on APIs MUST reference this contract.
 
-#### For API Tasks
-
-Add a "## API Contract" section to the description:
+**For API Tasks** - Add a "## API Contract" section:
 
 ```markdown
 ## API Contract
@@ -329,9 +502,7 @@ Add a "## API Contract" section to the description:
   - 409: Invitation already exists
 ```
 
-#### For UI Tasks That Use APIs
-
-Add a "## API Dependencies" section referencing the exact contract:
+**For UI Tasks That Use APIs** - Add a "## API Dependencies" section:
 
 ```markdown
 ## API Dependencies
@@ -345,62 +516,16 @@ This component uses the following API endpoints from `chat-invitation-api`:
 **IMPORTANT**: Read the API task's affected files FIRST to verify the exact endpoint path and request/response format before implementing.
 ```
 
-#### Why This Matters
+**Why This Matters**: Without explicit contracts, API workers might create endpoints at `/api/chat/invite` while UI workers assume `/api/chat/invitations`, resulting in 404 errors despite both tasks "passing".
 
-Without explicit contracts:
+#### 4.5 Auto-Generate E2E Integration Test Task
 
-1. API workers create endpoints at `/api/chat/invite`
-2. UI workers assume endpoints at `/api/chat/invitations`
-3. Result: 404 errors at runtime despite both tasks "passing"
-
-Explicit contracts in task descriptions ensure workers share the same understanding of:
-
-- Exact endpoint paths (e.g., `/api/chat/invitations` not `/api/chat/invite`)
-- Request body field names (e.g., `toEmail` not `email`)
-- Response structure for proper client parsing
-
-#### Steps Field - Sequential Test Steps
-
-The `steps` array must contain **sequential test steps** describing the exact flow to verify the feature. These are like manual QA test scripts:
-
-**For API tasks:**
-
-```json
-"steps": [
-  "Start the development server",
-  "Open API testing tool (curl, Postman, or browser)",
-  "Send GET request to /api/users/profile without auth header",
-  "Verify response is 401 Unauthorized",
-  "Send GET request with valid auth token",
-  "Verify response is 200 with user data (name, email, avatar)"
-]
-```
-
-**For UI tasks:**
-
-```json
-"steps": [
-  "Navigate to /profile in the browser",
-  "Verify the page loads without console errors",
-  "Check that user avatar is displayed and centered",
-  "Check that user name and email are visible",
-  "Click the 'Edit Profile' button",
-  "Verify edit form or modal appears"
-]
-```
-
-### Step 4.7: Auto-Generate E2E Integration Test Task
-
-**IMPORTANT**: When the feature includes BOTH `api` and `ui` category tasks, automatically generate an E2E integration test task that validates the client-server integration works correctly.
-
-#### When to Generate
-
-Generate an `e2e-integration-test` task if:
+**When to Generate**: Generate an `e2e-integration-test` task if:
 
 - There is at least one `api` category task AND
 - There is at least one `ui` category task that depends on the API
 
-#### E2E Task Template
+**E2E Task Template**:
 
 ```json
 {
@@ -422,164 +547,225 @@ Generate an `e2e-integration-test` task if:
 }
 ```
 
-#### Dynamic blockedBy
+The `blockedBy` array should list ALL `ui` category tasks from this feature.
 
-The `blockedBy` array should list ALL `ui` category tasks from this feature, ensuring E2E tests run only after all UI is implemented.
+---
 
-Example: If the feature has tasks `chat-api`, `join-room-ui`, `chat-messages-ui`:
+### Phase 5: Iteration and Approval
 
-```json
-"blockedBy": ["join-room-ui", "chat-messages-ui"]
+**Purpose**: Allow unlimited refinement rounds until user explicitly approves the board.
+
+**CRITICAL**: Files are ONLY written after explicit "Approve and create board" selection. Until then, the board exists only in conversation.
+
+#### Presentation Format
+
+Present the proposed board in this format:
+
+```markdown
+## Proposed Kanban Board
+
+**Project**: [Feature Name]
+**Tasks**: [N total]
+**Categories**: [data: X, api: Y, ui: Z, testing: W]
+
+### Task Overview
+
+| #   | Task Name            | Category | Depends On  |
+| --- | -------------------- | -------- | ----------- |
+| 1   | task-name-1          | data     | -           |
+| 2   | task-name-2          | api      | task-name-1 |
+| 3   | task-name-3          | ui       | task-name-2 |
+| 4   | e2e-integration-test | testing  | task-name-3 |
+
+### Task Details
+
+**1. task-name-1** (data)
+
+> [First 2-3 lines of description]
+
+- **Files**: `exact/path/to/create.ts`
+- **Pattern from**: `existing/reference/file.ts`
+
+**2. task-name-2** (api)
+
+> [First 2-3 lines of description]
+
+- **Endpoint**: `POST /api/exact/path`
+- **Depends on**: task-name-1
+
+**3. task-name-3** (ui)
+
+> [First 2-3 lines of description]
+
+- **Files**: `client/pages/feature.vue`
+- **Uses API**: task-name-2
+
+[...repeat for each task...]
 ```
 
-### Step 5: Write kanban-board.json
+#### Iteration Flow
 
-Ensure `.kanban/` directory exists, then write the task board:
+1. **Present board summary** (table + details as shown above)
 
-```json
-{
-  "project": "Feature name/description",
-  "created": "ISO timestamp",
-  "projectType": "detected project type (e.g., nuxt, next, django, express)",
-  "tasks": [
-    {
-      "name": "task-name",
-      "description": "## Description\n\nMarkdown description...",
-      "category": "category",
-      "blockedBy": [],
-      "steps": ["verification step 1", "verification step 2"],
-      "passes": false
-    }
-  ]
-}
-```
+2. **Ask for review** using AskUserQuestion:
 
-### Step 6: Initialize kanban-progress.json
+   ```
+   Question: "Review the kanban board above. What would you like to do?"
+   Options:
+   - "Approve and create board"
+   - "Add more tasks"
+   - "Remove tasks"
+   - "Modify a task"
+   - "Change task order/dependencies"
+   - "Start over from requirements"
+   ```
 
-Create an empty progress tracker:
+3. **Handle each response**:
 
-```json
-{}
-```
+   **"Approve and create board"**:
+   - Write `.kanban/kanban-board.json`
+   - Write `.kanban/kanban-progress.json` (empty: `{}`)
+   - Output success message with next steps
+   - DONE
 
-**Structure (keyed by task name):**
+   **"Add more tasks"**:
+   - Ask: "What additional tasks should be added?"
+   - Generate new tasks based on response
+   - Re-present updated board
+   - Return to step 2
 
-```json
-{
-  "user-profile-api": {
-    "status": "running",
-    "startedAt": "2026-01-20T10:00:00.000Z",
-    "log": "Created GET endpoint, added auth middleware. Need to add error handling next session.",
-    "affectedFiles": [
-      "server/api/users/profile.get.ts",
-      "server/middleware/auth.ts"
-    ],
-    "agent": "backend-developer"
-  },
-  "profile-page-ui": {
-    "status": "code-review",
-    "startedAt": "2026-01-20T09:00:00.000Z",
-    "completedAt": "2026-01-20T09:30:00.000Z",
-    "log": "Completed Vue page with avatar, name, email display. Edit button opens modal. Ready for review.",
-    "affectedFiles": [
-      "client/pages/profile.vue",
-      "client/components/Avatar.vue"
-    ],
-    "agent": "vue-expert"
-  }
-}
-```
+   **"Remove tasks"**:
+   - Ask: "Which tasks should be removed? (provide task names or numbers)"
+   - Remove specified tasks
+   - Update blockedBy references in remaining tasks
+   - Re-present updated board
+   - Return to step 2
 
-- `status` - Current execution state: `running`, `code-review`, `completed`, `error`, or `blocked`
-- `log` - Narrative of work done, useful for resuming context across sessions
-- `affectedFiles` - Array of file paths that were created, modified, or deleted during this task
-- `agent` - Agent name that worked on this task
+   **"Modify a task"**:
+   - Ask: "Which task do you want to modify? (provide task name or number)"
+   - Then ask: "What should be changed about this task?"
+   - Update the task based on response
+   - Re-present updated board
+   - Return to step 2
 
-The log field serves as a narrative history that helps agents understand context when resuming work (following Anthropic's "claude-progress.txt" pattern for cross-session context).
+   **"Change task order/dependencies"**:
+   - Ask: "What changes to the order or dependencies?"
+   - Update blockedBy fields as specified
+   - Re-present updated board
+   - Return to step 2
+
+   **"Start over from requirements"**:
+   - Clear current board state
+   - Return to Phase 2 (Requirements Gathering)
+   - Begin fresh question session
+
+4. **Loop continues** until "Approve and create board" is selected
+
+#### Exit Conditions
+
+- **User selects "Approve and create board"**: Write files, skill complete
+- **User selects "Start over from requirements"**: Clear state, return to Phase 2
+- **User abandons conversation**: Nothing written, no changes made
+
+---
 
 ## Example Task Breakdown
 
-### Example: User Profile Feature
+### Example: User Profile Feature (Interactive Result)
 
-For a "create user profile page" feature:
+After completing Phases 1-4 for "create user profile page with avatar upload":
 
 ```json
 {
-  "project": "User Profile Page",
+  "project": "User Profile Page with Avatar Upload",
   "created": "2024-01-15T10:30:00Z",
   "projectType": "nuxt",
   "tasks": [
     {
       "name": "user-profile-api",
-      "description": "## User Profile API Endpoint\n\nCreate a GET endpoint at `/api/users/profile` that returns the authenticated user's profile data.\n\n### Requirements\n- Return user data (name, email, avatar URL)\n- Require authentication\n- Handle user not found case\n\n## API Contract\n\n- **Endpoint**: `GET /api/users/profile`\n- **Request**: No body (authentication via cookie/header)\n- **Response (200)**: `{ name: string, email: string, avatarUrl: string | null }`\n- **Errors**:\n  - 401: Not authenticated\n  - 404: User not found",
+      "description": "## User Profile API Endpoint\n\nCreate a GET endpoint at `/api/users/profile` that returns the authenticated user's profile data.\n\n## Implementation Approach (LOCKED)\n\n- Use pattern from: `server/api/auth/login.post.ts`\n- Create file at: `server/api/users/profile.get.ts`\n- Follow auth middleware pattern from existing endpoints\n\n## API Contract (LOCKED)\n\n- **Endpoint**: `GET /api/users/profile`\n- **Request**: No body (authentication via cookie)\n- **Response (200)**: `{ id: number, name: string, email: string, avatarUrl: string | null }`\n- **Errors**:\n  - 401: Not authenticated\n  - 404: User not found in database",
       "category": "api",
       "blockedBy": [],
       "steps": [
         "Start the development server with npm run dev",
         "Open a terminal or API testing tool",
-        "Send GET request to http://localhost:3000/api/users/profile without auth header",
+        "Send GET request to http://localhost:3000/api/users/profile without auth cookie",
         "Verify response status is 401 Unauthorized",
-        "Log in to get a valid auth token",
-        "Send GET request to /api/users/profile with Authorization header",
+        "Log in via /api/auth/login to get auth cookie",
+        "Send GET request to /api/users/profile with auth cookie",
         "Verify response status is 200",
-        "Verify response body contains name, email, and avatarUrl fields"
+        "Verify response body contains id, name, email, and avatarUrl fields"
+      ],
+      "passes": false
+    },
+    {
+      "name": "avatar-upload-api",
+      "description": "## Avatar Upload API Endpoint\n\nCreate a POST endpoint for uploading user avatars.\n\n## Implementation Approach (LOCKED)\n\n- Use pattern from: `server/api/files/upload.post.ts`\n- Create file at: `server/api/users/avatar.post.ts`\n- Store files in: `public/uploads/avatars/`\n- File naming: `{userId}-{timestamp}.{ext}`\n\n## API Contract (LOCKED)\n\n- **Endpoint**: `POST /api/users/avatar`\n- **Request**: `multipart/form-data` with `avatar` file field\n- **Response (200)**: `{ avatarUrl: string }`\n- **Validation**: Max 2MB, image/jpeg or image/png only\n- **Errors**:\n  - 400: Invalid file type or size\n  - 401: Not authenticated",
+      "category": "api",
+      "blockedBy": [],
+      "steps": [
+        "Start the development server",
+        "Log in to get auth cookie",
+        "Send POST to /api/users/avatar with a 3MB file",
+        "Verify response is 400 with size error",
+        "Send POST with a .txt file",
+        "Verify response is 400 with type error",
+        "Send POST with valid 1MB JPEG",
+        "Verify response is 200 with avatarUrl",
+        "Verify file exists at the returned URL path"
       ],
       "passes": false
     },
     {
       "name": "profile-page-ui",
-      "description": "## Profile Page Component\n\nCreate a Vue page at `client/pages/profile.vue` displaying user information.\n\n### Layout\n- User avatar (large, centered)\n- User name and email\n- Edit profile button\n\n## API Dependencies\n\nThis component uses the following API endpoints from `user-profile-api`:\n\n- `GET /api/users/profile` - Fetch user data\n  - Response: `{ name, email, avatarUrl }`\n\n**IMPORTANT**: Read `user-profile-api` affected files FIRST to verify exact endpoint path and response format.",
+      "description": "## Profile Page Component\n\nCreate a Vue page displaying user profile with edit capability.\n\n## Implementation Approach (LOCKED)\n\n- Use pattern from: `client/pages/settings.vue`\n- Create file at: `client/pages/profile.vue`\n- Use existing `UiAvatar` component from `client/shared/ui/`\n- Use `useAuthStore` for user state\n\n## Layout (LOCKED per user requirements)\n\n- Centered card layout (max-w-md)\n- Avatar: 128px, clickable for upload\n- Name and email below avatar\n- \"Edit Profile\" button opens inline form (not modal)\n\n## API Dependencies\n\n- `GET /api/users/profile` from `user-profile-api`\n- `POST /api/users/avatar` from `avatar-upload-api`\n\n**IMPORTANT**: Read API task affected files to verify exact response format.",
       "category": "ui",
-      "blockedBy": ["user-profile-api"],
+      "blockedBy": ["user-profile-api", "avatar-upload-api"],
       "steps": [
         "Start the development server with npm run dev",
         "Log in to the application",
         "Navigate to /profile in the browser",
-        "Open browser DevTools and check for console errors",
-        "Verify the page loads without JavaScript errors",
-        "Check that user avatar image is displayed and centered",
-        "Check that user name is displayed below the avatar",
-        "Check that user email is displayed",
-        "Locate the 'Edit Profile' button",
-        "Click the 'Edit Profile' button",
-        "Verify an edit form or modal appears"
-      ],
-      "passes": false
-    },
-    {
-      "name": "profile-tests",
-      "description": "## Profile Feature Tests\n\nWrite tests for the profile API and page component.",
-      "category": "testing",
-      "blockedBy": ["user-profile-api", "profile-page-ui"],
-      "steps": [
-        "Run npm run test to execute the test suite",
-        "Verify all profile API tests pass",
-        "Verify profile component tests pass",
-        "Check test coverage report for profile-related files",
-        "Verify edge cases are tested (no user, network error, etc.)"
+        "Verify page loads without console errors",
+        "Verify avatar displays centered at 128px",
+        "Verify name and email display below avatar",
+        "Click on the avatar",
+        "Verify file picker opens",
+        "Select a valid image file",
+        "Verify avatar updates after upload completes",
+        "Click 'Edit Profile' button",
+        "Verify inline edit form appears (not modal)",
+        "Modify name field and save",
+        "Verify name updates on page"
       ],
       "passes": false
     },
     {
       "name": "e2e-integration-test",
-      "description": "## End-to-End Integration Test\n\nValidate that client-server integration works correctly.\n\n### Purpose\nCatches integration bugs that unit tests miss:\n- Endpoint path mismatches\n- Request/response format mismatches\n- Authentication flow issues",
+      "description": "## End-to-End Integration Test\n\nValidate client-server integration for profile feature.\n\n### Purpose\nCatches integration bugs that unit tests miss:\n- Endpoint path mismatches\n- Request/response format mismatches\n- File upload handling issues",
       "category": "testing",
       "blockedBy": ["profile-page-ui"],
       "steps": [
         "Start the development server with npm run dev",
         "Open browser DevTools Network tab",
         "Log in and navigate to /profile",
-        "Verify the GET /api/users/profile request appears in Network tab",
-        "Verify the request URL is exactly /api/users/profile (not /api/user/profile)",
-        "Verify the response is 200 with user data",
-        "Verify the UI correctly displays the name, email, and avatar from the response",
-        "Log out and verify /profile redirects or shows auth error"
+        "Verify GET /api/users/profile request appears",
+        "Verify request URL is exactly /api/users/profile",
+        "Verify response contains id, name, email, avatarUrl",
+        "Click avatar to upload new image",
+        "Verify POST /api/users/avatar request appears",
+        "Verify request is multipart/form-data with avatar field",
+        "Verify response contains new avatarUrl",
+        "Verify avatar image updates in UI",
+        "Test with invalid file, verify error displayed",
+        "Verify no 404 or 500 errors in Network tab"
       ],
       "passes": false
     }
   ]
 }
 ```
+
+---
 
 ## Adapting to Different Project Types
 
@@ -604,11 +790,17 @@ For a "create user profile page" feature:
 - Include API routes and pages
 - Handle shared types/interfaces
 
+---
+
 ## Notes
 
 - **CRITICAL**: Do NOT execute if no feature description is provided
+- **This skill is an interactive planning session**, not autonomous generation
+- **Board is only written after explicit user approval** in Phase 5
+- **Multiple iteration rounds are expected and encouraged** - refine until right
+- **Questions asked during Phase 2 are dynamically generated** based on discovery findings
 - The skill does NOT execute tasks - it only plans them
-- User should review `.kanban/kanban-board.json` before running `kanban:process`
+- User should review the board before running `kanban:process`
 - Tasks are designed to be executed by specialized agents
 - The `passes` field is updated by `kanban:process` after task completion
 - Task status is derived from `passes` and presence in `kanban-progress.json`

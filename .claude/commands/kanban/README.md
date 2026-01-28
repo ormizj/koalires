@@ -44,13 +44,29 @@ Verifies and sets up testing infrastructure for the kanban TDD workflow. Can be 
 
 ### `/kanban:create <feature>`
 
-Breaks a feature description into categorized tasks. Auto-detects project type and generates `kanban-board.json`.
+Interactive planning session that explores the codebase, asks clarifying questions, and iterates on the task board until user approval.
+
+**5-Phase Workflow:**
+
+1. **Discovery** - Explores codebase to understand existing patterns
+2. **Requirements** - Asks smart questions based on discovery findings
+3. **Summary** - Presents understanding for user confirmation
+4. **Task Generation** - Creates deterministic tasks with locked implementations
+5. **Iteration** - Review and refine until user approves
+
+**Key Points:**
+
+- Files are only written after explicit user approval
+- Multiple iteration rounds supported
+- Questions are dynamically generated based on what's discovered
 
 **Example:**
 
 ```bash
 /kanban:create Add user profile page with avatar upload and settings
 ```
+
+The command will then explore the codebase, ask relevant questions, and present a board for approval.
 
 ### `/kanban:process`
 
