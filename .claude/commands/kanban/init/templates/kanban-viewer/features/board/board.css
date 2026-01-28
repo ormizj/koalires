@@ -323,6 +323,10 @@
   padding: 0.875rem 0.875rem 0 0.875rem;
 }
 
+.task.expanded .task-main-content.no-details {
+  padding-bottom: 0.875rem;
+}
+
 /* ==============================================
    Task Body (content area below header)
    ============================================== */

@@ -45,11 +45,18 @@ export function createTaskCard(task, progress, status) {
   const tokensHtml = createTokensSection(finalTokens);
   const filesChangedHtml = createFilesChangedSection(progress);
 
+  // Check if there's content below the separator
+  const hasBottomDetails = timestampsHtml || tokensHtml || agentsHtml || affectedFilesHtml || filesChangedHtml;
+
   // Build summary badges (hidden when expanded)
   const hasBadges = stepsSummaryHtml || workLogSummaryHtml;
   const badgesHtml = hasBadges
     ? `<div class="task-summary-badges">${stepsSummaryHtml}${workLogSummaryHtml}</div>`
     : '';
+
+  // Check if there are ANY details to show
+  // Note: badges are hidden when expanded, so only show details section if there's bottom content
+  const hasAnyDetails = hasBottomDetails;
 
   return `
     <div class="task ${status}" data-task-name="${escapeHtml(task.name)}" onclick="openTaskModal('${escapeHtml(task.name)}')">
@@ -58,12 +65,13 @@ export function createTaskCard(task, progress, status) {
         ${categoryHtml}
       </div>
 
-      <div class="task-main-content">
+      <div class="task-main-content${!hasAnyDetails ? ' no-details' : ''}">
         ${descriptionHtml}
         ${stepsHtml}
         ${logHtml}
       </div>
 
+      ${hasAnyDetails ? `
       <div class="task-details">
         <div class="task-details-header">
           <div class="task-details-divider"></div>
@@ -71,13 +79,14 @@ export function createTaskCard(task, progress, status) {
           <div class="task-details-divider"></div>
         </div>
         ${badgesHtml}
-        ${hasBadges ? '<div class="task-details-separator"></div>' : ''}
+        ${hasBadges && hasBottomDetails ? '<div class="task-details-separator"></div>' : ''}
         ${timestampsHtml}
         ${tokensHtml}
         ${agentsHtml}
         ${affectedFilesHtml}
         ${filesChangedHtml}
       </div>
+      ` : ''}
     </div>
   `;
 }
