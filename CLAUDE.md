@@ -153,6 +153,8 @@ This is a Nuxt 4 project using Feature-Sliced Design (FSD) with `client/` as the
 | `agent-organizer`              | Multi-agent team assembly, task decomposition, workflow optimization, agent selection            |
 | `multi-agent-coordinator`      | Complex workflow orchestration, inter-agent communication, parallel execution, fault tolerance   |
 | `change-impact-analyzer`       | Ripple effect analysis, dependency tracing, breaking change detection, code change impact        |
+| `kanban-unit-tester`           | TDD specialist for kanban workflow, creates pre-implementation tests that fail initially         |
+| `kanban-command-updater`       | Kanban command maintenance, updating SKILL.md files, scripts, viewer, schema, new sub-commands   |
 
 ## Agent Selection Guidelines
 
@@ -169,4 +171,6 @@ This is a Nuxt 4 project using Feature-Sliced Design (FSD) with `client/` as the
 11. **For creating/managing CLAUDE skills and commands**: Use `claude-skill-command-manager`
 12. **For coordinating multiple agents**: Use `agent-organizer` or `multi-agent-coordinator`
 13. **⚠️ AFTER ANY CODE CHANGE**: Use `change-impact-analyzer` (MANDATORY - run recursively until no issues)
-14. **When uncertain**: Ask the user for clarification
+14. **For kanban TDD workflow**: Use `kanban-unit-tester` (creates tests before implementation)
+15. **For kanban command work**: Use `kanban-command-updater` (any file under `.claude/commands/kanban/`)
+16. **When uncertain**: Ask the user for clarification
