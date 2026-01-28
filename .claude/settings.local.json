@@ -41,7 +41,9 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\orm\\\\Desktop\\\\Files\\\\My Projects\\\\koalires\\\\.claude\\\\commands\\\\kanban\\\\process\\\\scripts\" -Name)",
       "Skill(kanban:init:verify-tests)",
       "Bash(npm run test:*)",
-      "Bash(npm run test:run:*)"
+      "Bash(npm run test:run:*)",
+      "Bash(ls -la \"C:\\\\Users\\\\orm\\\\Desktop\\\\Files\\\\My Projects\\\\koalires\\\\.claude\\\\agents\"\" 2>&1 || echo \"Directory check complete \")",
+      "Bash(git log:*)"
     ]
   }
 }
