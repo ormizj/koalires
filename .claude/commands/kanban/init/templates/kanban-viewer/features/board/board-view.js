@@ -7,6 +7,7 @@ import { getTaskStatus } from '../../shared/tasks.js';
 import { createTaskCard } from '../../shared/ui/templates/task-card.js';
 import { reapplySearch } from '../search/index.js';
 import { applyAutoCollapseAll } from './columns.js';
+import { boardStore } from '../../shared/store/index.js';
 
 // Token display mode: 'worker', 'tdd', or 'combined'
 const TOKEN_MODES = ['combined', 'worker', 'tdd'];
@@ -126,6 +127,9 @@ export const boardView = {
 
     // Apply auto-collapse based on task counts
     applyAutoCollapseAll();
+
+    // Restore expansion states from store
+    this._restoreExpansionStates();
   },
 
   _renderColumn(columnId, tasks, progressObj) {
@@ -155,7 +159,7 @@ export const boardView = {
 
     container.innerHTML = tasks
       .map((task) =>
-        createTaskCard(task, statusMap[columnId], progressObj[task.name])
+        createTaskCard(task, progressObj[task.name], statusMap[columnId])
       )
       .join('');
   },
@@ -197,7 +201,10 @@ export const boardView = {
       total: arr.reduce((a, b) => a + b, 0),
       min: arr.length > 0 ? Math.min(...arr) : 0,
       max: arr.length > 0 ? Math.max(...arr) : 0,
-      avg: arr.length > 0 ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0,
+      avg:
+        arr.length > 0
+          ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length)
+          : 0,
     });
 
     switch (mode) {
@@ -310,5 +317,17 @@ export const boardView = {
     if (progressFill) {
       progressFill.style.width = `${percentage}%`;
     }
+  },
+
+  /**
+   * Restore expansion states from store after render
+   */
+  _restoreExpansionStates() {
+    document.querySelectorAll('.task').forEach((taskEl) => {
+      const taskName = taskEl.dataset.taskName;
+      if (taskName && boardStore.isTaskExpanded(taskName)) {
+        taskEl.classList.add('expanded');
+      }
+    });
   },
 };

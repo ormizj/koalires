@@ -421,9 +421,9 @@ function renderTaskDetails(task, progress, status) {
     html += `
       <div class="task-detail-section">
         <div class="task-detail-label">Started</div>
-        <div class="task-detail-value task-detail-time">
-          ${getIcon('clock', 14)}
-          <span title="${formatDate(startedAt)}">${formatRelativeTime(startedAt)}</span>
+        <div class="task-detail-value task-detail-time" title="Started: ${formatDate(startedAt)}">
+          ${getIcon('play', 14)}
+          <span>${formatRelativeTime(startedAt)}</span>
         </div>
       </div>
     `;
@@ -433,19 +433,42 @@ function renderTaskDetails(task, progress, status) {
     html += `
       <div class="task-detail-section">
         <div class="task-detail-label">Completed</div>
-        <div class="task-detail-value task-detail-time">
-          ${getIcon('checkCircle', 14)}
-          <span title="${formatDate(completedAt)}">${formatRelativeTime(completedAt)}</span>
+        <div class="task-detail-value task-detail-time" title="Completed: ${formatDate(completedAt)}">
+          ${getIcon('check', 14)}
+          <span>${formatRelativeTime(completedAt)}</span>
         </div>
       </div>
     `;
   }
 
   if (duration) {
+    // Calculate full duration for tooltip
+    const start = new Date(startedAt);
+    const end = new Date(completedAt);
+    const diffMs = end - start;
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHour = Math.floor(diffMin / 60);
+    const diffDays = Math.floor(diffHour / 24);
+    const remainHour = diffHour % 24;
+    const remainMin = diffMin % 60;
+    const remainSec = diffSec % 60;
+    let durationFull;
+    if (diffDays > 0) {
+      durationFull = `${diffDays}:${String(remainHour).padStart(2, '0')}:${String(remainMin).padStart(2, '0')}:${String(remainSec).padStart(2, '0')}`;
+    } else if (remainHour > 0) {
+      durationFull = `${String(remainHour).padStart(2, '0')}:${String(remainMin).padStart(2, '0')}:${String(remainSec).padStart(2, '0')}`;
+    } else {
+      durationFull = `${String(remainMin).padStart(2, '0')}:${String(remainSec).padStart(2, '0')}`;
+    }
+
     html += `
       <div class="task-detail-section">
         <div class="task-detail-label">Duration</div>
-        <div class="task-detail-value">${duration}</div>
+        <div class="task-detail-value task-detail-time" title="Duration: ${durationFull}">
+          ${getIcon('clock', 14)}
+          <span>${duration}</span>
+        </div>
       </div>
     `;
   }
@@ -464,15 +487,15 @@ function renderTaskDetails(task, progress, status) {
     html += `
       <div class="task-detail-section">
         <div class="task-detail-label">Tokens</div>
-        <div class="task-detail-value">
+        <div class="task-detail-value" title="Tokens used: ${finalTokens.toLocaleString()}">
           <div class="task-detail-tokens">
-            ${getIcon('tokens', 14)}
+            ${getIcon('coin', 14)}
             <span>${finalTokens.toLocaleString()} / ${tokenLimit.toLocaleString()}</span>
+            <span class="task-detail-token-percent" style="color: ${tokenColor};">${tokenPercent}%</span>
           </div>
           <div class="task-detail-token-bar">
             <div class="task-detail-token-fill" style="width: ${tokenPercent}%; background: ${tokenColor};"></div>
           </div>
-          <div class="task-detail-token-percent" style="color: ${tokenColor};">${tokenPercent}%</div>
         </div>
       </div>
     `;
@@ -747,7 +770,11 @@ function loadDetailsState() {
     const savedWidth = localStorage.getItem(DETAILS_WIDTH_KEY);
     if (savedWidth !== null) {
       const parsed = parseInt(savedWidth, 10);
-      if (!isNaN(parsed) && parsed >= DETAILS_MIN_WIDTH && parsed <= DETAILS_MAX_WIDTH) {
+      if (
+        !isNaN(parsed) &&
+        parsed >= DETAILS_MIN_WIDTH &&
+        parsed <= DETAILS_MAX_WIDTH
+      ) {
         detailsWidth = parsed;
       }
     }
@@ -838,7 +865,10 @@ function initDetailsResizer() {
     let newWidth = startWidth + delta;
 
     // Clamp to min/max
-    newWidth = Math.max(DETAILS_MIN_WIDTH, Math.min(DETAILS_MAX_WIDTH, newWidth));
+    newWidth = Math.max(
+      DETAILS_MIN_WIDTH,
+      Math.min(DETAILS_MAX_WIDTH, newWidth)
+    );
 
     detailsWidth = newWidth;
     detailsPanel.style.width = `${newWidth}px`;

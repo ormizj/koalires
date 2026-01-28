@@ -44,6 +44,9 @@ let currentColumnId = null;
 let columnTasks = [];
 let selectedTaskIndex = 0;
 
+// Keyboard navigation state
+let keyboardListenerActive = false;
+
 // Modal instance
 let metadataModal = null;
 
@@ -257,6 +260,9 @@ export function showModal(taskName, openedAt = null) {
   // Load default tab (board)
   switchTab('board');
 
+  // Activate keyboard navigation
+  activateKeyboardNavigation();
+
   // Start auto-refresh polling
   startRefreshPolling();
 }
@@ -320,6 +326,9 @@ export async function showColumnModal(columnId, taskNames, openedAt = null) {
   checkTabDataAvailability();
   switchTab('board');
 
+  // Activate keyboard navigation
+  activateKeyboardNavigation();
+
   // Start auto-refresh
   startRefreshPolling();
 }
@@ -332,6 +341,9 @@ export function hideModal() {
 
   // Stop auto-refresh polling
   stopRefreshPolling();
+
+  // Deactivate keyboard navigation
+  deactivateKeyboardNavigation();
 
   // Hide modal via BaseModal
   metadataModal.hide();
@@ -365,6 +377,9 @@ function minimizeModal() {
 
   // Stop auto-refresh polling
   stopRefreshPolling();
+
+  // Deactivate keyboard navigation
+  deactivateKeyboardNavigation();
 
   // Minimize via BaseModal
   metadataModal.minimize({
@@ -1386,6 +1401,78 @@ function initQaToggle() {
       switchTab(currentTabName);
     }
   });
+}
+
+// ===== Keyboard Navigation =====
+
+/**
+ * Handle keyboard navigation for tasks and tabs
+ */
+function handleKeyDown(e) {
+  // Skip if modal not visible
+  if (!metadataModal?.getIsVisible()) return;
+
+  // Skip if input/textarea is focused (don't break search input)
+  const activeTag = document.activeElement?.tagName;
+  if (activeTag === 'INPUT' || activeTag === 'TEXTAREA') return;
+
+  const { key } = e;
+
+  // Task navigation (Arrow Up/Down) - only in column mode with sidebar
+  if ((key === 'ArrowDown' || key === 'ArrowUp') && isColumnMode) {
+    e.preventDefault();
+    const taskCount = columnTasks.length;
+    if (taskCount === 0) return;
+
+    if (key === 'ArrowDown' && selectedTaskIndex < taskCount - 1) {
+      const newIndex = selectedTaskIndex + 1;
+      selectSidebarTask(columnTasks[newIndex], newIndex);
+    } else if (key === 'ArrowUp' && selectedTaskIndex > 0) {
+      const newIndex = selectedTaskIndex - 1;
+      selectSidebarTask(columnTasks[newIndex], newIndex);
+    }
+  }
+
+  // Tab navigation (Arrow Left/Right)
+  if (key === 'ArrowLeft' || key === 'ArrowRight') {
+    e.preventDefault();
+    const allTabs = ['board', 'progress', 'prompt', 'log', 'output'];
+    const enabledTabs = allTabs.filter((tab) => {
+      const tabEl = metadataModal.element?.querySelector(
+        `.modal-tab[data-tab="${tab}"]`
+      );
+      return tabEl && !tabEl.classList.contains('disabled');
+    });
+
+    const currentIdx = enabledTabs.indexOf(currentTabName);
+    if (currentIdx === -1) return;
+
+    if (key === 'ArrowRight' && currentIdx < enabledTabs.length - 1) {
+      switchTab(enabledTabs[currentIdx + 1]);
+    } else if (key === 'ArrowLeft' && currentIdx > 0) {
+      switchTab(enabledTabs[currentIdx - 1]);
+    }
+  }
+}
+
+/**
+ * Activate keyboard navigation listener
+ */
+function activateKeyboardNavigation() {
+  if (!keyboardListenerActive) {
+    document.addEventListener('keydown', handleKeyDown);
+    keyboardListenerActive = true;
+  }
+}
+
+/**
+ * Deactivate keyboard navigation listener
+ */
+function deactivateKeyboardNavigation() {
+  if (keyboardListenerActive) {
+    document.removeEventListener('keydown', handleKeyDown);
+    keyboardListenerActive = false;
+  }
 }
 
 // ===== Sidebar Functions =====

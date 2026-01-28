@@ -9,35 +9,63 @@ import {
 } from '../../shared/utils/format.js';
 import { getTaskStatus } from '../../shared/tasks.js';
 import { showTaskModal } from '../task-modal/index.js';
+import { tableStore } from '../../shared/store/index.js';
 
 export const tableView = {
   // Internal state
   _currentTasks: [],
   _originalOrder: [],
   _currentSort: { column: null, direction: null },
+  _tddData: {},
 
   /**
    * Render the table view with tasks
    * @param {Object} boardData - Board data
    * @param {Object} progressData - Progress data
+   * @param {Object} tddData - TDD/QA progress data
    */
-  render(boardData, progressData) {
+  render(boardData, progressData, tddData = {}) {
     if (!boardData?.tasks) return;
+    this._tddData = tddData;
 
     this._originalOrder = boardData.tasks.map((task) => {
       const progress = progressData?.[task.name] || {};
+      const tdd = tddData?.[task.name] || {};
       const status = getTaskStatus(task, progressData || {});
-      const tokensUsed = progress.tokensUsed || [];
-      const finalTokens =
-        tokensUsed.length > 0 ? tokensUsed[tokensUsed.length - 1] : 0;
+
+      // Worker tokens
+      const workerTokensArray = progress.tokensUsed || [];
+      const workerTokens =
+        workerTokensArray.length > 0
+          ? workerTokensArray[workerTokensArray.length - 1]
+          : 0;
+
+      // TDD/QA tokens
+      const tddTokensArray = tdd.tokensUsed || [];
+      const tddTokens =
+        tddTokensArray.length > 0
+          ? tddTokensArray[tddTokensArray.length - 1]
+          : 0;
+
+      // Combined tokens
+      const combinedTokens = workerTokens + tddTokens;
 
       return {
         name: task.name,
         category: task.category || '',
         status: status,
-        startedAt: progress.startedAt || null,
-        completedAt: progress.completedAt || null,
-        tokens: finalTokens,
+        // Worker timestamps
+        workerStartedAt: progress.startedAt || null,
+        workerCompletedAt: progress.completedAt || null,
+        workerTokens: workerTokens,
+        // TDD/QA timestamps
+        tddStartedAt: tdd.startedAt || null,
+        tddCompletedAt: tdd.completedAt || null,
+        tddTokens: tddTokens,
+        // Combined (for main row display)
+        startedAt: progress.startedAt || tdd.startedAt || null,
+        completedAt: progress.completedAt || tdd.completedAt || null,
+        tokens: combinedTokens,
         raw: task,
       };
     });
@@ -162,14 +190,22 @@ export const tableView = {
     if (!tbody) return;
 
     tbody.innerHTML = this._currentTasks
-      .map((task) => this._createTableRow(task))
+      .map((task) => this._createTableRowGroup(task))
       .join('');
 
-    // Add click handlers for row selection
-    tbody.querySelectorAll('tr').forEach((row) => {
+    // Add click handlers for row selection and expansion
+    tbody.querySelectorAll('.table-row-main').forEach((row) => {
+      const taskName = row.dataset.taskName;
+
+      // Double click on row toggles expansion
+      row.addEventListener('dblclick', (e) => {
+        if (e.target.closest('.table-action-btn')) return;
+        this._toggleRowExpansion(taskName);
+      });
+
+      // Single click opens task modal (existing behavior)
       row.addEventListener('click', (e) => {
         if (e.target.closest('.table-action-btn')) return;
-        const taskName = row.dataset.taskName;
         if (taskName) {
           showTaskModal(taskName);
         }
@@ -177,14 +213,24 @@ export const tableView = {
     });
   },
 
-  _createTableRow(task) {
+  _createTableRowGroup(task) {
+    const isExpanded = tableStore.isRowExpanded(task.name);
+    return (
+      this._createMainRow(task, isExpanded) +
+      this._createDetailRow(task, 'worker', isExpanded) +
+      this._createDetailRow(task, 'qa', isExpanded)
+    );
+  },
+
+  _createMainRow(task, isExpanded) {
     const statusClass = this._getStatusClass(task.status);
     const statusLabel = this._getStatusLabel(task.status);
     const categoryClass = `category-${task.category}`;
     const duration = calculateDuration(task.startedAt, task.completedAt);
+    const expandedClass = isExpanded ? 'expanded' : '';
 
     return `
-      <tr data-task-name="${this._escapeHtml(task.name)}">
+      <tr class="table-row-main ${expandedClass}" data-task-name="${this._escapeHtml(task.name)}">
         <td>
           <span class="table-task-name">${this._escapeHtml(task.name)}</span>
         </td>
@@ -200,6 +246,52 @@ export const tableView = {
         <td>${task.tokens > 0 ? formatTokens(task.tokens) : '-'}</td>
       </tr>
     `;
+  },
+
+  _createDetailRow(task, type, isExpanded) {
+    const isWorker = type === 'worker';
+    const label = isWorker ? 'Worker' : 'QA';
+    const className = isWorker ? 'table-row-worker' : 'table-row-qa';
+    const startedAt = isWorker ? task.workerStartedAt : task.tddStartedAt;
+    const completedAt = isWorker ? task.workerCompletedAt : task.tddCompletedAt;
+    const tokens = isWorker ? task.workerTokens : task.tddTokens;
+    const duration = calculateDuration(startedAt, completedAt);
+    const displayStyle = isExpanded ? '' : 'display: none;';
+
+    return `
+      <tr class="table-row-detail ${className}" data-task-name="${this._escapeHtml(task.name)}" style="${displayStyle}">
+        <td>
+          <span class="table-detail-indent"></span>
+          <span class="table-detail-label">${label}</span>
+        </td>
+        <td></td>
+        <td></td>
+        <td>${startedAt ? formatRelativeTime(startedAt) : '-'}</td>
+        <td>${completedAt ? formatRelativeTime(completedAt) : '-'}</td>
+        <td>${duration || '-'}</td>
+        <td>${tokens > 0 ? formatTokens(tokens) : '-'}</td>
+      </tr>
+    `;
+  },
+
+  _toggleRowExpansion(taskName) {
+    const isExpanded = tableStore.toggleRowExpanded(taskName);
+
+    // Update the main row
+    const mainRow = document.querySelector(
+      `.table-row-main[data-task-name="${taskName}"]`
+    );
+    if (mainRow) {
+      mainRow.classList.toggle('expanded', isExpanded);
+    }
+
+    // Show/hide detail rows
+    const detailRows = document.querySelectorAll(
+      `.table-row-detail[data-task-name="${taskName}"]`
+    );
+    detailRows.forEach((row) => {
+      row.style.display = isExpanded ? '' : 'none';
+    });
   },
 
   _getStatusClass(status) {

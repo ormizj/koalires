@@ -204,17 +204,43 @@ export const modalStore = {
   },
 
   /**
-   * Get all modals sorted by openedAt timestamp with focus state
+   * Get all modals sorted by type, mode/column, then openedAt
+   * Sort order: metadata before task, then "all" first, columns in kanban order, singles by openedAt
    * @returns {Array} Array of { id, isFocused, ...modalState } objects
    */
   getAllModalsSorted() {
+    const COLUMN_ORDER = ['all', 'pending', 'blocked', 'progress', 'review', 'completed'];
+    const TYPE_ORDER = { metadata: 0, task: 1 };
+
     return Array.from(this.modals.entries())
       .map(([id, state]) => ({
         id,
         isFocused: this.focusedModalId === id,
         ...state,
       }))
-      .sort((a, b) => (a.openedAt || 0) - (b.openedAt || 0));
+      .sort((a, b) => {
+        // 1. Sort by type (metadata before task)
+        const typeA = TYPE_ORDER[a.type] ?? 2;
+        const typeB = TYPE_ORDER[b.type] ?? 2;
+        if (typeA !== typeB) return typeA - typeB;
+
+        // 2. Within same type, sort by mode/column
+        const getModeOrder = (modal) => {
+          if (modal.mode === 'column') {
+            const colIndex = COLUMN_ORDER.indexOf(modal.columnId);
+            return colIndex >= 0 ? colIndex : COLUMN_ORDER.length;
+          }
+          // Single mode comes after all columns
+          return COLUMN_ORDER.length + 1;
+        };
+
+        const modeOrderA = getModeOrder(a);
+        const modeOrderB = getModeOrder(b);
+        if (modeOrderA !== modeOrderB) return modeOrderA - modeOrderB;
+
+        // 3. Within same mode (single tasks), sort by openedAt
+        return (a.openedAt || 0) - (b.openedAt || 0);
+      });
   },
 
   /**

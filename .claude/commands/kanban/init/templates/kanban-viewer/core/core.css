@@ -492,11 +492,11 @@ body {
 }
 
 /* Different active colors per mode */
-.token-mode-btn.active[data-mode="worker"] {
+.token-mode-btn.active[data-mode='worker'] {
   background: var(--status-progress);
 }
 
-.token-mode-btn.active[data-mode="tdd"] {
+.token-mode-btn.active[data-mode='tdd'] {
   background: var(--status-review);
 }
 

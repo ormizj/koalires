@@ -6,6 +6,8 @@ import { showModal, showColumnModal } from '../metadata-modal/index.js';
 import { showTaskModal, showColumnTaskModal } from '../task-modal/index.js';
 import { getBoardData, getProgressData } from '../../core/data.js';
 import { getTaskStatus } from '../../shared/tasks.js';
+import { tableView } from '../table/table-view.js';
+import { boardStore } from '../../shared/store/index.js';
 
 let activeMenu = null;
 let targetTaskElement = null;
@@ -74,7 +76,7 @@ function handleContextMenu(event) {
   }
 
   // Check if right-clicked on a table row
-  const tableRow = event.target.closest('.task-table tbody tr');
+  const tableRow = event.target.closest('.task-table tbody tr.table-row-main');
   if (tableRow) {
     showTableRowContextMenu(event, tableRow);
     return;
@@ -115,16 +117,12 @@ function showTaskContextMenu(event, taskElement) {
 }
 
 function showTableRowContextMenu(event, tableRow) {
-  // Create a fake task element wrapper for compatibility with handleTaskMenuClick
   const taskName = tableRow.dataset.taskName || 'Task';
-  targetTaskElement = {
-    querySelector: (selector) => {
-      if (selector === '.task-name') {
-        return { textContent: taskName };
-      }
-      return null;
-    },
-  };
+
+  // Store actual table row element with marker
+  targetTaskElement = tableRow;
+  targetTaskElement._isTableRow = true;
+  targetTaskElement._taskName = taskName;
 
   const menu = document.getElementById('task-context-menu');
 
@@ -132,12 +130,13 @@ function showTableRowContextMenu(event, tableRow) {
   const titleEl = document.getElementById('task-menu-title');
   if (titleEl) titleEl.textContent = taskName;
 
-  // Hide expand/collapse options in table view (not applicable)
+  // Show expand/collapse based on row expansion state
+  const isExpanded = tableRow.classList.contains('expanded');
   const expandItem = menu.querySelector('[data-action="expand-task"]');
   const collapseItem = menu.querySelector('[data-action="collapse-task"]');
 
-  if (expandItem) expandItem.classList.add('hidden');
-  if (collapseItem) collapseItem.classList.add('hidden');
+  if (expandItem) expandItem.classList.toggle('hidden', isExpanded);
+  if (collapseItem) collapseItem.classList.toggle('hidden', !isExpanded);
 
   positionMenu(menu, event.clientX, event.clientY);
   menu.classList.remove('hidden');
@@ -267,38 +266,61 @@ function handleTaskMenuClick(event) {
   const action = menuItem.dataset.action;
 
   switch (action) {
-    case 'expand-task':
-      // Find the actual DOM element for the task card
-      if (targetTaskElement && targetTaskElement.classList) {
-        targetTaskElement.classList.add('expanded');
+    case 'view-task':
+      if (targetTaskElement?._isTableRow) {
+        showTaskModal(targetTaskElement._taskName);
       } else if (targetTaskElement) {
-        // Handle table row case - find the actual card by task name
         const taskName =
-          targetTaskElement.querySelector?.('.task-name')?.textContent;
+          targetTaskElement.querySelector('.task-name')?.textContent;
+        if (taskName) showTaskModal(taskName);
+      }
+      break;
+    case 'expand-task':
+      if (targetTaskElement?._isTableRow) {
+        // Handle table row expansion
+        tableView._toggleRowExpansion(targetTaskElement._taskName);
+      } else if (targetTaskElement && targetTaskElement.classList) {
+        // Handle board card expansion - use boardStore for persistence
+        const taskName = targetTaskElement.dataset?.taskName ||
+          targetTaskElement.querySelector('.task-name')?.textContent;
         if (taskName) {
-          const taskCard = document.querySelector(
-            `.task[data-task-name="${taskName}"]`
-          );
+          boardStore.setTaskExpanded(taskName, true);
+          targetTaskElement.classList.add('expanded');
+        }
+      } else if (targetTaskElement) {
+        const taskName = targetTaskElement.querySelector?.('.task-name')?.textContent;
+        if (taskName) {
+          boardStore.setTaskExpanded(taskName, true);
+          const taskCard = document.querySelector(`.task[data-task-name="${taskName}"]`);
           taskCard?.classList.add('expanded');
         }
       }
       break;
     case 'collapse-task':
-      if (targetTaskElement && targetTaskElement.classList) {
-        targetTaskElement.classList.remove('expanded');
-      } else if (targetTaskElement) {
-        const taskName =
-          targetTaskElement.querySelector?.('.task-name')?.textContent;
+      if (targetTaskElement?._isTableRow) {
+        // Handle table row collapse
+        tableView._toggleRowExpansion(targetTaskElement._taskName);
+      } else if (targetTaskElement && targetTaskElement.classList) {
+        // Handle board card collapse - use boardStore for persistence
+        const taskName = targetTaskElement.dataset?.taskName ||
+          targetTaskElement.querySelector('.task-name')?.textContent;
         if (taskName) {
-          const taskCard = document.querySelector(
-            `.task[data-task-name="${taskName}"]`
-          );
+          boardStore.setTaskExpanded(taskName, false);
+          targetTaskElement.classList.remove('expanded');
+        }
+      } else if (targetTaskElement) {
+        const taskName = targetTaskElement.querySelector?.('.task-name')?.textContent;
+        if (taskName) {
+          boardStore.setTaskExpanded(taskName, false);
+          const taskCard = document.querySelector(`.task[data-task-name="${taskName}"]`);
           taskCard?.classList.remove('expanded');
         }
       }
       break;
     case 'view-metadata':
-      if (targetTaskElement) {
+      if (targetTaskElement?._isTableRow) {
+        showModal(targetTaskElement._taskName);
+      } else if (targetTaskElement) {
         const taskName =
           targetTaskElement.querySelector('.task-name')?.textContent;
         if (taskName) showModal(taskName);
@@ -335,11 +357,13 @@ function handleAppMenuClick(event) {
       break;
     }
     case 'collapse-all':
+      boardStore.collapseAllTasks();
       document.querySelectorAll('.task.expanded').forEach((task) => {
         task.classList.remove('expanded');
       });
       break;
     case 'expand-all':
+      boardStore.expandAllTasks();
       document.querySelectorAll('.task').forEach((task) => {
         task.classList.add('expanded');
       });
@@ -372,16 +396,18 @@ function handleColumnMenuClick(event) {
     }
     case 'column-collapse-all':
       if (targetColumnElement) {
-        targetColumnElement
-          .querySelectorAll('.task.expanded')
-          .forEach((task) => {
-            task.classList.remove('expanded');
-          });
+        targetColumnElement.querySelectorAll('.task.expanded').forEach((task) => {
+          const taskName = task.dataset.taskName;
+          if (taskName) boardStore.setTaskExpanded(taskName, false);
+          task.classList.remove('expanded');
+        });
       }
       break;
     case 'column-expand-all':
       if (targetColumnElement) {
         targetColumnElement.querySelectorAll('.task').forEach((task) => {
+          const taskName = task.dataset.taskName;
+          if (taskName) boardStore.setTaskExpanded(taskName, true);
           task.classList.add('expanded');
         });
       }

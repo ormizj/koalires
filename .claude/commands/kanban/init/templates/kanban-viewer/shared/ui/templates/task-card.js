@@ -4,7 +4,7 @@
  */
 
 import { escapeHtml } from '../../utils/dom.js';
-import { formatRelativeTime, formatTokens } from '../../utils/format.js';
+import { formatRelativeTime, formatTokens, parseMarkdown } from '../../utils/format.js';
 import { getIcon } from '../../utils/icons.js';
 import { getCategoryClass } from '../components/CategoryBadge.js';
 
@@ -30,33 +30,54 @@ export function createTaskCard(task, progress, status) {
     ? `
       <div class="task-description-section">
         <div class="task-description-label">Description</div>
-        <div class="task-description">${escapeHtml(task.description)}</div>
+        <div class="task-description">${parseMarkdown(task.description)}</div>
       </div>
     `
     : '';
 
   const stepsHtml = createStepsSection(task.steps, status);
-  const affectedFilesHtml = createAffectedFilesSection(task.affectedFiles);
-  const agentsHtml = createAgentsSection(task.agents, task.qaAgent);
-  const logHtml = createLogSection(progress?.log);
+  const stepsSummaryHtml = createStepsSummarySection(task.steps);
+  const workLogSummaryHtml = createWorkLogSummarySection(progress?.workLog);
+  const affectedFilesHtml = createAffectedFilesSection(progress?.affectedFiles);
+  const agentsHtml = createAgentsSection(progress?.agent, progress?.tddAgent);
+  const logHtml = createLogSection(progress?.workLog);
   const timestampsHtml = createTimestampsSection(progress);
   const tokensHtml = createTokensSection(finalTokens);
   const filesChangedHtml = createFilesChangedSection(progress);
 
+  // Build summary badges (hidden when expanded)
+  const hasBadges = stepsSummaryHtml || workLogSummaryHtml;
+  const badgesHtml = hasBadges
+    ? `<div class="task-summary-badges">${stepsSummaryHtml}${workLogSummaryHtml}</div>`
+    : '';
+
   return `
-    <div class="task ${status}" data-task="${escapeHtml(task.name)}" onclick="openTaskModal('${escapeHtml(task.name)}')">
+    <div class="task ${status}" data-task-name="${escapeHtml(task.name)}" onclick="openTaskModal('${escapeHtml(task.name)}')">
       <div class="task-header">
         <span class="task-name">${escapeHtml(task.name)}</span>
         ${categoryHtml}
       </div>
-      ${descriptionHtml}
-      ${stepsHtml}
-      ${affectedFilesHtml}
-      ${agentsHtml}
-      ${logHtml}
-      ${timestampsHtml}
-      ${tokensHtml}
-      ${filesChangedHtml}
+
+      <div class="task-main-content">
+        ${descriptionHtml}
+        ${stepsHtml}
+        ${logHtml}
+      </div>
+
+      <div class="task-details">
+        <div class="task-details-header">
+          <div class="task-details-divider"></div>
+          <span class="task-details-label">Details</span>
+          <div class="task-details-divider"></div>
+        </div>
+        ${badgesHtml}
+        ${hasBadges ? '<div class="task-details-separator"></div>' : ''}
+        ${timestampsHtml}
+        ${tokensHtml}
+        ${agentsHtml}
+        ${affectedFilesHtml}
+        ${filesChangedHtml}
+      </div>
     </div>
   `;
 }
@@ -64,35 +85,46 @@ export function createTaskCard(task, progress, status) {
 function createStepsSection(steps, status) {
   if (!steps || steps.length === 0) return '';
 
-  const maxVisible = 3;
-  const visibleSteps = steps.slice(0, maxVisible);
-  const hiddenSteps = steps.slice(maxVisible);
-  const hasMore = hiddenSteps.length > 0;
-
   let html = `
     <div class="task-steps">
       <div class="task-steps-label">Steps</div>
   `;
 
-  visibleSteps.forEach((step) => {
+  steps.forEach((step) => {
     html += `<div class="task-step">${escapeHtml(step)}</div>`;
   });
-
-  if (hasMore) {
-    hiddenSteps.forEach((step) => {
-      html += `<div class="task-step task-steps-hidden" style="display: none;">${escapeHtml(step)}</div>`;
-    });
-    html += `<div class="task-steps-collapsed">+${hiddenSteps.length} more steps...</div>`;
-  }
 
   html += '</div>';
   return html;
 }
 
+function createStepsSummarySection(steps) {
+  if (!steps || steps.length === 0) return '';
+
+  return `
+    <div class="task-summary-badge">
+      ${getIcon('list', 12)}
+      <span>${steps.length} Verification Step${steps.length !== 1 ? 's' : ''}</span>
+    </div>
+  `;
+}
+
+function createWorkLogSummarySection(workLog) {
+  if (!workLog || workLog.length === 0) return '';
+
+  return `
+    <div class="task-summary-badge">
+      ${getIcon('file', 12)}
+      <span>${workLog.length} Work Log${workLog.length !== 1 ? 's' : ''}</span>
+    </div>
+  `;
+}
+
 function createAffectedFilesSection(files) {
   if (!files || files.length === 0) return '';
 
-  const maxVisible = 3;
+  // 1-3 files: show all, 4+ files: show 2 + "X more"
+  const maxVisible = files.length <= 3 ? 3 : 2;
   const visibleFiles = files.slice(0, maxVisible);
 
   let html = `
@@ -112,8 +144,8 @@ function createAffectedFilesSection(files) {
   return html;
 }
 
-function createAgentsSection(agents, qaAgent) {
-  if ((!agents || agents.length === 0) && !qaAgent) return '';
+function createAgentsSection(agent, tddAgent) {
+  if (!agent && !tddAgent) return '';
 
   let html = `
     <div class="task-agents">
@@ -121,14 +153,12 @@ function createAgentsSection(agents, qaAgent) {
       <div class="task-agents-list">
   `;
 
-  if (agents) {
-    agents.forEach((agent) => {
-      html += `<span class="task-agent">${escapeHtml(agent)}</span>`;
-    });
+  if (agent) {
+    html += `<span class="task-agent">${escapeHtml(agent)}</span>`;
   }
 
-  if (qaAgent) {
-    html += `<span class="task-agent task-agent-qa">${escapeHtml(qaAgent)}</span>`;
+  if (tddAgent) {
+    html += `<span class="task-agent task-agent-qa">${escapeHtml(tddAgent)}</span>`;
   }
 
   html += '</div></div>';
@@ -162,8 +192,9 @@ function createTimestampsSection(progress) {
   let html = '<div class="task-timestamps">';
 
   if (startedAt) {
+    const startDate = new Date(startedAt).toLocaleString();
     html += `
-      <div class="task-timestamp started">
+      <div class="task-timestamp started" title="Started: ${startDate}">
         <span class="task-timestamp-icon">${getIcon('play', 12)}</span>
         ${formatRelativeTime(startedAt)}
       </div>
@@ -171,8 +202,9 @@ function createTimestampsSection(progress) {
   }
 
   if (completedAt) {
+    const completeDate = new Date(completedAt).toLocaleString();
     html += `
-      <div class="task-timestamp completed">
+      <div class="task-timestamp completed" title="Completed: ${completeDate}">
         <span class="task-timestamp-icon">${getIcon('check', 12)}</span>
         ${formatRelativeTime(completedAt)}
       </div>
@@ -183,14 +215,26 @@ function createTimestampsSection(progress) {
     const start = new Date(startedAt);
     const end = new Date(completedAt);
     const diffMs = end - start;
-    const diffMin = Math.floor(diffMs / 60000);
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
     const diffHour = Math.floor(diffMin / 60);
+    const diffDays = Math.floor(diffHour / 24);
+    const remainHour = diffHour % 24;
     const remainMin = diffMin % 60;
+    const remainSec = diffSec % 60;
     const duration =
       diffHour > 0 ? `${diffHour}h ${remainMin}m` : `${diffMin}m`;
+    let durationFull;
+    if (diffDays > 0) {
+      durationFull = `${diffDays}:${String(remainHour).padStart(2, '0')}:${String(remainMin).padStart(2, '0')}:${String(remainSec).padStart(2, '0')}`;
+    } else if (remainHour > 0) {
+      durationFull = `${String(remainHour).padStart(2, '0')}:${String(remainMin).padStart(2, '0')}:${String(remainSec).padStart(2, '0')}`;
+    } else {
+      durationFull = `${String(remainMin).padStart(2, '0')}:${String(remainSec).padStart(2, '0')}`;
+    }
 
     html += `
-      <div class="task-timestamp duration">
+      <div class="task-timestamp duration" title="Duration: ${durationFull}">
         <span class="task-timestamp-icon">${getIcon('clock', 12)}</span>
         ${duration}
       </div>
@@ -214,13 +258,16 @@ function createTokensSection(tokens) {
     severityClass = 'warning';
   }
 
+  const percentColor = percentage >= 90 ? '#f85149' : percentage >= 70 ? '#f0883e' : '#58a6ff';
+
   return `
-    <div class="task-tokens ${severityClass}">
+    <div class="task-tokens ${severityClass}" title="Tokens used: ${tokens.toLocaleString()}">
       <span class="task-tokens-icon">${getIcon('coin', 14)}</span>
       <span>${formattedTokens}</span>
       <div class="task-tokens-bar">
         <div class="task-tokens-fill" style="width: ${percentage}%"></div>
       </div>
+      <span class="task-tokens-percent" style="color: ${percentColor};">${percentage.toFixed(1)}%</span>
     </div>
   `;
 }

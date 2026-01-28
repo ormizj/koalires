@@ -172,3 +172,75 @@
   background: var(--color-bg-active);
   color: var(--color-text);
 }
+
+/* ==============================================
+   Expandable Row Styles
+   ============================================== */
+
+/* Main Row Styles */
+.table-row-main {
+  cursor: pointer;
+}
+
+.table-row-main.expanded {
+  background: var(--color-bg-active);
+}
+
+/* Detail Rows */
+.table-row-detail {
+  font-size: 12px;
+}
+
+.table-row-detail td {
+  padding: 8px 16px;
+  color: var(--color-text-muted);
+}
+
+.table-row-detail td:first-child {
+  padding-left: 40px;
+}
+
+/* Detail Indent */
+.table-detail-indent {
+  display: inline-block;
+  width: 16px;
+  margin-right: 8px;
+}
+
+/* Detail Label Badge */
+.table-detail-label {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+/* Worker Row - faint orange/yellow background */
+.table-row-worker {
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.table-row-worker:hover {
+  background: rgba(245, 158, 11, 0.15);
+}
+
+.table-row-worker .table-detail-label {
+  background: var(--color-warning-bg);
+  color: var(--status-progress);
+}
+
+/* QA Row - faint purple background */
+.table-row-qa {
+  background: rgba(163, 113, 247, 0.08);
+}
+
+.table-row-qa:hover {
+  background: rgba(163, 113, 247, 0.15);
+}
+
+.table-row-qa .table-detail-label {
+  background: rgba(163, 113, 247, 0.2);
+  color: var(--status-review);
+}

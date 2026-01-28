@@ -71,7 +71,9 @@
           <div class="stats-title-row">
             <span class="stats-title">Token Statistics</span>
             <div class="token-mode-selector" id="token-mode-selector">
-              <button class="token-mode-btn active" data-mode="combined">ALL</button>
+              <button class="token-mode-btn active" data-mode="combined">
+                ALL
+              </button>
               <button class="token-mode-btn" data-mode="worker">WORKER</button>
               <button class="token-mode-btn" data-mode="tdd">QA</button>
             </div>
@@ -356,6 +358,10 @@
         <span class="context-menu-header-text" id="task-menu-title">Task</span>
       </div>
       <div class="context-menu-divider"></div>
+      <div class="context-menu-item" data-action="view-task">
+        <span class="context-menu-icon" id="ctx-task-view-icon"></span>
+        Task view
+      </div>
       <div class="context-menu-item" data-action="expand-task">
         <span class="context-menu-icon" id="ctx-expand-icon"></span>
         Expand
@@ -366,7 +372,7 @@
       </div>
       <div class="context-menu-item" data-action="view-metadata">
         <span class="context-menu-icon" id="ctx-task-metadata-icon"></span>
-        View metadata
+        Metadata
       </div>
     </div>
 
@@ -386,13 +392,13 @@
           >Task view (<span id="board-task-count-view">0</span> tasks)</span
         >
       </div>
-      <div class="context-menu-item" data-action="collapse-all">
-        <span class="context-menu-icon" id="ctx-board-collapse-icon"></span>
-        Collapse all tasks
-      </div>
       <div class="context-menu-item" data-action="expand-all">
         <span class="context-menu-icon" id="ctx-board-expand-icon"></span>
         Expand all tasks
+      </div>
+      <div class="context-menu-item" data-action="collapse-all">
+        <span class="context-menu-icon" id="ctx-board-collapse-icon"></span>
+        Collapse all tasks
       </div>
       <div class="context-menu-item" data-action="board-metadata">
         <span class="context-menu-icon" id="ctx-board-metadata-icon"></span>
@@ -420,13 +426,13 @@
           >Task view (<span id="column-task-count-view">0</span> tasks)</span
         >
       </div>
-      <div class="context-menu-item" data-action="column-collapse-all">
-        <span class="context-menu-icon" id="ctx-column-collapse-icon"></span>
-        Collapse all in column
-      </div>
       <div class="context-menu-item" data-action="column-expand-all">
         <span class="context-menu-icon" id="ctx-column-expand-icon"></span>
         Expand all in column
+      </div>
+      <div class="context-menu-item" data-action="column-collapse-all">
+        <span class="context-menu-icon" id="ctx-column-collapse-icon"></span>
+        Collapse all in column
       </div>
       <div class="context-menu-item" data-action="column-metadata">
         <span class="context-menu-icon" id="ctx-column-metadata-icon"></span>

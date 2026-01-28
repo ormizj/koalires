@@ -50,7 +50,7 @@ function render() {
 
   if (boardData) {
     boardView.render(boardData, progressData, tddData);
-    tableView.render(boardData, progressData);
+    tableView.render(boardData, progressData, tddData);
   }
 }
 
@@ -139,11 +139,13 @@ function initTokenModeToggle() {
 function injectContextMenuIcons() {
   // Task context menu
   const taskHeaderIcon = document.getElementById('ctx-task-header-icon');
+  const taskViewIcon = document.getElementById('ctx-task-view-icon');
   const expandIcon = document.getElementById('ctx-expand-icon');
   const collapseIcon = document.getElementById('ctx-collapse-icon');
   const taskMetadataIcon = document.getElementById('ctx-task-metadata-icon');
 
   if (taskHeaderIcon) taskHeaderIcon.innerHTML = getIcon('file', 12);
+  if (taskViewIcon) taskViewIcon.innerHTML = getIcon('clipboard', 14);
   if (expandIcon) expandIcon.innerHTML = getIcon('folderOpen', 14);
   if (collapseIcon) collapseIcon.innerHTML = getIcon('folder', 14);
   if (taskMetadataIcon) taskMetadataIcon.innerHTML = getIcon('search', 14);

@@ -19,6 +19,9 @@ export const boardStore = {
   maximizedColumn: null,
   autoCollapseColumns: new Set(),
 
+  // Expanded task cards
+  expandedTasks: new Set(),
+
   // Subscribers for state changes
   _subscribers: new Set(),
 
@@ -211,6 +214,67 @@ export const boardStore = {
     this.saveColumnState();
   },
 
+  // ===== Task Expansion Methods =====
+
+  /**
+   * Check if a task card is expanded
+   * @param {string} taskName - Task name
+   * @returns {boolean} True if expanded
+   */
+  isTaskExpanded(taskName) {
+    return this.expandedTasks.has(taskName);
+  },
+
+  /**
+   * Toggle task expansion state
+   * @param {string} taskName - Task name
+   * @returns {boolean} New state (true if expanded)
+   */
+  toggleTaskExpanded(taskName) {
+    if (this.expandedTasks.has(taskName)) {
+      this.expandedTasks.delete(taskName);
+    } else {
+      this.expandedTasks.add(taskName);
+    }
+    this._notifySubscribers('taskExpanded', taskName);
+    this.saveColumnState();
+    return this.expandedTasks.has(taskName);
+  },
+
+  /**
+   * Set task expansion state
+   * @param {string} taskName - Task name
+   * @param {boolean} expanded - Whether to expand
+   */
+  setTaskExpanded(taskName, expanded) {
+    if (expanded) {
+      this.expandedTasks.add(taskName);
+    } else {
+      this.expandedTasks.delete(taskName);
+    }
+    this._notifySubscribers('taskExpanded', taskName);
+    this.saveColumnState();
+  },
+
+  /**
+   * Expand all tasks
+   */
+  expandAllTasks() {
+    const tasks = this.boardData?.tasks || [];
+    tasks.forEach((task) => this.expandedTasks.add(task.name));
+    this._notifySubscribers('taskExpanded');
+    this.saveColumnState();
+  },
+
+  /**
+   * Collapse all tasks
+   */
+  collapseAllTasks() {
+    this.expandedTasks.clear();
+    this._notifySubscribers('taskExpanded');
+    this.saveColumnState();
+  },
+
   // ===== localStorage Persistence =====
 
   /**
@@ -222,6 +286,7 @@ export const boardStore = {
         minimized: Array.from(this.minimizedColumns),
         maximized: this.maximizedColumn,
         autoCollapse: Array.from(this.autoCollapseColumns),
+        expandedTasks: Array.from(this.expandedTasks),
       };
       localStorage.setItem(COLUMN_STATE_KEY, JSON.stringify(state));
     } catch {
@@ -240,11 +305,13 @@ export const boardStore = {
         this.minimizedColumns = new Set(state.minimized || []);
         this.maximizedColumn = state.maximized || null;
         this.autoCollapseColumns = new Set(state.autoCollapse || []);
+        this.expandedTasks = new Set(state.expandedTasks || []);
       }
     } catch {
       this.minimizedColumns = new Set();
       this.maximizedColumn = null;
       this.autoCollapseColumns = new Set();
+      this.expandedTasks = new Set();
     }
   },
 
