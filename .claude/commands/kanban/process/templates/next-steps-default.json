@@ -1,0 +1,69 @@
+{
+  "rules": [
+    {
+      "name": "npm-deps",
+      "pattern": "package\\.json$",
+      "command": "npm install",
+      "reason": "package.json was modified",
+      "priority": 0
+    },
+    {
+      "name": "composer-deps",
+      "pattern": "composer\\.json$",
+      "command": "composer install",
+      "reason": "composer.json was modified",
+      "priority": 0
+    },
+    {
+      "name": "pip-deps",
+      "pattern": "requirements\\.txt$",
+      "command": "pip install -r requirements.txt",
+      "reason": "requirements.txt was modified",
+      "priority": 0
+    },
+    {
+      "name": "prisma-generate",
+      "pattern": "\\.prisma$",
+      "command": "npm run db:generate",
+      "reason": "Prisma schema changed",
+      "priority": 1
+    },
+    {
+      "name": "prisma-push",
+      "pattern": "\\.prisma$",
+      "command": "npm run db:push",
+      "reason": "Database schema needs sync",
+      "priority": 2,
+      "critical": true
+    },
+    {
+      "name": "laravel-migrations",
+      "pattern": "database/migrations/",
+      "command": "php artisan migrate",
+      "reason": "Database migrations added",
+      "priority": 1,
+      "critical": true
+    },
+    {
+      "name": "typecheck",
+      "pattern": "\\.(ts|tsx|vue)$",
+      "command": "npm run typecheck",
+      "reason": "TypeScript files modified",
+      "priority": 3
+    },
+    {
+      "name": "lint",
+      "pattern": "\\.(ts|tsx|vue|js|jsx|css|scss|php|py)$",
+      "command": "npm run lint:fix",
+      "reason": "Code files modified",
+      "priority": 4
+    },
+    {
+      "name": "tests",
+      "pattern": "(tests?/|spec/|\\.test\\.|_test\\.)",
+      "command": "npm run test",
+      "reason": "Test files created or modified",
+      "priority": 5
+    }
+  ]
+}
