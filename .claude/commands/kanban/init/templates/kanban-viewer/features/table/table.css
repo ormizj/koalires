@@ -1,0 +1,174 @@
+/* ==============================================
+   Table View Styles
+   Task list table display
+   ============================================== */
+
+/* ==============================================
+   Table View Container
+   ============================================== */
+
+.table-view {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.table-view.hidden {
+  display: none;
+}
+
+/* ==============================================
+   Task Table
+   ============================================== */
+
+.task-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+/* ==============================================
+   Table Header
+   ============================================== */
+
+.task-table thead {
+  background: var(--color-bg-tertiary);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.task-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--color-border);
+  cursor: pointer;
+  user-select: none;
+}
+
+.task-table th:hover {
+  background: var(--color-bg-active);
+}
+
+/* Sort Icons */
+.task-table th .sort-icon {
+  margin-left: 4px;
+  opacity: 0.3;
+}
+
+.task-table th.sort-asc .sort-icon::after {
+  content: '\25B2';
+}
+
+.task-table th.sort-desc .sort-icon::after {
+  content: '\25BC';
+}
+
+.task-table th.sort-asc .sort-icon,
+.task-table th.sort-desc .sort-icon {
+  opacity: 1;
+}
+
+/* ==============================================
+   Table Body
+   ============================================== */
+
+.task-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-bg-tertiary);
+  color: var(--color-text);
+}
+
+.task-table tbody tr {
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.task-table tbody tr:hover {
+  background: var(--color-bg-tertiary);
+}
+
+/* ==============================================
+   Table Task Name
+   ============================================== */
+
+.table-task-name {
+  font-family: monospace;
+  font-weight: 500;
+}
+
+/* ==============================================
+   Table Status Badge
+   ============================================== */
+
+.table-status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.table-status-badge.pending {
+  background: rgba(139, 148, 158, 0.2);
+  color: var(--status-pending);
+}
+
+.table-status-badge.in-progress {
+  background: var(--color-warning-bg);
+  color: var(--status-progress);
+}
+
+.table-status-badge.code-review {
+  background: rgba(163, 113, 247, 0.2);
+  color: var(--status-review);
+}
+
+.table-status-badge.completed {
+  background: var(--color-success-bg);
+  color: var(--status-completed);
+}
+
+.table-status-badge.blocked {
+  background: var(--color-danger-bg);
+  color: var(--status-blocked);
+}
+
+/* ==============================================
+   Table Category Badge
+   ============================================== */
+
+.table-category-badge {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-family: monospace;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+/* ==============================================
+   Table Action Button
+   ============================================== */
+
+.table-action-btn {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all var(--transition-fast);
+}
+
+.table-action-btn:hover {
+  background: var(--color-bg-active);
+  color: var(--color-text);
+}

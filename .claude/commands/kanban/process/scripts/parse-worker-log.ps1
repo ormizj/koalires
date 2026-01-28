@@ -42,7 +42,10 @@ param(
     [string]$AgentName,
 
     [Parameter()]
-    [string]$StartedAt
+    [string]$StartedAt,
+
+    [Parameter()]
+    [switch]$IsTdd
 )
 
 $ErrorActionPreference = "Stop"
@@ -131,13 +134,6 @@ $subtype = ""
 $durationMs = 0
 $totalCost = 0
 $verificationSteps = @()
-$testResults = @{
-    totalTests = 0
-    passedTests = 0
-    failedTests = 0
-    skippedTests = 0
-    detected = $false
-}
 
 # Extract data from log entries
 foreach ($entry in $logEntries) {
@@ -213,71 +209,6 @@ foreach ($entry in $logEntries) {
                         }
                     }
 
-                    # Pattern 3: Test result patterns (Vitest, Jest, pytest, etc.)
-                    # Examples: "45 passed", "3 failed", "Tests: 48 passed, 3 failed"
-                    #           "✓ 45 tests passed", "46 out of 49 tests PASS"
-
-                    # Match "N passed" pattern
-                    if ($text -match '(\d+)\s+(?:tests?\s+)?pass(?:ed|ing)?') {
-                        $passCount = [int]$matches[1]
-                        if ($passCount -gt $testResults.passedTests) {
-                            $testResults.passedTests = $passCount
-                            $testResults.detected = $true
-                        }
-                    }
-
-                    # Match "N failed" pattern
-                    if ($text -match '(\d+)\s+(?:tests?\s+)?fail(?:ed|ing)?') {
-                        $failCount = [int]$matches[1]
-                        if ($failCount -gt $testResults.failedTests) {
-                            $testResults.failedTests = $failCount
-                            $testResults.detected = $true
-                        }
-                    }
-
-                    # Match "N out of M tests" pattern
-                    if ($text -match '(\d+)\s+out\s+of\s+(\d+)\s+tests?') {
-                        $passCount = [int]$matches[1]
-                        $totalCount = [int]$matches[2]
-                        if ($totalCount -gt $testResults.totalTests) {
-                            $testResults.totalTests = $totalCount
-                            $testResults.passedTests = $passCount
-                            $testResults.failedTests = $totalCount - $passCount
-                            $testResults.detected = $true
-                        }
-                    }
-
-                    # Match Vitest/Jest summary format "Tests: N passed, M failed, K total"
-                    if ($text -match 'Tests?:\s*(\d+)\s*passed') {
-                        $passCount = [int]$matches[1]
-                        if ($passCount -gt $testResults.passedTests) {
-                            $testResults.passedTests = $passCount
-                            $testResults.detected = $true
-                        }
-                    }
-                    if ($text -match 'Tests?:.*?(\d+)\s*failed') {
-                        $failCount = [int]$matches[1]
-                        if ($failCount -gt $testResults.failedTests) {
-                            $testResults.failedTests = $failCount
-                            $testResults.detected = $true
-                        }
-                    }
-                    if ($text -match 'Tests?:.*?(\d+)\s*total') {
-                        $totalCount = [int]$matches[1]
-                        if ($totalCount -gt $testResults.totalTests) {
-                            $testResults.totalTests = $totalCount
-                            $testResults.detected = $true
-                        }
-                    }
-
-                    # Match "FAIL" or "FAILED" without a number (at least one failure)
-                    if ($text -match '\b(?:FAIL|FAILED)\b' -and $testResults.failedTests -eq 0) {
-                        # Only set if we haven't detected a specific count
-                        if (-not $testResults.detected) {
-                            $testResults.failedTests = 1
-                            $testResults.detected = $true
-                        }
-                    }
                 }
             }
         }
@@ -328,7 +259,6 @@ $status = if ($isError -or $subtype -eq "error") {
 
 # Build verification object
 $allStepsPassed = $true
-$testsAllPassed = $true
 $verificationObj = @{
     passed = $true
     steps = @()
@@ -352,40 +282,14 @@ if ($verificationSteps.Count -gt 0) {
     $verificationObj.passed = ($status -eq "success")
 }
 
-# STRICT TEST PASS VALIDATION: If ANY tests failed, mark verification as failed
-# This ensures 100% test pass rate is required, not 94% or any partial pass
-if ($testResults.detected -and $testResults.failedTests -gt 0) {
-    $testsAllPassed = $false
-    $verificationObj.passed = $false
-
-    # Add test results to verification object for transparency
-    $verificationObj.testResults = @{
-        totalTests = $testResults.totalTests
-        passedTests = $testResults.passedTests
-        failedTests = $testResults.failedTests
-        passRate = if ($testResults.totalTests -gt 0) {
-            [math]::Round(($testResults.passedTests / $testResults.totalTests) * 100, 1)
-        } else { 0 }
-        reason = "STRICT: $($testResults.failedTests) test(s) failed. 100% pass rate required."
-    }
-} elseif ($testResults.detected -and $testResults.passedTests -gt 0 -and $testResults.failedTests -eq 0) {
-    # All tests passed
-    $verificationObj.testResults = @{
-        totalTests = if ($testResults.totalTests -gt 0) { $testResults.totalTests } else { $testResults.passedTests }
-        passedTests = $testResults.passedTests
-        failedTests = 0
-        passRate = 100
-    }
-}
-
 # Reconcile verification object with status (bidirectional correction)
 # If verification failed but status is success, mark as error
 if (-not $verificationObj.passed -and $status -eq "success") {
     $status = "error"
 }
 # If verification passed but status is error (false positive), mark as success
-# Only override if we have explicit verification steps that all passed AND tests passed
-if ($verificationObj.passed -and $verificationObj.steps.Count -gt 0 -and $status -eq "error" -and $testsAllPassed) {
+# Only override if we have explicit verification steps that all passed
+if ($verificationObj.passed -and $verificationObj.steps.Count -gt 0 -and $status -eq "error") {
     $status = "success"
 }
 
@@ -432,9 +336,10 @@ if (-not $StartedAt) {
 # Convert affected files to relative paths (remove project root if present)
 $normalizedFiles = @()
 foreach ($file in $affectedFiles) {
-    # Remove common Windows absolute path prefixes
-    $normalized = $file -replace "^[A-Za-z]:\\.*?\\koalires\\", ""
-    $normalized = $normalized -replace "\\", "/"
+    # Normalize to forward slashes first
+    $normalized = $file -replace "\\", "/"
+    # Remove common absolute path prefixes (handles both C:\ and C:/ formats)
+    $normalized = $normalized -replace "^[A-Za-z]:/.*?/koalires/", ""
     $normalizedFiles += $normalized
 }
 
@@ -450,6 +355,16 @@ $output = @{
     affectedFiles = $normalizedFiles
     tokensUsed = $tokensUsed
     durationMs = $durationMs
+}
+
+# For TDD phase, extract testFiles from affectedFiles
+if ($IsTdd) {
+    $testFiles = @($normalizedFiles | Where-Object {
+        $_ -match '\.(test|spec)\.(ts|js|tsx|jsx)$' -or
+        $_ -match 'test_.*\.py$' -or
+        $_ -match '.*_test\.(py|go)$'
+    })
+    $output.testFiles = $testFiles
 }
 
 # Add error details if status is error

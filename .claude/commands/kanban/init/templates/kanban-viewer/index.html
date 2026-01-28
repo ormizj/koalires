@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Kanban Board Viewer</title>
+    <!-- Styles -->
     <link rel="stylesheet" href="styles.css" />
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   </head>
@@ -66,8 +67,15 @@
           </div>
         </div>
         <div class="stats-separator"></div>
-        <div class="stats-section">
-          <div class="stats-title">Token Statistics</div>
+        <div class="stats-section token-stats-section">
+          <div class="stats-title-row">
+            <span class="stats-title">Token Statistics</span>
+            <div class="token-mode-selector" id="token-mode-selector">
+              <button class="token-mode-btn active" data-mode="combined">ALL</button>
+              <button class="token-mode-btn" data-mode="worker">WORKER</button>
+              <button class="token-mode-btn" data-mode="tdd">QA</button>
+            </div>
+          </div>
           <div class="stats">
             <div class="stat stat-min">
               <div class="stat-value" id="stat-min">0</div>
@@ -102,7 +110,13 @@
         <div class="column-header">
           <span class="column-title">Pending</span>
           <span class="column-count" id="count-pending">0</span>
+          <span class="auto-indicator"></span>
           <div class="column-controls">
+            <button
+              class="control-btn auto-btn"
+              title="Auto mode OFF"
+              onclick="toggleAutoCollapse(event, 'pending')"
+            ></button>
             <button
               class="control-btn minimize-btn"
               title="Minimize"
@@ -134,7 +148,13 @@
         <div class="column-header">
           <span class="column-title">Hold</span>
           <span class="column-count" id="count-blocked">0</span>
+          <span class="auto-indicator"></span>
           <div class="column-controls">
+            <button
+              class="control-btn auto-btn"
+              title="Auto mode OFF"
+              onclick="toggleAutoCollapse(event, 'blocked')"
+            ></button>
             <button
               class="control-btn minimize-btn"
               title="Minimize"
@@ -166,7 +186,13 @@
         <div class="column-header">
           <span class="column-title">In Progress</span>
           <span class="column-count" id="count-progress">0</span>
+          <span class="auto-indicator"></span>
           <div class="column-controls">
+            <button
+              class="control-btn auto-btn"
+              title="Auto mode OFF"
+              onclick="toggleAutoCollapse(event, 'progress')"
+            ></button>
             <button
               class="control-btn minimize-btn"
               title="Minimize"
@@ -198,7 +224,13 @@
         <div class="column-header">
           <span class="column-title">Code Review</span>
           <span class="column-count" id="count-review">0</span>
+          <span class="auto-indicator"></span>
           <div class="column-controls">
+            <button
+              class="control-btn auto-btn"
+              title="Auto mode OFF"
+              onclick="toggleAutoCollapse(event, 'review')"
+            ></button>
             <button
               class="control-btn minimize-btn"
               title="Minimize"
@@ -230,7 +262,13 @@
         <div class="column-header">
           <span class="column-title">Completed</span>
           <span class="column-count" id="count-completed">0</span>
+          <span class="auto-indicator"></span>
           <div class="column-controls">
+            <button
+              class="control-btn auto-btn"
+              title="Auto mode OFF"
+              onclick="toggleAutoCollapse(event, 'completed')"
+            ></button>
             <button
               class="control-btn minimize-btn"
               title="Minimize"
@@ -314,12 +352,20 @@
     <!-- Task Context Menu -->
     <div id="task-context-menu" class="context-menu hidden">
       <div class="context-menu-header">
-        <span class="context-menu-header-icon">📌</span>
+        <span class="context-menu-header-icon" id="ctx-task-header-icon"></span>
         <span class="context-menu-header-text" id="task-menu-title">Task</span>
       </div>
       <div class="context-menu-divider"></div>
+      <div class="context-menu-item" data-action="expand-task">
+        <span class="context-menu-icon" id="ctx-expand-icon"></span>
+        Expand
+      </div>
+      <div class="context-menu-item" data-action="collapse-task">
+        <span class="context-menu-icon" id="ctx-collapse-icon"></span>
+        Collapse
+      </div>
       <div class="context-menu-item" data-action="view-metadata">
-        <span class="context-menu-icon">🔍</span>
+        <span class="context-menu-icon" id="ctx-task-metadata-icon"></span>
         View metadata
       </div>
     </div>
@@ -327,48 +373,66 @@
     <!-- App Context Menu (Global Board Actions) -->
     <div id="app-context-menu" class="context-menu hidden">
       <div class="context-menu-header">
-        <span class="context-menu-header-icon">📋</span>
+        <span
+          class="context-menu-header-icon"
+          id="ctx-board-header-icon"
+        ></span>
         <span class="context-menu-header-text">Board</span>
       </div>
       <div class="context-menu-divider"></div>
-      <div class="context-menu-item" data-action="board-metadata">
-        <span class="context-menu-icon">🔍</span>
+      <div class="context-menu-item" data-action="board-task-view">
+        <span class="context-menu-icon" id="ctx-board-task-view-icon"></span>
         <span class="context-menu-text"
-          >Metadata (<span id="board-task-count">0</span> tasks)</span
+          >Task view (<span id="board-task-count-view">0</span> tasks)</span
         >
       </div>
       <div class="context-menu-item" data-action="collapse-all">
-        <span class="context-menu-icon">📁</span>
+        <span class="context-menu-icon" id="ctx-board-collapse-icon"></span>
         Collapse all tasks
       </div>
       <div class="context-menu-item" data-action="expand-all">
-        <span class="context-menu-icon">📂</span>
+        <span class="context-menu-icon" id="ctx-board-expand-icon"></span>
         Expand all tasks
+      </div>
+      <div class="context-menu-item" data-action="board-metadata">
+        <span class="context-menu-icon" id="ctx-board-metadata-icon"></span>
+        <span class="context-menu-text"
+          >Metadata (<span id="board-task-count">0</span> tasks)</span
+        >
       </div>
     </div>
 
     <!-- Column Context Menu -->
     <div id="column-context-menu" class="context-menu hidden">
       <div class="context-menu-header">
-        <span class="context-menu-header-icon">📊</span>
+        <span
+          class="context-menu-header-icon"
+          id="ctx-column-header-icon"
+        ></span>
         <span class="context-menu-header-text" id="column-menu-title"
           >Column</span
         >
       </div>
       <div class="context-menu-divider"></div>
-      <div class="context-menu-item" data-action="column-metadata">
-        <span class="context-menu-icon">🔍</span>
+      <div class="context-menu-item" data-action="column-task-view">
+        <span class="context-menu-icon" id="ctx-column-task-view-icon"></span>
         <span class="context-menu-text"
-          >Metadata (<span id="column-task-count">0</span> tasks)</span
+          >Task view (<span id="column-task-count-view">0</span> tasks)</span
         >
       </div>
       <div class="context-menu-item" data-action="column-collapse-all">
-        <span class="context-menu-icon">📁</span>
+        <span class="context-menu-icon" id="ctx-column-collapse-icon"></span>
         Collapse all in column
       </div>
       <div class="context-menu-item" data-action="column-expand-all">
-        <span class="context-menu-icon">📂</span>
+        <span class="context-menu-icon" id="ctx-column-expand-icon"></span>
         Expand all in column
+      </div>
+      <div class="context-menu-item" data-action="column-metadata">
+        <span class="context-menu-icon" id="ctx-column-metadata-icon"></span>
+        <span class="context-menu-text"
+          >Metadata (<span id="column-task-count">0</span> tasks)</span
+        >
       </div>
     </div>
 
@@ -502,6 +566,161 @@
       </div>
     </div>
 
-    <script type="module" src="js/main.js"></script>
+    <!-- Task Modal -->
+    <div id="task-modal-overlay" class="modal-overlay hidden">
+      <div id="task-modal" class="task-modal-container">
+        <div class="task-modal-header">
+          <span class="task-modal-title">Task</span>
+          <div class="task-modal-header-buttons">
+            <button class="task-modal-minimize" title="Minimize">
+              <svg viewBox="0 0 24 24" width="16" height="16">
+                <line
+                  x1="5"
+                  y1="12"
+                  x2="19"
+                  y2="12"
+                  stroke="currentColor"
+                  stroke-width="2"
+                />
+              </svg>
+            </button>
+            <button class="task-modal-maximize" title="Maximize">
+              <svg viewBox="0 0 24 24" width="16" height="16">
+                <rect
+                  x="3"
+                  y="3"
+                  width="18"
+                  height="18"
+                  rx="2"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  fill="none"
+                />
+              </svg>
+            </button>
+            <button class="task-modal-close" title="Close">
+              <svg viewBox="0 0 24 24" width="16" height="16">
+                <line
+                  x1="18"
+                  y1="6"
+                  x2="6"
+                  y2="18"
+                  stroke="currentColor"
+                  stroke-width="2"
+                />
+                <line
+                  x1="6"
+                  y1="6"
+                  x2="18"
+                  y2="18"
+                  stroke="currentColor"
+                  stroke-width="2"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="task-modal-body-wrapper">
+          <div class="task-modal-sidebar hidden" id="task-modal-sidebar">
+            <div class="sidebar-header">
+              <span class="sidebar-title">Tasks</span>
+              <button
+                class="sidebar-collapse-btn"
+                id="task-modal-sidebar-collapse"
+                title="Collapse sidebar"
+              >
+                <svg viewBox="0 0 24 24" width="14" height="14">
+                  <polyline
+                    points="15,18 9,12 15,6"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    fill="none"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </button>
+            </div>
+            <div class="sidebar-content" id="task-modal-sidebar-list"></div>
+          </div>
+          <button
+            class="sidebar-expand-btn hidden"
+            id="task-modal-sidebar-expand"
+            title="Expand sidebar"
+          >
+            <svg viewBox="0 0 24 24" width="12" height="12">
+              <polyline
+                points="9,18 15,12 9,6"
+                stroke="currentColor"
+                stroke-width="2"
+                fill="none"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+          <div
+            class="sidebar-resizer hidden"
+            id="task-modal-sidebar-resizer"
+          ></div>
+          <div class="task-modal-main">
+            <main class="task-modal-content"></main>
+            <div
+              class="task-modal-details-resizer"
+              id="task-modal-details-resizer"
+            ></div>
+            <aside class="task-modal-details" id="task-modal-details">
+              <div class="task-modal-details-header">
+                <span class="task-modal-details-title">Details</span>
+                <button
+                  class="details-collapse-btn"
+                  id="task-modal-details-collapse"
+                  title="Collapse details"
+                >
+                  <svg viewBox="0 0 24 24" width="14" height="14">
+                    <polyline
+                      points="9,18 15,12 9,6"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      fill="none"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </button>
+              </div>
+              <div class="task-modal-details-content"></div>
+            </aside>
+            <button
+              class="details-expand-btn hidden"
+              id="task-modal-details-expand"
+              title="Expand details"
+            >
+              <svg viewBox="0 0 24 24" width="12" height="12">
+                <polyline
+                  points="15,18 9,12 15,6"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  fill="none"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <!-- Resize handles -->
+        <div class="resize-handle resize-n"></div>
+        <div class="resize-handle resize-s"></div>
+        <div class="resize-handle resize-e"></div>
+        <div class="resize-handle resize-w"></div>
+        <div class="resize-handle resize-ne"></div>
+        <div class="resize-handle resize-nw"></div>
+        <div class="resize-handle resize-se"></div>
+        <div class="resize-handle resize-sw"></div>
+      </div>
+    </div>
+
+    <script type="module" src="core/main.js"></script>
   </body>
 </html>

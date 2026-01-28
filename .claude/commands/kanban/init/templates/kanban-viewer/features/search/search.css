@@ -1,0 +1,270 @@
+/* ==============================================
+   Search Styles
+   Task search input and filtering
+   ============================================== */
+
+/* ==============================================
+   Task Search Container
+   ============================================== */
+
+.task-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  border-left: 1px solid var(--color-border);
+  border-radius: 0;
+  padding: 6px 10px;
+  width: 180px;
+  transition: width var(--transition-base);
+}
+
+.task-search:focus-within {
+  width: 220px;
+}
+
+/* ==============================================
+   Search Input
+   ============================================== */
+
+.task-search input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--color-text);
+  font-size: 13px;
+  outline: none;
+  min-width: 0;
+}
+
+.task-search input::placeholder {
+  color: var(--color-text-subtle);
+}
+
+/* ==============================================
+   Search Count
+   ============================================== */
+
+.task-search .search-count {
+  font-size: 11px;
+  color: var(--color-text-subtle);
+  white-space: nowrap;
+  min-width: fit-content;
+}
+
+.task-search .search-count:empty {
+  display: none;
+}
+
+/* ==============================================
+   Search Clear Button
+   ============================================== */
+
+.task-search .search-clear {
+  background: transparent;
+  border: none;
+  color: var(--color-text-subtle);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  display: none;
+  transition: color var(--transition-fast);
+}
+
+.task-search .search-clear:hover {
+  color: var(--status-error);
+}
+
+.task-search.has-value .search-clear {
+  display: block;
+}
+
+/* ==============================================
+   Search Hidden State
+   ============================================== */
+
+.task.search-hidden,
+.task-table tbody tr.search-hidden {
+  display: none !important;
+}
+
+/* ==============================================
+   Empty Search Message
+   ============================================== */
+
+.search-empty-msg {
+  text-align: center;
+  padding: 1.5rem 1rem;
+  color: var(--color-text-subtle);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+/* ==============================================
+   Metadata Search Container (Legacy - Hidden)
+   ============================================== */
+
+.metadata-search-container {
+  display: none;
+}
+
+/* ==============================================
+   JSON Viewer Search Bar
+   ============================================== */
+
+.json-viewer-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(22, 27, 34, 0.95);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  margin-bottom: 12px;
+  /* Sticky top-right positioning */
+  position: sticky;
+  top: 0;
+  margin-left: auto;
+  width: fit-content;
+  z-index: 10;
+  backdrop-filter: blur(8px);
+}
+
+.json-viewer-search input {
+  flex: 1;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  padding: 6px 10px;
+  font-size: 13px;
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.json-viewer-search input:focus {
+  border-color: var(--color-accent);
+}
+
+.json-viewer-search input::placeholder {
+  color: var(--color-text-subtle);
+}
+
+/* ==============================================
+   Search Navigation
+   ============================================== */
+
+.search-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.search-nav button {
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  transition: all var(--transition-fast);
+}
+
+.search-nav button:hover:not(:disabled) {
+  background: var(--color-bg-active);
+  color: var(--color-text);
+  border-color: var(--color-accent);
+}
+
+.search-nav button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ==============================================
+   Search Count & Status
+   ============================================== */
+
+.search-count {
+  color: var(--color-text-subtle);
+  font-size: 12px;
+  white-space: nowrap;
+  min-width: 40px;
+  text-align: center;
+}
+
+.search-status {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* ==============================================
+   Search Input Wrapper
+   ============================================== */
+
+.search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-input-wrapper input {
+  padding-right: 24px; /* Space for clear button */
+}
+
+.search-clear {
+  position: absolute;
+  right: 4px;
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 4px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.search-input-wrapper:focus-within .search-clear,
+.search-input-wrapper input:not(:placeholder-shown) + .search-clear {
+  opacity: 1;
+}
+
+.search-clear:hover {
+  color: var(--color-text);
+}
+
+/* ==============================================
+   Copy Button - Fixed Width
+   ============================================== */
+
+.copy-btn {
+  min-width: 6.5rem; /* Fits "Copy Selected" */
+  height: 28px; /* Match input height */
+  padding: 0 10px;
+  font-size: 12px;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  color: var(--color-text);
+  transition: all var(--transition-fast);
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.copy-btn:hover {
+  background: var(--color-bg-active);
+  border-color: var(--color-accent);
+}

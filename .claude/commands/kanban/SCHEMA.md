@@ -14,6 +14,7 @@ Strict, unambiguous schema definitions for all kanban data files. No interpolati
 | `.kanban/worker-logs/`                        | Worker output logs (runtime)               | Created at runtime |
 | `.kanban/worker-logs/{task-name}.json`        | Claude session log for token tracking      | Created at runtime |
 | `.kanban/worker-logs/{task-name}-output.json` | Worker output file with results            | Created by worker  |
+| `.kanban/next-steps.json`                     | Post-process command rules                 | Optional           |
 
 ---
 
@@ -462,7 +463,269 @@ For error/blocked status, include:
 
 ---
 
-## 9. Task Dependencies (blockedBy)
+## 9. Output File Schemas
+
+This section documents the complete structure of output files created during kanban workflow execution.
+
+### 9.1 Worker Output File Schema
+
+The file `.kanban/worker-logs/{task-name}-output.json` is created by `parse-worker-log.ps1` after parsing raw Claude session logs.
+
+```typescript
+interface WorkerOutput {
+  taskName: string; // REQUIRED - Task name from kanban-board.json
+  status: 'success' | 'error'; // REQUIRED - Worker completion status
+  startedAt: string; // REQUIRED - ISO 8601 timestamp when work began
+  completedAt: string; // REQUIRED - ISO 8601 timestamp when work finished
+  agent: string; // REQUIRED - Agent name that executed the task
+  verification: {
+    // REQUIRED - Verification results
+    passed: boolean; // True if all steps passed
+    steps: Array<{
+      // Array of step results
+      description: string; // Step text from task.steps
+      passed: boolean; // Whether step passed
+    }>;
+  };
+  workLog: string[]; // REQUIRED - Work log entries from worker
+  affectedFiles: string[]; // REQUIRED - File paths created/modified/deleted
+  tokensUsed: number[]; // OPTIONAL - Context window usage per API turn
+  durationMs: number; // OPTIONAL - Execution duration in milliseconds
+  error?: {
+    // OPTIONAL - Present when status is "error"
+    message: string; // Error description
+    type: 'execution'; // Error type
+    suggestedFix: string; // Recommended fix
+  };
+}
+```
+
+#### Example Success Output
+
+```json
+{
+  "taskName": "auth-api-endpoint",
+  "status": "success",
+  "startedAt": "2026-01-20T10:00:00.000Z",
+  "completedAt": "2026-01-20T10:15:30.000Z",
+  "agent": "backend-developer",
+  "verification": {
+    "passed": true,
+    "steps": [
+      { "description": "Create login endpoint", "passed": true },
+      { "description": "Add JWT validation", "passed": true }
+    ]
+  },
+  "workLog": [
+    "Created server/api/auth/login.post.ts",
+    "Added JWT token generation",
+    "Verified all tests pass"
+  ],
+  "affectedFiles": ["server/api/auth/login.post.ts", "server/utils/jwt.ts"],
+  "tokensUsed": [29260, 30500, 31200],
+  "durationMs": 930000
+}
+```
+
+#### Example Error Output
+
+```json
+{
+  "taskName": "auth-api-endpoint",
+  "status": "error",
+  "startedAt": "2026-01-20T10:00:00.000Z",
+  "completedAt": "2026-01-20T10:05:00.000Z",
+  "agent": "backend-developer",
+  "verification": {
+    "passed": false,
+    "steps": [
+      { "description": "Create login endpoint", "passed": true },
+      { "description": "Add JWT validation", "passed": false }
+    ]
+  },
+  "workLog": ["Created endpoint", "Failed JWT validation"],
+  "affectedFiles": ["server/api/auth/login.post.ts"],
+  "error": {
+    "message": "JWT secret not configured",
+    "type": "execution",
+    "suggestedFix": "Add JWT_SECRET to .env file"
+  }
+}
+```
+
+### 9.2 TDD Test Creation Output
+
+The file `.kanban/worker-logs/{task-name}-test-creation-output.json` follows the same schema as worker output (Section 9.1). It is created by `parse-worker-log.ps1` after parsing the kanban-unit-tester session log.
+
+| Source File                               | Output File                                 |
+| ----------------------------------------- | ------------------------------------------- |
+| `{task}-test-creation.json` (session log) | `{task}-test-creation-output.json` (parsed) |
+
+The `affectedFiles` field contains paths to created test files, which are passed to implementation workers.
+
+### 9.3 Dispatcher Test Verification
+
+After running tests via `run-tests.ps1`, the dispatcher updates the worker output file with test results:
+
+```typescript
+interface DispatcherTestVerification {
+  verification: {
+    passed: boolean; // True if tests passed
+    testResults: {
+      // Added by dispatcher
+      totalTests: number; // Total test count
+      passedTests: number; // Passed test count
+      failedTests: number; // Failed test count
+    };
+    source: 'dispatcher'; // Indicates dispatcher added this
+  };
+}
+```
+
+#### Example Updated Output
+
+```json
+{
+  "taskName": "auth-api-endpoint",
+  "status": "success",
+  "verification": {
+    "passed": true,
+    "steps": [{ "description": "Create login endpoint", "passed": true }],
+    "testResults": {
+      "totalTests": 5,
+      "passedTests": 5,
+      "failedTests": 0
+    },
+    "source": "dispatcher"
+  }
+}
+```
+
+### 9.4 run-tests.ps1 Return Schema
+
+The `run-tests.ps1` script returns a hashtable/object with test execution results:
+
+```typescript
+interface TestRunResult {
+  passed: boolean; // True if all tests passed (exitCode === 0)
+  totalTests: number; // Total tests detected in output
+  passedTests: number; // Number of passed tests
+  failedTests: number; // Number of failed tests
+  command: string; // Test command that was executed
+  exitCode: number; // Process exit code (0 = success)
+  output: string; // Raw test command output
+}
+```
+
+#### Field Details
+
+| Field         | Type    | Description                                               |
+| ------------- | ------- | --------------------------------------------------------- |
+| `passed`      | boolean | `true` if `exitCode === 0`, `false` otherwise             |
+| `totalTests`  | number  | Parsed from test output (e.g., "5 tests passed")          |
+| `passedTests` | number  | Count of passing tests from output                        |
+| `failedTests` | number  | Count of failing tests (`totalTests - passedTests`)       |
+| `command`     | string  | The npm/vitest command executed (e.g., `npm run test`)    |
+| `exitCode`    | number  | Process exit code: `0` = success, non-zero = failure      |
+| `output`      | string  | Full stdout/stderr from test execution (may be truncated) |
+
+#### Example Return Values
+
+**Success:**
+
+```powershell
+@{
+  passed = $true
+  totalTests = 12
+  passedTests = 12
+  failedTests = 0
+  command = "npm run test"
+  exitCode = 0
+  output = "✓ All 12 tests passed..."
+}
+```
+
+**Failure:**
+
+```powershell
+@{
+  passed = $false
+  totalTests = 12
+  passedTests = 10
+  failedTests = 2
+  command = "npm run test"
+  exitCode = 1
+  output = "✗ 2 tests failed..."
+}
+```
+
+---
+
+## 10. next-steps.json (Post-Process Commands)
+
+### Purpose
+
+The `next-steps.json` file defines rules for recommending follow-up commands after `kanban:process` completes. It analyzes affected files from all tasks and matches them against patterns to suggest commands like `npm run db:push`, `npm install`, etc.
+
+### TypeScript Interface
+
+```typescript
+interface NextStepsConfig {
+  rules: NextStepRule[];
+}
+
+interface NextStepRule {
+  name: string;       // REQUIRED - Unique identifier (prevents duplicate recommendations)
+  pattern: string;    // REQUIRED - Regex pattern to match affected file paths
+  command: string;    // REQUIRED - Shell command to recommend
+  reason: string;     // REQUIRED - Human-readable explanation
+  priority?: number;  // OPTIONAL - Sort order (lower = higher priority, default: 99)
+  critical?: boolean; // OPTIONAL - If true, shown in red with [CRITICAL] marker
+}
+```
+
+### Example
+
+```json
+{
+  "rules": [
+    {
+      "name": "prisma-push",
+      "pattern": "\\.prisma$",
+      "command": "npm run db:push",
+      "reason": "Database schema needs sync",
+      "priority": 2,
+      "critical": true
+    },
+    {
+      "name": "typecheck",
+      "pattern": "\\.(ts|tsx|vue)$",
+      "command": "npm run typecheck",
+      "reason": "TypeScript files modified",
+      "priority": 3
+    }
+  ]
+}
+```
+
+### Field Constraints
+
+| Field      | Type    | Required | Constraints                                    |
+| ---------- | ------- | -------- | ---------------------------------------------- |
+| `name`     | string  | Yes      | Unique within rules array                      |
+| `pattern`  | string  | Yes      | Valid regex pattern                            |
+| `command`  | string  | Yes      | Shell command to execute                       |
+| `reason`   | string  | Yes      | Explanation shown to user                      |
+| `priority` | number  | No       | Lower = higher priority (0 is highest)         |
+| `critical` | boolean | No       | If true, displayed with red [CRITICAL] marker  |
+
+### Default Rules
+
+If `.kanban/next-steps.json` doesn't exist, defaults from `.claude/commands/kanban/process/templates/next-steps-default.json` are used. These include common patterns for npm, composer, pip, Prisma, Laravel, TypeScript, and test files.
+
+---
+
+## 11. Task Dependencies (blockedBy)
 
 ### Purpose
 

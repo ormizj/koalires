@@ -21,10 +21,12 @@ powershell -ExecutionPolicy Bypass -File ".claude/commands/kanban/init/scripts/k
 The script handles:
 
 - Creating `.kanban/` and `.kanban/worker-logs/` directories
-- Copying `kanban-unit-tester.md` agent to `.claude/agents/`
+- Copying kanban agents to `.claude/agents/`:
+  - `kanban-unit-tester.md` - TDD specialist for pre-implementation tests
+  - `kanban-command-updater.md` - Kanban command maintenance specialist
 - Copying viewer template to `.kanban/kanban-viewer/`
-- Initializing `kanban-board.json` and `kanban-progress.json`
-- Adding `kanban` npm script to `package.json`
+- Initializing `kanban-board.json`, `kanban-progress.json`, `config.json`, and `next-steps.json`
+- Adding kanban script to the project's package manager configuration
 
 ### Step 8: Verify Test Infrastructure
 
@@ -41,6 +43,13 @@ This ensures testing is ready for the kanban TDD workflow. The verify-tests skil
 3. Offer to set up missing infrastructure if needed
 
 ## After Initialization
+
+**Important:** New agents were added to `.claude/agents/`:
+
+- `kanban-unit-tester.md` - TDD specialist for creating pre-implementation tests
+- `kanban-command-updater.md` - Specialist for maintaining/extending kanban commands
+
+Claude Code must be restarted to recognize new agents. Exit this session and start a new one before using kanban workflows.
 
 The user can now:
 

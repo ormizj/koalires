@@ -33,10 +33,13 @@ Raw session log written to .kanban/worker-logs/{task}.json
 parse-worker-log.ps1 extracts:
   - Affected files (from Write/Edit tool calls)
   - Token usage (from message.usage fields)
-  - Verification results (from text patterns)
   - Success/failure status (from result entry)
     ↓
 Creates .kanban/worker-logs/{task}-output.json (normalized format)
+    ↓
+Dispatcher runs independent test verification via run-tests.ps1
+  - Tests affected files using config from .kanban/config.json
+  - Returns structured JSON results (pass/fail per file)
     ↓
 process-worker-output.ps1 updates:
   - kanban-progress.json (work log, files, tokens)
@@ -64,21 +67,24 @@ New approach: Dispatcher parses the raw session log as the single source of trut
 
 All kanban files are in the `.kanban/` directory:
 
-| Path                                     | Purpose                                            |
-| ---------------------------------------- | -------------------------------------------------- |
-| `.kanban/kanban-board.json`              | Task definitions with passes field                 |
-| `.kanban/kanban-progress.json`           | Status tracking, work logs, affected files, agents |
-| `.kanban/worker-logs/`                   | Worker output logs                                 |
-| `.kanban/worker-logs/{task}.json`        | Raw worker session log (JSON format)               |
-| `.kanban/worker-logs/{task}-output.json` | Parsed/normalized output (created by dispatcher)   |
+| Path                                     | Purpose                                              |
+| ---------------------------------------- | ---------------------------------------------------- |
+| `.kanban/kanban-board.json`              | Task definitions with passes field                   |
+| `.kanban/kanban-progress.json`           | Status tracking, work logs, affected files, agents   |
+| `.kanban/config.json`                    | Test configuration (test command, timeout, patterns) |
+| `.kanban/worker-logs/`                   | Worker output logs                                   |
+| `.kanban/worker-logs/{task}.json`        | Raw worker session log (JSON format)                 |
+| `.kanban/worker-logs/{task}-output.json` | Parsed/normalized output (created by dispatcher)     |
 
 ## Scripts
 
-| Script                      | Purpose                                                 |
-| --------------------------- | ------------------------------------------------------- |
-| `parallel-dispatch.ps1`     | Main orchestrator - spawns workers, coordinates parsing |
-| `parse-worker-log.ps1`      | Parses raw JSON log, creates normalized output file     |
-| `process-worker-output.ps1` | Updates kanban files from normalized output             |
+| Script                      | Purpose                                                           |
+| --------------------------- | ----------------------------------------------------------------- |
+| `parallel-dispatch.ps1`     | Main orchestrator - spawns workers, coordinates parsing           |
+| `parse-worker-log.ps1`      | Parses raw JSON log, creates normalized output file               |
+| `process-worker-output.ps1` | Updates kanban files from normalized output                       |
+| `run-tests.ps1`             | Runs tests for specific files and returns structured JSON results |
+| `show-next-steps.ps1`       | Shows recommended post-process commands based on affected files   |
 
 ## Task Status Logic
 
@@ -199,15 +205,15 @@ powershell -ExecutionPolicy Bypass -File ".claude/commands/kanban/process/script
 
 **Optional Parameters**:
 
-| Parameter            | Description                                            | Default |
-| -------------------- | ------------------------------------------------------ | ------- |
-| `-Parallel N`        | Maximum concurrent workers                             | 3       |
-| `-DryRun`            | Show what would run without executing                  | false   |
-| `-AllowDbMigrations` | Run Prisma db push + generate after Wave 1             | false   |
-| `-FailFast`          | Stop immediately if any task fails                     | false   |
-| `-RunVerification`   | Run typecheck/lint/tests after each wave               | false   |
-| `-NonInteractive`    | No prompts (auto-detected in CI)                       | false   |
-| `-DefaultFailAction` | Action on failure in non-interactive (Skip/Retry/Quit) | Skip    |
+| Parameter            | Description                                                              | Default |
+| -------------------- | ------------------------------------------------------------------------ | ------- |
+| `-Parallel N`        | Maximum concurrent workers                                               | 3       |
+| `-DryRun`            | Show what would run without executing                                    | false   |
+| `-FailFast`          | Stop immediately if any task fails                                       | false   |
+| `-RunVerification`   | Run typecheck/lint/tests after each wave                                 | true    |
+| `-SkipVerification`  | Disable independent verification (shorthand for -RunVerification:$false) | false   |
+| `-NonInteractive`    | No prompts (auto-detected in CI)                                         | false   |
+| `-DefaultFailAction` | Action on failure in non-interactive (Skip/Retry/Quit)                   | Skip    |
 
 **Examples**:
 
@@ -221,11 +227,11 @@ powershell -ExecutionPolicy Bypass -File ".claude/commands/kanban/process/script
 # Preview without executing
 powershell -ExecutionPolicy Bypass -File ".claude/commands/kanban/process/scripts/parallel-dispatch.ps1" -DryRun
 
-# Run with database migrations and fail-fast
-powershell -ExecutionPolicy Bypass -File ".claude/commands/kanban/process/scripts/parallel-dispatch.ps1" -AllowDbMigrations -FailFast
+# Run with fail-fast (verification enabled by default)
+powershell -ExecutionPolicy Bypass -File ".claude/commands/kanban/process/scripts/parallel-dispatch.ps1" -FailFast
 
-# Run with full verification (typecheck, lint, tests) after each wave
-powershell -ExecutionPolicy Bypass -File ".claude/commands/kanban/process/scripts/parallel-dispatch.ps1" -RunVerification -FailFast
+# Run without verification (faster, less safe)
+powershell -ExecutionPolicy Bypass -File ".claude/commands/kanban/process/scripts/parallel-dispatch.ps1" -SkipVerification
 ```
 
 ### Phase 3: Monitor and Handle Failures
@@ -372,6 +378,75 @@ The dispatcher automatically determines which tasks need processing based on cur
 5. **Update** kanban files with extracted data
 6. **Handle** failures with retry/skip/quit options
 7. **Report** final summary when all waves complete
+
+---
+
+## Recommended Next Steps
+
+After all tasks complete, the dispatcher analyzes affected files and suggests post-processing commands.
+
+### Output Example
+
+```
+==================================================
+            RECOMMENDED NEXT STEPS
+==================================================
+
+  1. npm run db:push [CRITICAL]
+     -> Database schema needs sync
+  2. npm run db:generate
+     -> Prisma schema changed
+  3. npm run typecheck
+     -> TypeScript files modified
+
+==================================================
+```
+
+### How It Works
+
+1. Collects all `affectedFiles` from `kanban-progress.json`
+2. Loads rules from `.kanban/next-steps.json` (or defaults)
+3. Matches file patterns against rules using regex
+4. Displays matched commands sorted by priority
+
+### Customization
+
+Create `.kanban/next-steps.json` to customize rules for your project:
+
+```json
+{
+  "rules": [
+    {
+      "name": "prisma-push",
+      "pattern": "\\.prisma$",
+      "command": "npm run db:push",
+      "reason": "Database schema needs sync",
+      "priority": 1,
+      "critical": true
+    }
+  ]
+}
+```
+
+### Rule Properties
+
+| Property   | Required | Description                                     |
+| ---------- | -------- | ----------------------------------------------- |
+| `name`     | Yes      | Unique identifier (used for deduplication)      |
+| `pattern`  | Yes      | Regex pattern to match against file paths       |
+| `command`  | Yes      | Command to suggest running                      |
+| `reason`   | Yes      | Human-readable explanation shown to user        |
+| `priority` | No       | Sort order (lower = higher priority, default 0) |
+| `critical` | No       | If true, shown in red with [CRITICAL] marker    |
+
+### Default Rules
+
+The default template includes rules for common scenarios:
+
+- **Dependency managers**: package.json, composer.json, requirements.txt
+- **Database**: Prisma schemas, Laravel migrations
+- **Quality**: TypeScript type checking, linting
+- **Testing**: Test file modifications
 
 ---
 

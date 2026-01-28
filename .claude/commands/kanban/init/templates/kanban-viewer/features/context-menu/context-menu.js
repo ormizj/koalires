@@ -2,9 +2,10 @@
  * Context menu handling for kanban board
  */
 
-import { showModal, showColumnModal } from './metadata-modal.js';
-import { getBoardData, getProgressData } from './data.js';
-import { getTaskStatus } from './tasks.js';
+import { showModal, showColumnModal } from '../metadata-modal/index.js';
+import { showTaskModal, showColumnTaskModal } from '../task-modal/index.js';
+import { getBoardData, getProgressData } from '../../core/data.js';
+import { getTaskStatus } from '../../shared/tasks.js';
 
 let activeMenu = null;
 let targetTaskElement = null;
@@ -100,6 +101,14 @@ function showTaskContextMenu(event, taskElement) {
   const titleEl = document.getElementById('task-menu-title');
   if (titleEl) titleEl.textContent = taskName;
 
+  // Show/hide expand/collapse based on current state
+  const isExpanded = taskElement.classList.contains('expanded');
+  const expandItem = menu.querySelector('[data-action="expand-task"]');
+  const collapseItem = menu.querySelector('[data-action="collapse-task"]');
+
+  if (expandItem) expandItem.classList.toggle('hidden', isExpanded);
+  if (collapseItem) collapseItem.classList.toggle('hidden', !isExpanded);
+
   positionMenu(menu, event.clientX, event.clientY);
   menu.classList.remove('hidden');
   activeMenu = menu;
@@ -123,6 +132,13 @@ function showTableRowContextMenu(event, tableRow) {
   const titleEl = document.getElementById('task-menu-title');
   if (titleEl) titleEl.textContent = taskName;
 
+  // Hide expand/collapse options in table view (not applicable)
+  const expandItem = menu.querySelector('[data-action="expand-task"]');
+  const collapseItem = menu.querySelector('[data-action="collapse-task"]');
+
+  if (expandItem) expandItem.classList.add('hidden');
+  if (collapseItem) collapseItem.classList.add('hidden');
+
   positionMenu(menu, event.clientX, event.clientY);
   menu.classList.remove('hidden');
   activeMenu = menu;
@@ -135,7 +151,9 @@ function showAppContextMenu(event) {
   const boardData = getBoardData();
   const taskCount = boardData?.tasks?.length || 0;
   const countSpan = document.getElementById('board-task-count');
+  const countViewSpan = document.getElementById('board-task-count-view');
   if (countSpan) countSpan.textContent = taskCount;
+  if (countViewSpan) countViewSpan.textContent = taskCount;
 
   positionMenu(menu, event.clientX, event.clientY);
   menu.classList.remove('hidden');
@@ -162,10 +180,16 @@ function showColumnContextMenu(event, columnId, columnElement) {
   // Update task count in menu
   const taskCount = getTasksInColumn(columnId).length;
   const countSpan = document.getElementById('column-task-count');
+  const countViewSpan = document.getElementById('column-task-count-view');
   if (countSpan) countSpan.textContent = taskCount;
+  if (countViewSpan) countViewSpan.textContent = taskCount;
 
-  // Disable metadata if no tasks
+  // Disable task view and metadata if no tasks
+  const taskViewItem = menu.querySelector('[data-action="column-task-view"]');
   const metadataItem = menu.querySelector('[data-action="column-metadata"]');
+  if (taskViewItem) {
+    taskViewItem.classList.toggle('disabled', taskCount === 0);
+  }
   if (metadataItem) {
     metadataItem.classList.toggle('disabled', taskCount === 0);
   }
@@ -178,7 +202,7 @@ function showColumnContextMenu(event, columnId, columnElement) {
 /**
  * Get task names in a specific column based on their status
  */
-function getTasksInColumn(columnId) {
+export function getTasksInColumn(columnId) {
   const boardData = getBoardData();
   const progressData = getProgressData();
   if (!boardData?.tasks) return [];
@@ -243,6 +267,36 @@ function handleTaskMenuClick(event) {
   const action = menuItem.dataset.action;
 
   switch (action) {
+    case 'expand-task':
+      // Find the actual DOM element for the task card
+      if (targetTaskElement && targetTaskElement.classList) {
+        targetTaskElement.classList.add('expanded');
+      } else if (targetTaskElement) {
+        // Handle table row case - find the actual card by task name
+        const taskName =
+          targetTaskElement.querySelector?.('.task-name')?.textContent;
+        if (taskName) {
+          const taskCard = document.querySelector(
+            `.task[data-task-name="${taskName}"]`
+          );
+          taskCard?.classList.add('expanded');
+        }
+      }
+      break;
+    case 'collapse-task':
+      if (targetTaskElement && targetTaskElement.classList) {
+        targetTaskElement.classList.remove('expanded');
+      } else if (targetTaskElement) {
+        const taskName =
+          targetTaskElement.querySelector?.('.task-name')?.textContent;
+        if (taskName) {
+          const taskCard = document.querySelector(
+            `.task[data-task-name="${taskName}"]`
+          );
+          taskCard?.classList.remove('expanded');
+        }
+      }
+      break;
     case 'view-metadata':
       if (targetTaskElement) {
         const taskName =
@@ -262,14 +316,24 @@ function handleAppMenuClick(event) {
   const action = menuItem.dataset.action;
 
   switch (action) {
-    case 'board-metadata':
-      // Get all task names and show column modal with all tasks
+    case 'board-task-view': {
+      // Get all task names and show task modal with all tasks
+      const boardDataTaskView = getBoardData();
+      if (boardDataTaskView?.tasks?.length > 0) {
+        const allTaskNamesTaskView = boardDataTaskView.tasks.map((t) => t.name);
+        showColumnTaskModal('all', allTaskNamesTaskView);
+      }
+      break;
+    }
+    case 'board-metadata': {
+      // Get all task names and show metadata column modal with all tasks
       const boardData = getBoardData();
       if (boardData?.tasks?.length > 0) {
         const allTaskNames = boardData.tasks.map((t) => t.name);
         showColumnModal('all', allTaskNames);
       }
       break;
+    }
     case 'collapse-all':
       document.querySelectorAll('.task.expanded').forEach((task) => {
         task.classList.remove('expanded');
@@ -292,12 +356,20 @@ function handleColumnMenuClick(event) {
   const action = menuItem.dataset.action;
 
   switch (action) {
-    case 'column-metadata':
+    case 'column-task-view': {
+      const taskNamesTaskView = getTasksInColumn(targetColumnId);
+      if (taskNamesTaskView.length > 0) {
+        showColumnTaskModal(targetColumnId, taskNamesTaskView);
+      }
+      break;
+    }
+    case 'column-metadata': {
       const taskNames = getTasksInColumn(targetColumnId);
       if (taskNames.length > 0) {
         showColumnModal(targetColumnId, taskNames);
       }
       break;
+    }
     case 'column-collapse-all':
       if (targetColumnElement) {
         targetColumnElement

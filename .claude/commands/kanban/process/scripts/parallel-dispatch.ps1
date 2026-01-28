@@ -5,8 +5,7 @@
 .DESCRIPTION
     Orchestrates parallel execution of kanban tasks by spawning claude -p workers.
     Tasks are processed in waves based on category dependencies.
-    Injects project context (import aliases, FSD rules) into worker prompts.
-    Optionally runs database migrations after Wave 1 (data/config tasks).
+    Dynamically detects project stack and available agents for task dispatch.
 
 .PARAMETER Parallel
     Maximum number of concurrent workers. Default is 3.
@@ -22,10 +21,6 @@
     Action to take when tasks fail in non-interactive mode.
     Valid values: Skip (default), Retry, Quit.
 
-.PARAMETER AllowDbMigrations
-    Run Prisma database migrations (db push + generate) after Wave 1 completes.
-    Safe for development databases. Does not force-reset data.
-
 .PARAMETER FailFast
     Stop execution immediately if any task in a wave fails.
     Prevents cascade failures when dependencies break.
@@ -33,13 +28,17 @@
 .PARAMETER RunVerification
     Run independent verification (typecheck, lint, tests) after each wave.
     Catches issues that workers may have self-reported incorrectly.
+    ENABLED BY DEFAULT. Use -RunVerification:$false or -SkipVerification to disable.
+
+.PARAMETER SkipVerification
+    Disable independent verification after each wave. Shorthand for -RunVerification:$false.
 
 .EXAMPLE
     .\parallel-dispatch.ps1
     .\parallel-dispatch.ps1 -Parallel 5
     .\parallel-dispatch.ps1 -DryRun
     .\parallel-dispatch.ps1 -NonInteractive -DefaultFailAction Skip
-    .\parallel-dispatch.ps1 -AllowDbMigrations -FailFast
+    .\parallel-dispatch.ps1 -FailFast
 #>
 
 param(
@@ -57,14 +56,19 @@ param(
     [string]$DefaultFailAction = "Skip",
 
     [Parameter()]
-    [switch]$AllowDbMigrations,
-
-    [Parameter()]
     [switch]$FailFast,
 
     [Parameter()]
-    [switch]$RunVerification
+    [bool]$RunVerification = $true,
+
+    [Parameter()]
+    [switch]$SkipVerification
 )
+
+# Handle SkipVerification flag (overrides RunVerification default)
+if ($SkipVerification) {
+    $RunVerification = $false
+}
 
 # Detect non-interactive environment if not explicitly set
 if (-not $NonInteractive) {
@@ -85,6 +89,10 @@ $ProgressFile = Join-Path $KanbanDir "kanban-progress.json"
 $PromptTemplate = Join-Path $ScriptDir "../prompts/worker-task.md"
 $ProcessWorkerOutputScript = Join-Path $ScriptDir "process-worker-output.ps1"
 $ParseWorkerLogScript = Join-Path $ScriptDir "parse-worker-log.ps1"
+$ShowNextStepsScript = Join-Path $ScriptDir "show-next-steps.ps1"
+
+# Dot-source the Show-NextSteps function
+. $ShowNextStepsScript
 
 # Wave definitions - tasks are processed in dependency order
 $WaveDefinitions = @{
@@ -98,17 +106,115 @@ $WaveDefinitions = @{
 # Categories that require pre-implementation tests (TDD)
 $TddCategories = @("data", "api", "integration", "ui", "config")
 
-# Agent mapping by category
-$AgentMapping = @{
-    "data"        = "backend-developer"
-    "api"         = "backend-developer"
-    "ui"          = "vue-expert"
-    "integration" = "backend-developer"
-    "config"      = "backend-developer"
-    "testing"     = "kanban-unit-tester"
-}
+# Agent mapping will be dynamically detected at runtime
+$script:AgentMapping = $null
 
 #region Helper Functions
+
+function Get-ProjectAgentMapping {
+    <#
+    .SYNOPSIS
+        Dynamically detect project stack and available agents for task dispatch.
+    .DESCRIPTION
+        Scans project for framework indicators and checks .claude/agents/ for
+        available agent definitions. Returns a mapping of categories to agents.
+    #>
+    param([string]$ProjectRoot)
+
+    $detected = @{
+        frontendFramework = $null  # vue, react, angular, svelte
+        backendFramework = $null   # express, fastapi, django, rails, go
+        language = $null           # typescript, python, go, ruby, php
+    }
+
+    # Detect frontend framework from package.json
+    $packageJsonPath = Join-Path $ProjectRoot "package.json"
+    if (Test-Path $packageJsonPath) {
+        try {
+            $pkg = Get-Content $packageJsonPath -Raw | ConvertFrom-Json
+            $deps = @()
+            if ($pkg.dependencies) { $deps += $pkg.dependencies.PSObject.Properties.Name }
+            if ($pkg.devDependencies) { $deps += $pkg.devDependencies.PSObject.Properties.Name }
+
+            if ($deps -contains "vue" -or $deps -contains "nuxt") { $detected.frontendFramework = "vue" }
+            elseif ($deps -contains "react" -or $deps -contains "next") { $detected.frontendFramework = "react" }
+            elseif ($deps -contains "@angular/core") { $detected.frontendFramework = "angular" }
+            elseif ($deps -contains "svelte" -or $deps -contains "@sveltejs/kit") { $detected.frontendFramework = "svelte" }
+
+            # Detect TypeScript
+            if ($deps -contains "typescript") { $detected.language = "typescript" }
+        }
+        catch {
+            # Silently continue if package.json can't be read
+        }
+    }
+
+    # Detect backend language from project files
+    if (Test-Path (Join-Path $ProjectRoot "requirements.txt")) { $detected.language = "python" }
+    elseif (Test-Path (Join-Path $ProjectRoot "pyproject.toml")) { $detected.language = "python" }
+    elseif (Test-Path (Join-Path $ProjectRoot "go.mod")) { $detected.language = "go" }
+    elseif (Test-Path (Join-Path $ProjectRoot "Gemfile")) { $detected.language = "ruby" }
+    elseif (Test-Path (Join-Path $ProjectRoot "composer.json")) { $detected.language = "php" }
+    elseif (Test-Path (Join-Path $ProjectRoot "Cargo.toml")) { $detected.language = "rust" }
+
+    # Build default agent mapping (all general-purpose initially)
+    $mapping = @{
+        "data"        = "general-purpose"
+        "api"         = "general-purpose"
+        "ui"          = "general-purpose"
+        "integration" = "general-purpose"
+        "config"      = "general-purpose"
+        "testing"     = "kanban-unit-tester"
+    }
+
+    # Check if project has specific agents defined in .claude/agents/
+    $agentsDir = Join-Path $ProjectRoot ".claude/agents"
+    if (Test-Path $agentsDir) {
+        $availableAgents = Get-ChildItem $agentsDir -Filter "*.md" -ErrorAction SilentlyContinue |
+                           ForEach-Object { $_.BaseName }
+
+        # Map detected stack to available agents
+        if ($detected.frontendFramework -eq "vue" -and $availableAgents -contains "vue-expert") {
+            $mapping["ui"] = "vue-expert"
+        }
+        elseif ($detected.frontendFramework -eq "react" -and $availableAgents -contains "react-expert") {
+            $mapping["ui"] = "react-expert"
+        }
+        elseif ($detected.frontendFramework -eq "angular" -and $availableAgents -contains "angular-expert") {
+            $mapping["ui"] = "angular-expert"
+        }
+        elseif ($detected.frontendFramework -eq "svelte" -and $availableAgents -contains "svelte-expert") {
+            $mapping["ui"] = "svelte-expert"
+        }
+
+        # Map backend agents
+        if ($availableAgents -contains "backend-developer") {
+            $mapping["data"] = "backend-developer"
+            $mapping["api"] = "backend-developer"
+            $mapping["integration"] = "backend-developer"
+            $mapping["config"] = "backend-developer"
+        }
+
+        # Language-specific backend agents
+        if ($detected.language -eq "python" -and $availableAgents -contains "python-developer") {
+            $mapping["data"] = "python-developer"
+            $mapping["api"] = "python-developer"
+            $mapping["integration"] = "python-developer"
+            $mapping["config"] = "python-developer"
+        }
+        elseif ($detected.language -eq "go" -and $availableAgents -contains "go-developer") {
+            $mapping["data"] = "go-developer"
+            $mapping["api"] = "go-developer"
+            $mapping["integration"] = "go-developer"
+            $mapping["config"] = "go-developer"
+        }
+    }
+
+    return @{
+        mapping = $mapping
+        detected = $detected
+    }
+}
 
 function Invoke-IndependentVerification {
     <#
@@ -117,6 +223,7 @@ function Invoke-IndependentVerification {
     .DESCRIPTION
         After workers complete, run project verification commands independently
         to catch issues that workers may have self-reported incorrectly.
+        Uses config.json for verification commands if available, otherwise falls back to package.json detection.
     #>
     param(
         [string]$ProjectRoot,
@@ -125,9 +232,22 @@ function Invoke-IndependentVerification {
 
     $results = @{
         typecheck = $null
+        lintFix = $null
         lint = $null
         tests = $null
         allPassed = $true
+    }
+
+    # Load kanban config for verification commands
+    $configPath = Join-Path $ProjectRoot ".kanban/config.json"
+    $config = $null
+    if (Test-Path $configPath) {
+        try {
+            $config = Get-Content $configPath -Raw | ConvertFrom-Json
+        }
+        catch {
+            Write-Host "[Warning] Could not read config.json: $($_.Exception.Message)" -ForegroundColor Yellow
+        }
     }
 
     # Check if package.json exists to determine available commands
@@ -151,14 +271,21 @@ function Invoke-IndependentVerification {
         return $results
     }
 
+    # Get verification commands from config or fallback to package.json detection
+    $verifyCommands = @{
+        typecheck = if ($config -and $config.verification -and $config.verification.typecheck) { $config.verification.typecheck } elseif ($scripts.typecheck) { "npm run typecheck" } else { $null }
+        lint = if ($config -and $config.verification -and $config.verification.lint) { $config.verification.lint } elseif ($scripts.lint) { "npm run lint" } else { $null }
+        lintFix = if ($config -and $config.verification -and $config.verification.lintFix) { $config.verification.lintFix } elseif ($scripts.'lint:fix') { "npm run lint:fix" } else { $null }
+    }
+
     # Save current location
     Push-Location $ProjectRoot
 
     try {
         # Run TypeScript type checking if available
-        if ($scripts.typecheck) {
+        if ($verifyCommands.typecheck) {
             Write-Host "[Check] Running typecheck..." -ForegroundColor Gray
-            $typecheckOutput = & npm run typecheck 2>&1
+            $typecheckOutput = Invoke-Expression $verifyCommands.typecheck 2>&1
             $results.typecheck = $LASTEXITCODE -eq 0
 
             if ($results.typecheck) {
@@ -175,13 +302,26 @@ function Invoke-IndependentVerification {
                 }
             }
         } else {
-            Write-Host "[Skip] No typecheck script found" -ForegroundColor DarkGray
+            Write-Host "[Skip] No typecheck command found" -ForegroundColor DarkGray
         }
 
-        # Run lint if available (only on affected files if possible)
-        if ($scripts.lint) {
+        # Run lint:fix first if available to auto-fix formatting issues
+        if ($verifyCommands.lintFix) {
+            Write-Host "[Check] Running lint:fix to auto-fix issues..." -ForegroundColor Gray
+            $lintFixOutput = Invoke-Expression $verifyCommands.lintFix 2>&1
+            $results.lintFix = $LASTEXITCODE -eq 0
+
+            if ($results.lintFix) {
+                Write-Host "[PASS] Lint:fix completed" -ForegroundColor Green
+            } else {
+                Write-Host "[INFO] Lint:fix ran (some issues may remain)" -ForegroundColor Yellow
+            }
+        }
+
+        # Run lint after lint:fix
+        if ($verifyCommands.lint) {
             Write-Host "[Check] Running lint..." -ForegroundColor Gray
-            $lintOutput = & npm run lint 2>&1
+            $lintOutput = Invoke-Expression $verifyCommands.lint 2>&1
             $results.lint = $LASTEXITCODE -eq 0
 
             if ($results.lint) {
@@ -198,7 +338,7 @@ function Invoke-IndependentVerification {
                 }
             }
         } else {
-            Write-Host "[Skip] No lint script found" -ForegroundColor DarkGray
+            Write-Host "[Skip] No lint command found" -ForegroundColor DarkGray
         }
 
         # Run tests if available
@@ -239,67 +379,10 @@ function Invoke-IndependentVerification {
     return $results
 }
 
-function Invoke-DatabaseMigrations {
-    <#
-    .SYNOPSIS
-        Run Prisma database migrations (db push + generate) after Wave 1 completes.
-    #>
-    param([string]$ProjectRoot)
-
-    Write-Host ""
-    Write-Host ("=" * 50) -ForegroundColor Yellow
-    Write-Host "DATABASE MIGRATIONS" -ForegroundColor Yellow
-    Write-Host ("=" * 50) -ForegroundColor Yellow
-
-    # Check if Prisma schema exists
-    $prismaSchemaDir = Join-Path $ProjectRoot "server\database\schemas"
-    if (-not (Test-Path $prismaSchemaDir)) {
-        Write-Host "[Skip] No Prisma schemas directory found at $prismaSchemaDir" -ForegroundColor Gray
-        return $true
-    }
-
-    Write-Host "[Info] Running Prisma database push..." -ForegroundColor Cyan
-
-    try {
-        # Run prisma db push (non-destructive by default)
-        $pushOutput = & npx prisma db push 2>&1
-        $pushExitCode = $LASTEXITCODE
-
-        if ($pushExitCode -ne 0) {
-            Write-Host "[Error] Prisma db push failed:" -ForegroundColor Red
-            Write-Host $pushOutput -ForegroundColor Red
-            return $false
-        }
-
-        Write-Host "[Success] Database schema synchronized" -ForegroundColor Green
-
-        # Run prisma generate
-        Write-Host "[Info] Generating Prisma client..." -ForegroundColor Cyan
-        $generateOutput = & npx prisma generate 2>&1
-        $generateExitCode = $LASTEXITCODE
-
-        if ($generateExitCode -ne 0) {
-            Write-Host "[Error] Prisma generate failed:" -ForegroundColor Red
-            Write-Host $generateOutput -ForegroundColor Red
-            return $false
-        }
-
-        Write-Host "[Success] Prisma client generated" -ForegroundColor Green
-        Write-Host ("=" * 50) -ForegroundColor Yellow
-        Write-Host ""
-
-        return $true
-    }
-    catch {
-        Write-Host "[Error] Database migration failed: $($_.Exception.Message)" -ForegroundColor Red
-        return $false
-    }
-}
-
 function Get-ProjectContext {
     <#
     .SYNOPSIS
-        Extracts project context from CLAUDE.md and nuxt.config.ts for worker prompts.
+        Extracts project context from CLAUDE.md for worker prompts.
     #>
     param([string]$ProjectRoot)
 
@@ -324,68 +407,69 @@ function Get-ProjectContext {
         }
     }
 
-    # Try to read nuxt.config.ts for import aliases
-    $nuxtConfigPath = Join-Path $ProjectRoot "nuxt.config.ts"
-    if (Test-Path $nuxtConfigPath) {
-        try {
-            $nuxtConfig = Get-Content $nuxtConfigPath -Raw -ErrorAction Stop
-
-            # Extract alias section
-            if ($nuxtConfig -match 'alias:\s*\{([^}]+)\}') {
-                $aliasBlock = $matches[1]
-                $contextParts += @"
-### Import Aliases (from nuxt.config.ts)
-
-**IMPORTANT**: Use these aliases for imports between FSD layers:
-$aliasBlock
-
-The ``~`` alias also works in Nuxt and resolves to the srcDir (client/).
-When importing between slices, prefer using public API exports (index.ts).
-"@
-            }
-
-            # Extract srcDir if present
-            if ($nuxtConfig -match "srcDir:\s*['\x22]([^'\x22]+)['\x22]") {
-                $srcDir = $matches[1]
-                $contextParts += "`n**Source Directory**: ``$srcDir/``"
-            }
-        }
-        catch {
-            # Silently continue if nuxt.config.ts can't be read
-        }
-    }
-
-    # Add FSD layer rules as default context
-    $contextParts += @"
-
-### FSD Architecture Rules
-
-Feature-Sliced Design layer hierarchy (imports only allowed downward):
-1. **app** - App-wide concerns, providers, layouts
-2. **pages** - Route pages
-3. **widgets** - Large self-contained UI blocks
-4. **features** - Business features with user actions
-5. **entities** - Business entities (user, file, folder)
-6. **shared** - Reusable utilities, UI components, API clients
-
-**Import Rules**:
-- Widgets can import from: features, entities, shared
-- Features can import from: entities, shared
-- Entities can import from: shared
-- Use public API exports (index.ts) when importing between slices
-"@
-
     if ($contextParts.Count -eq 0) {
-        return "No project-specific context available. Follow general best practices."
+        return "Follow project conventions from CLAUDE.md if available. Use general best practices."
     }
 
     return ($contextParts -join "`n`n")
 }
 
+function Get-TransitiveDependencies {
+    <#
+    .SYNOPSIS
+        Recursively collects all transitive dependencies for a task.
+    .DESCRIPTION
+        Given a task name, returns all task names in the dependency chain,
+        not just direct blockedBy dependencies. This ensures UI tasks receive
+        context from API tasks even if they're not directly connected.
+    #>
+    param(
+        [string]$TaskName,
+        [array]$AllTasks,
+        [hashtable]$Visited = @{}
+    )
+
+    # Avoid infinite loops from circular dependencies
+    if ($Visited.ContainsKey($TaskName)) {
+        return @()
+    }
+    $Visited[$TaskName] = $true
+
+    $task = $AllTasks | Where-Object { $_.name -eq $TaskName }
+    if (-not $task) {
+        return @()
+    }
+
+    $deps = @()
+
+    # Get direct dependencies
+    if ($task.blockedBy -and $task.blockedBy.Count -gt 0) {
+        foreach ($depName in $task.blockedBy) {
+            # Add the direct dependency
+            if ($deps -notcontains $depName) {
+                $deps += $depName
+            }
+            # Recursively get its dependencies
+            $transitive = Get-TransitiveDependencies -TaskName $depName -AllTasks $AllTasks -Visited $Visited
+            foreach ($transDep in $transitive) {
+                if ($deps -notcontains $transDep) {
+                    $deps += $transDep
+                }
+            }
+        }
+    }
+
+    return $deps
+}
+
 function Get-DependencyContext {
     <#
     .SYNOPSIS
-        Gathers context from completed blockedBy tasks for worker prompt injection.
+        Gathers context from ALL transitive dependencies for worker prompt injection.
+    .DESCRIPTION
+        Unlike the previous implementation that only looked at direct blockedBy tasks,
+        this now collects context from the ENTIRE dependency chain. This ensures that
+        UI tasks receive context from API tasks even if there are intermediate tasks.
     #>
     param(
         [object]$Task,
@@ -394,18 +478,29 @@ function Get-DependencyContext {
     )
 
     $context = @()
-    $blockedBy = $Task.blockedBy
 
-    if (-not $blockedBy -or $blockedBy.Count -eq 0) {
+    # Get ALL transitive dependencies, not just direct blockedBy
+    $allDeps = Get-TransitiveDependencies -TaskName $Task.name -AllTasks $AllTasks -Visited @{}
+
+    if (-not $allDeps -or $allDeps.Count -eq 0) {
         return "No dependencies for this task."
     }
 
-    foreach ($depName in $blockedBy) {
+    # Separate direct and transitive dependencies for clarity
+    $directDeps = @()
+    if ($Task.blockedBy) {
+        $directDeps = $Task.blockedBy
+    }
+
+    foreach ($depName in $allDeps) {
         $depProgress = $Progress[$depName]
         $depTask = $AllTasks | Where-Object { $_.name -eq $depName }
 
+        # Mark whether this is a direct or transitive dependency
+        $depType = if ($directDeps -contains $depName) { "direct" } else { "transitive" }
+
         if ($depProgress -and $depTask.passes) {
-            $context += "**$depName** (completed):"
+            $context += "**$depName** (completed, $depType dependency):"
             if ($depProgress.affectedFiles -and $depProgress.affectedFiles.Count -gt 0) {
                 foreach ($file in $depProgress.affectedFiles) {
                     $context += "- $file"
@@ -415,11 +510,11 @@ function Get-DependencyContext {
             }
             $context += ""
         } elseif ($depProgress) {
-            $context += "**$depName** (status: $($depProgress.status)):"
+            $context += "**$depName** (status: $($depProgress.status), $depType dependency):"
             $context += "- WARNING: Dependency not yet completed"
             $context += ""
         } else {
-            $context += "**$depName** (not started):"
+            $context += "**$depName** (not started, $depType dependency):"
             $context += "- WARNING: Dependency has not been processed"
             $context += ""
         }
@@ -599,10 +694,10 @@ function Write-SubHeader {
 function Get-AgentForCategory {
     param([string]$Category)
 
-    if ($AgentMapping.ContainsKey($Category)) {
-        return $AgentMapping[$Category]
+    if ($script:AgentMapping -and $script:AgentMapping.ContainsKey($Category)) {
+        return $script:AgentMapping[$Category]
     }
-    return "backend-developer"  # Default fallback
+    return "general-purpose"  # Default fallback
 }
 
 function Get-TokenUsageFromLog {
@@ -848,7 +943,8 @@ function Invoke-ParseWorkerLog {
         [string]$JsonLogPath,
         [string]$OutputFilePath,
         [string]$AgentName,
-        [string]$StartedAt
+        [string]$StartedAt,
+        [switch]$IsTdd
     )
 
     if (-not (Test-Path $JsonLogPath)) {
@@ -868,6 +964,10 @@ function Invoke-ParseWorkerLog {
 
         if ($StartedAt) {
             $scriptArgs += @("-StartedAt", "`"$StartedAt`"")
+        }
+
+        if ($IsTdd) {
+            $scriptArgs += @("-IsTdd")
         }
 
         $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $ParseWorkerLogScript @scriptArgs 2>&1
@@ -1116,6 +1216,8 @@ function Wait-TestCreationBatch {
         $task = $worker.Task
         $taskName = $task.name
         $jsonLogPath = $worker.JsonLogPath
+        $startedAt = $worker.StartedAt
+        $agentName = $worker.AgentName
 
         # Wait for log file to be ready
         $maxWaitMs = 5000
@@ -1149,12 +1251,37 @@ function Wait-TestCreationBatch {
             }
         }
 
-        # Extract test files from the log
-        $testFiles = Get-TestFilesFromLog -JsonLogPath $jsonLogPath
+        # Create output file path for TDD phase
+        $outputFilePath = Join-Path $LogsDir "$taskName-test-creation-output.json"
+
+        # Parse the raw log to create structured output (consistent with implementation workers)
+        # Pass -IsTdd flag so the parser extracts testFiles from affectedFiles
+        Write-Host "       [TDD] Parsing raw log for $taskName..." -ForegroundColor Gray
+        $parseResult = Invoke-ParseWorkerLog -TaskName $taskName -JsonLogPath $jsonLogPath -OutputFilePath $outputFilePath -AgentName $agentName -StartedAt $startedAt -IsTdd
+
+        # Extract test files from the output file (not raw log) for consistency
+        $testFiles = @()
+        if ($parseResult -and $parseResult.success -and (Test-Path $outputFilePath)) {
+            try {
+                $outputContent = Get-Content $outputFilePath -Raw | ConvertFrom-Json
+                if ($outputContent.affectedFiles) {
+                    $testFiles = @($outputContent.affectedFiles | Where-Object { $_ -match '\.(test|spec)\.(ts|js|tsx|jsx)$' -or $_ -match 'test_.*\.py$' -or $_ -match '.*_test\.(py|go)$' })
+                }
+            }
+            catch {
+                Write-Host "       [TDD] Could not read output file, falling back to raw log parsing" -ForegroundColor Yellow
+                $testFiles = Get-TestFilesFromLog -JsonLogPath $jsonLogPath
+            }
+        }
+        else {
+            # Fallback to raw log parsing if output file creation failed
+            $testFiles = Get-TestFilesFromLog -JsonLogPath $jsonLogPath
+        }
 
         $results += @{
             Task = $task
             JsonLogPath = $jsonLogPath
+            OutputFilePath = $outputFilePath
             TestFiles = $testFiles
             Success = ($testFiles.Count -gt 0)
         }
@@ -1422,6 +1549,65 @@ function Wait-WorkerBatch {
 
         Write-Host "       [Dispatcher] Parsing raw log for $taskName..." -ForegroundColor Gray
         $parseResult = Invoke-ParseWorkerLog -TaskName $taskName -JsonLogPath $jsonLogPath -OutputFilePath $outputFilePath -AgentName $agentName -StartedAt $startedAt
+
+        # ============================================================
+        # DISPATCHER-SIDE TEST VERIFICATION
+        # Run tests directly instead of parsing worker output
+        # Read testFiles from TDD output file (created by parse-worker-log.ps1 with -IsTdd)
+        # ============================================================
+        $tddOutputPath = Join-Path $LogsDir "$taskName-test-creation-output.json"
+        $taskTestFiles = @()
+        if (Test-Path $tddOutputPath) {
+            try {
+                $tddOutput = Get-Content $tddOutputPath -Raw | ConvertFrom-Json
+                if ($tddOutput.testFiles) {
+                    $taskTestFiles = @($tddOutput.testFiles)
+                }
+            } catch {
+                Write-Host "       [Warning] Could not read TDD output file for ${taskName}: $($_.Exception.Message)" -ForegroundColor Yellow
+            }
+        }
+
+        if ($taskTestFiles.Count -gt 0) {
+            Write-Host "       [Dispatcher] Verifying $($taskTestFiles.Count) test file(s)..." -ForegroundColor Cyan
+
+            $runTestsScript = Join-Path $ScriptDir "run-tests.ps1"
+            $configFile = Join-Path $ProjectRoot ".kanban/config.json"
+
+            try {
+                $testResultJson = & powershell -NoProfile -ExecutionPolicy Bypass -File $runTestsScript -TestFiles $taskTestFiles -ConfigFile $configFile -WorkingDir $ProjectRoot 2>&1 | Out-String
+                $testResult = $testResultJson.Trim() | ConvertFrom-Json -ErrorAction Stop
+
+                # Update output file with dispatcher's actual test results
+                if (Test-Path $outputFilePath) {
+                    $outputContent = Get-Content $outputFilePath -Raw | ConvertFrom-Json
+
+                    $outputContent.verification = @{
+                        passed = $testResult.passed
+                        testResults = @{
+                            totalTests = $testResult.totalTests
+                            passedTests = $testResult.passedTests
+                            failedTests = $testResult.failedTests
+                        }
+                        source = "dispatcher"
+                    }
+
+                    $outputContent.status = if ($testResult.passed) { "success" } else { "error" }
+                    $outputContent | ConvertTo-Json -Depth 10 | Set-Content $outputFilePath -Encoding UTF8
+                }
+
+                if ($testResult.passed) {
+                    Write-Host "       [PASS] All $($testResult.passedTests) test(s) passed" -ForegroundColor Green
+                } else {
+                    Write-Host "       [FAIL] $($testResult.failedTests) of $($testResult.totalTests) test(s) failed" -ForegroundColor Red
+                    # Store failure context for retry prompt
+                    $parseResult.testFailureOutput = $testResult.output
+                }
+            }
+            catch {
+                Write-Host "       [Warning] Dispatcher test run failed: $($_.Exception.Message)" -ForegroundColor Yellow
+            }
+        }
 
         # Initialize variables
         $tokensUsed = @()
@@ -1731,6 +1917,20 @@ function Main {
         exit 1
     }
 
+    # Detect project stack and available agents
+    Write-Host "Detecting project agents..." -ForegroundColor Gray
+    $agentResult = Get-ProjectAgentMapping -ProjectRoot $ProjectRoot
+    $script:AgentMapping = $agentResult.mapping
+    $detected = $agentResult.detected
+
+    # Display detected configuration
+    $detectedParts = @()
+    if ($detected.frontendFramework) { $detectedParts += "frontend=$($detected.frontendFramework)" }
+    if ($detected.language) { $detectedParts += "language=$($detected.language)" }
+    if ($detectedParts.Count -gt 0) {
+        Write-Host "Detected: $($detectedParts -join ', ')" -ForegroundColor Gray
+    }
+
     Write-Host "Project: $($board.project)" -ForegroundColor White
     Write-Host "Total Tasks: $($board.tasks.Count)" -ForegroundColor White
     Write-Host "Max Parallel Workers: $Parallel" -ForegroundColor White
@@ -1833,7 +2033,7 @@ function Main {
                 $testCreators = @()
                 foreach ($task in $tddBatch) {
                     $testPrompt = Build-TestCreationPrompt -Task $task -Board $board
-                    $testLogPath = Join-Path $LogsDir "$($task.name)-test-creation.json"
+                    $testLogPath = Join-Path $LogsDir "$($task.name)-test-creation.txt"
 
                     Write-Host "  [TDD] Starting test creation for: $($task.name)" -ForegroundColor Magenta
 
@@ -1854,6 +2054,20 @@ function Main {
                     $taskName = $result.Task.name
                     $testFiles = $result.TestFiles
                     $taskTestFiles[$taskName] = $testFiles
+
+                    # Persist testFiles to progress.json for dispatcher verification
+                    if ($testFiles -and $testFiles.Count -gt 0) {
+                        try {
+                            $progressContent = Get-Content $ProgressFile -Raw | ConvertFrom-Json
+                            if ($progressContent.$taskName) {
+                                $progressContent.$taskName | Add-Member -NotePropertyName "testFiles" -NotePropertyValue $testFiles -Force
+                                $progressContent | ConvertTo-Json -Depth 10 | Set-Content $ProgressFile -Encoding UTF8
+                            }
+                        }
+                        catch {
+                            Write-Host "       [Warning] Could not persist testFiles for ${taskName}: $($_.Exception.Message)" -ForegroundColor Yellow
+                        }
+                    }
 
                     if ($testFiles.Count -gt 0) {
                         Write-Host "  [PASS] " -ForegroundColor Green -NoNewline
@@ -1888,7 +2102,7 @@ function Main {
 
                 $prompt = Build-WorkerPrompt -Task $task -Board $board -TemplatePath $PromptTemplate -TestFiles $testFiles -Progress $progress
                 $logPath = Join-Path $LogsDir "$($task.name).log"
-                $jsonLogPath = Join-Path $LogsDir "$($task.name).json"
+                $jsonLogPath = Join-Path $LogsDir "$($task.name).txt"
                 $outputFilePath = Join-Path $LogsDir "$($task.name)-output.json"
 
                 Write-Host "Starting worker for: $($task.name)" -ForegroundColor Cyan
@@ -1943,16 +2157,6 @@ function Main {
             }
         }
 
-        # After Wave 1 (data, config) completes, run database migrations
-        if ($waveNum -eq 1 -and $AllowDbMigrations -and -not $DryRun) {
-            $migrationSuccess = Invoke-DatabaseMigrations -ProjectRoot $ProjectRoot
-            if (-not $migrationSuccess -and $FailFast) {
-                Write-Host ""
-                Write-Host "[FailFast] Database migration failed. Stopping execution." -ForegroundColor Red
-                exit 1
-            }
-        }
-
         # Run independent verification after each wave if enabled
         if ($RunVerification -and -not $DryRun -and $waveTasks.Count -gt 0) {
             $verificationResults = Invoke-IndependentVerification -ProjectRoot $ProjectRoot
@@ -1999,6 +2203,9 @@ function Main {
     if ($totalFailure -gt 0) {
         Write-Host "Check worker-logs in $LogsDir for failure details." -ForegroundColor Yellow
     }
+
+    # Show recommended next steps based on what changed
+    Show-NextSteps -ProjectRoot $ProjectRoot
 }
 
 # Run main function

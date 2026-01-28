@@ -157,11 +157,83 @@ VALIDATION RESULTS:
 
 ---
 
-## Phase 3: Setup Missing Infrastructure
+## Phase 3: Update Kanban Config
+
+After detecting and validating the framework, update `.kanban/config.json` with framework-specific test settings.
+
+### Step 3.1: Read Existing Config
+
+Read `.kanban/config.json` to get current settings (should have `testTimeout` from init).
+
+### Step 3.2: Determine Test Command
+
+Based on detected framework, determine the appropriate test command:
+
+| Framework | Check for                          | testCommand                    |
+| --------- | ---------------------------------- | ------------------------------ |
+| Vitest    | `scripts.test:run` in package.json | `npm run test:run` (preferred) |
+| Vitest    | No test:run script                 | `npx vitest run`               |
+| Jest      | `scripts.test` in package.json     | `npm test -- --ci`             |
+| Jest      | No test script                     | `npx jest --ci`                |
+| pytest    | -                                  | `pytest`                       |
+| go test   | -                                  | `go test ./...`                |
+| PHPUnit   | -                                  | `./vendor/bin/phpunit`         |
+| RSpec     | -                                  | `bundle exec rspec`            |
+
+**Priority for JS/TS projects:**
+
+1. Check if `package.json` has a `test:run` script - use `npm run test:run`
+2. Check if `package.json` has a `test` script - use `npm test -- --run` (for vitest) or `npm test -- --ci` (for jest)
+3. Fall back to `npx [framework] run`
+
+### Step 3.3: Determine Test Patterns
+
+Set regex patterns to parse test output:
+
+| Framework | testPatterns.passed  | testPatterns.failed |
+| --------- | -------------------- | ------------------- |
+| Vitest    | `(\d+)\s+passed`     | `(\d+)\s+failed`    |
+| Jest      | `(\d+)\s+passed`     | `(\d+)\s+failed`    |
+| pytest    | `(\d+)\s+passed`     | `(\d+)\s+failed`    |
+| go test   | `^ok`                | `^FAIL`             |
+| PHPUnit   | `OK \((\d+) tests`   | `FAILURES!`         |
+| RSpec     | `(\d+) examples?, 0` | `(\d+) failures?`   |
+
+### Step 3.4: Update Config File
+
+Merge the detected settings into the existing config:
+
+```typescript
+// Read existing config
+const config = JSON.parse(fs.readFileSync('.kanban/config.json'));
+
+// Add test settings
+config.testCommand = detectedTestCommand;
+config.testPatterns = {
+  passed: passedPattern,
+  failed: failedPattern,
+};
+
+// Write back
+fs.writeFileSync('.kanban/config.json', JSON.stringify(config, null, 2));
+```
+
+### Step 3.5: Report Config Update
+
+```
+KANBAN CONFIG UPDATED:
+- testCommand: [detected command]
+- testPatterns.passed: [pattern]
+- testPatterns.failed: [pattern]
+```
+
+---
+
+## Phase 4: Setup Missing Infrastructure
 
 If validation failed or no framework detected, guide the user through setup.
 
-### Step 3.1: Determine Recommended Framework
+### Step 4.1: Determine Recommended Framework
 
 Based on project type, recommend a test framework:
 
@@ -176,7 +248,7 @@ Based on project type, recommend a test framework:
 | PHP/Laravel    | PHPUnit               | Laravel default                   |
 | Ruby/Rails     | RSpec                 | Rails convention                  |
 
-### Step 3.2: Offer Setup Options
+### Step 4.2: Offer Setup Options
 
 Present the user with options:
 
@@ -193,7 +265,7 @@ Options:
 What would you like to do?
 ```
 
-### Step 3.3: Install Framework (if user accepts)
+### Step 4.3: Install Framework (if user accepts)
 
 For Vitest (JS/TS projects):
 
@@ -233,7 +305,7 @@ pip install pytest pytest-asyncio
 Create config file using template from:
 `.claude/commands/kanban/init/templates/test-configs/pytest.ini.template`
 
-### Step 3.4: Create Sample Test Directory
+### Step 4.4: Create Sample Test Directory
 
 Create a sample test to verify setup:
 
@@ -250,7 +322,7 @@ describe('Test Infrastructure', () => {
 });
 ```
 
-### Step 3.5: Verify Installation
+### Step 4.5: Verify Installation
 
 After setup, run the test command to verify:
 
@@ -260,7 +332,7 @@ npm run test -- --run
 
 ---
 
-## Phase 4: Final Report
+## Phase 5: Final Report
 
 Output a summary of the verification/setup process:
 

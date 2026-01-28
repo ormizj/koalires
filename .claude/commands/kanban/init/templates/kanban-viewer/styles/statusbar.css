@@ -1,0 +1,74 @@
+/* ==============================================
+   Status Bar Styles
+   Bottom status bar footer
+   ============================================== */
+
+/* ==============================================
+   Status Bar Container
+   ============================================== */
+
+.status-bar {
+  position: fixed;
+  bottom: 1rem;
+  left: 1rem;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-md);
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  z-index: var(--z-status-bar);
+}
+
+/* ==============================================
+   Status Indicator
+   ============================================== */
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.status-indicator span {
+  line-height: 1;
+  display: flex;
+  align-items: center;
+}
+
+/* ==============================================
+   Status Circle
+   ============================================== */
+
+.status-circle {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-text-muted);
+  transition: background-color var(--transition-slow);
+  flex-shrink: 0;
+}
+
+.status-circle.connected {
+  background: var(--color-accent);
+}
+
+.status-circle.disconnected {
+  background: var(--status-error);
+}
+
+/* ==============================================
+   Status Bar Divider
+   ============================================== */
+
+.status-bar-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--color-border-hover);
+  display: none;
+  flex-shrink: 0;
+  margin-left: 4px;
+}

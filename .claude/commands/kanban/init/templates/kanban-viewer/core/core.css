@@ -1,0 +1,526 @@
+/* ==============================================
+   Core CSS - Variables, Base, Header
+   Merged from: variables.css, base.css, header.css
+   ============================================== */
+
+/* ==============================================
+   CSS Custom Properties (Design Tokens)
+   Kanban Viewer Design System
+   ============================================== */
+
+:root {
+  /* ============================================
+     Background Colors
+     ============================================ */
+  --color-bg: #0d1117;
+  --color-bg-secondary: #161b22;
+  --color-bg-tertiary: #21262d;
+  --color-bg-hover: #1c2128;
+  --color-bg-active: #30363d;
+
+  /* ============================================
+     Border Colors
+     ============================================ */
+  --color-border: #30363d;
+  --color-border-secondary: #21262d;
+  --color-border-hover: #484f58;
+
+  /* ============================================
+     Text Colors
+     ============================================ */
+  --color-text: #c9d1d9;
+  --color-text-muted: #8b949e;
+  --color-text-subtle: #6e7681;
+  --color-accent: #58a6ff;
+  --color-accent-hover: #79c0ff;
+
+  /* ============================================
+     Status Colors
+     ============================================ */
+  --status-pending: #8b949e;
+  --status-progress: #f0883e;
+  --status-review: #a371f7;
+  --status-completed: #3fb950;
+  --status-blocked: #f85149;
+  --status-error: #f85149;
+
+  /* ============================================
+     Category Colors
+     ============================================ */
+  --category-data: #238636;
+  --category-api: #1f6feb;
+  --category-ui: #a371f7;
+  --category-integration: #f0883e;
+  --category-config: #d29922;
+  --category-testing: #8b949e;
+
+  /* ============================================
+     Semantic Colors
+     ============================================ */
+  --color-success: #3fb950;
+  --color-success-bg: rgba(63, 185, 80, 0.2);
+  --color-success-border: rgba(63, 185, 80, 0.3);
+
+  --color-warning: #f0883e;
+  --color-warning-bg: rgba(240, 136, 62, 0.2);
+  --color-warning-border: rgba(240, 136, 62, 0.3);
+
+  --color-danger: #f85149;
+  --color-danger-bg: rgba(248, 81, 73, 0.2);
+  --color-danger-border: rgba(248, 81, 73, 0.3);
+
+  --color-info: #58a6ff;
+  --color-info-bg: rgba(88, 166, 255, 0.1);
+  --color-info-border: rgba(88, 166, 255, 0.2);
+
+  /* ============================================
+     JSON Syntax Highlighting
+     ============================================ */
+  --json-key: #7ee787;
+  --json-string: #a5d6ff;
+  --json-number: #79c0ff;
+  --json-boolean: #ff7b72;
+  --json-null: #ffa657;
+  --json-match-bg: rgba(255, 213, 0, 0.3);
+  --json-match-current-bg: rgba(255, 213, 0, 0.6);
+  --json-match-current-outline: #ffd500;
+
+  /* ============================================
+     Modal Dimensions
+     ============================================ */
+  --modal-min-width: 500px;
+  --modal-min-height: 400px;
+  --modal-default-width: 700px;
+  --modal-default-height: 600px;
+  --modal-border-radius: 12px;
+
+  /* Task Modal Dimensions */
+  --task-modal-min-width: 600px;
+  --task-modal-min-height: 450px;
+  --task-modal-default-width: 850px;
+  --task-modal-default-height: 650px;
+
+  /* ============================================
+     Sidebar Dimensions
+     ============================================ */
+  --sidebar-width: 200px;
+  --sidebar-min-width: 120px;
+  --sidebar-max-width: 400px;
+
+  /* ============================================
+     Column Dimensions
+     ============================================ */
+  --column-min-width: 17.5rem;
+  --column-min-height: 31.25rem;
+  --column-minimized-width: 2.5rem;
+
+  /* ============================================
+     Spacing Scale
+     ============================================ */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+
+  /* ============================================
+     Border Radius
+     ============================================ */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+
+  /* ============================================
+     Typography
+     ============================================ */
+  --font-family-base:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
+    sans-serif;
+  --font-family-mono:
+    'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+
+  --font-size-xs: 0.65rem;
+  --font-size-sm: 0.75rem;
+  --font-size-md: 0.8rem;
+  --font-size-base: 0.875rem;
+  --font-size-lg: 0.9rem;
+  --font-size-xl: 1rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: 1.8rem;
+
+  /* ============================================
+     Transitions
+     ============================================ */
+  --transition-fast: 0.15s ease;
+  --transition-base: 0.2s ease;
+  --transition-slow: 0.3s ease;
+
+  /* ============================================
+     Shadows
+     ============================================ */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.5);
+
+  /* ============================================
+     Z-Index Scale
+     ============================================ */
+  --z-dropdown: 1000;
+  --z-modal-overlay: 2000;
+  --z-modal: 2001;
+  --z-status-bar: 2500;
+}
+
+/* ==============================================
+   Base Styles
+   Reset, typography, body styles
+   ============================================== */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-family-base);
+  background: var(--color-bg);
+  color: var(--color-text);
+  min-height: 100vh;
+  padding: 1rem;
+}
+
+/* ==============================================
+   Custom Scrollbar Styles
+   ============================================== */
+
+/* WebKit browsers (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-sm);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--color-bg-secondary);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-hover);
+}
+
+::-webkit-scrollbar-corner {
+  background: var(--color-bg-secondary);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) var(--color-bg-secondary);
+}
+
+/* ==============================================
+   Progress Bar
+   ============================================== */
+
+.progress-bar {
+  width: 100%;
+  height: 0.5rem;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-top: 0.9375rem;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    var(--status-completed),
+    var(--color-accent)
+  );
+  transition: width 0.5s ease;
+}
+
+/* ==============================================
+   Error State
+   ============================================== */
+
+.error-message {
+  text-align: center;
+  padding: 2.5rem;
+  color: var(--status-error);
+  font-size: var(--font-size-xl);
+}
+
+/* ==============================================
+   Empty State
+   ============================================== */
+
+.empty-column {
+  text-align: center;
+  padding: 2.5rem 1.25rem;
+  color: var(--color-text-subtle);
+  font-size: 0.85rem;
+}
+
+/* ==============================================
+   Responsive Breakpoints
+   ============================================== */
+
+@media (max-width: 1400px) {
+  .board {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 1000px) {
+  .board {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .board {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ==============================================
+   Header Styles
+   Header, stats, and project metadata
+   ============================================== */
+
+/* ==============================================
+   Header Container
+   ============================================== */
+
+.header {
+  position: relative;
+  text-align: center;
+  margin-bottom: 1.875rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.header h1 {
+  font-size: var(--font-size-3xl);
+  color: var(--color-accent);
+  margin-bottom: 0.5rem;
+}
+
+.header p {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-lg);
+}
+
+/* ==============================================
+   Header Controls Container
+   ============================================== */
+
+.header-controls {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: stretch;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.header-controls:focus-within {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
+}
+
+/* ==============================================
+   Stats Section
+   ============================================== */
+
+.stats {
+  display: flex;
+  justify-content: center;
+  gap: 1.875rem;
+  margin-top: 0.25rem;
+}
+
+.stat {
+  text-align: center;
+}
+
+.stat-value {
+  font-size: var(--font-size-2xl);
+  font-weight: bold;
+}
+
+.stat-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+}
+
+/* Stat Color Variants */
+.stat-pending .stat-value {
+  color: var(--status-pending);
+}
+
+.stat-progress .stat-value {
+  color: var(--status-progress);
+}
+
+.stat-review .stat-value {
+  color: var(--status-review);
+}
+
+.stat-completed .stat-value {
+  color: var(--status-completed);
+}
+
+.stat-blocked .stat-value {
+  color: var(--status-blocked);
+}
+
+.stat-tokens .stat-value {
+  color: var(--color-accent);
+}
+
+.stat-min .stat-value {
+  color: var(--status-completed);
+}
+
+.stat-max .stat-value {
+  color: var(--status-error);
+}
+
+.stat-avg .stat-value {
+  color: var(--status-review);
+}
+
+/* ==============================================
+   Stats Container Layout
+   ============================================== */
+
+.stats-container {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 2rem;
+  margin-top: 0.9375rem;
+}
+
+.stats-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stats-separator {
+  width: 1px;
+  height: 60px;
+  background: var(--color-border);
+  align-self: center;
+}
+
+.stats-title {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.05rem;
+  margin-bottom: 0.5rem;
+}
+
+/* ==============================================
+   Token Stats Title Row with Toggle
+   ============================================== */
+
+.stats-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.stats-title-row .stats-title {
+  margin-bottom: 0;
+}
+
+/* Token Mode Segmented Control */
+.token-mode-selector {
+  display: flex;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.token-mode-btn {
+  padding: 2px 8px;
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.token-mode-btn:not(:last-child) {
+  border-right: 1px solid var(--color-border);
+}
+
+.token-mode-btn:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.token-mode-btn.active {
+  background: var(--color-accent);
+  color: var(--color-bg);
+}
+
+/* Different active colors per mode */
+.token-mode-btn.active[data-mode="worker"] {
+  background: var(--status-progress);
+}
+
+.token-mode-btn.active[data-mode="tdd"] {
+  background: var(--status-review);
+}
+
+/* ==============================================
+   Project Metadata
+   ============================================== */
+
+.project-meta {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-lg);
+}
+
+.project-meta-separator {
+  width: 4px;
+  height: 4px;
+  background: var(--color-text-subtle);
+  border-radius: 50%;
+}
+
+.project-created {
+  font-size: var(--font-size-md);
+  color: var(--color-text-subtle);
+}

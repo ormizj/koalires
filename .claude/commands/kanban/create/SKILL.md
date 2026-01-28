@@ -308,6 +308,57 @@ Use descriptive, kebab-case names:
 - `setup-database-config`
 - `user-api-tests`
 
+### Step 4.6: Add Explicit API Contracts (CRITICAL)
+
+**IMPORTANT**: To prevent client-server miscoordination, every API task MUST include an explicit contract section in its description. UI tasks that depend on APIs MUST reference this contract.
+
+#### For API Tasks
+
+Add a "## API Contract" section to the description:
+
+```markdown
+## API Contract
+
+- **Endpoint**: `POST /api/chat/invitations`
+- **Request Body**: `{ toEmail: string }`
+- **Response (200)**: `{ id: number, toUserId: number, status: string }`
+- **Errors**:
+  - 400: Invalid email format
+  - 401: Not authenticated
+  - 404: User not found
+  - 409: Invitation already exists
+```
+
+#### For UI Tasks That Use APIs
+
+Add a "## API Dependencies" section referencing the exact contract:
+
+```markdown
+## API Dependencies
+
+This component uses the following API endpoints from `chat-invitation-api`:
+
+- `POST /api/chat/invitations` - Send invitation
+  - Request: `{ toEmail: string }`
+  - Response: `{ id, toUserId, status }`
+
+**IMPORTANT**: Read the API task's affected files FIRST to verify the exact endpoint path and request/response format before implementing.
+```
+
+#### Why This Matters
+
+Without explicit contracts:
+
+1. API workers create endpoints at `/api/chat/invite`
+2. UI workers assume endpoints at `/api/chat/invitations`
+3. Result: 404 errors at runtime despite both tasks "passing"
+
+Explicit contracts in task descriptions ensure workers share the same understanding of:
+
+- Exact endpoint paths (e.g., `/api/chat/invitations` not `/api/chat/invite`)
+- Request body field names (e.g., `toEmail` not `email`)
+- Response structure for proper client parsing
+
 #### Steps Field - Sequential Test Steps
 
 The `steps` array must contain **sequential test steps** describing the exact flow to verify the feature. These are like manual QA test scripts:
@@ -336,6 +387,49 @@ The `steps` array must contain **sequential test steps** describing the exact fl
   "Click the 'Edit Profile' button",
   "Verify edit form or modal appears"
 ]
+```
+
+### Step 4.7: Auto-Generate E2E Integration Test Task
+
+**IMPORTANT**: When the feature includes BOTH `api` and `ui` category tasks, automatically generate an E2E integration test task that validates the client-server integration works correctly.
+
+#### When to Generate
+
+Generate an `e2e-integration-test` task if:
+
+- There is at least one `api` category task AND
+- There is at least one `ui` category task that depends on the API
+
+#### E2E Task Template
+
+```json
+{
+  "name": "e2e-integration-test",
+  "description": "## End-to-End Integration Test\n\nValidate that all client-server interactions work correctly after implementation.\n\n### Purpose\nThis task catches integration bugs that unit tests miss, such as:\n- Endpoint path mismatches (client calls wrong URL)\n- Request/response format mismatches\n- Authentication flow issues\n\n### Test Approach\n1. Start the dev server\n2. Test each API endpoint with actual HTTP requests\n3. Verify UI components make correct API calls\n4. Check error handling for edge cases",
+  "category": "testing",
+  "blockedBy": ["<all-ui-task-names>"],
+  "steps": [
+    "Start the development server with npm run dev",
+    "Open browser DevTools Network tab",
+    "Navigate through each feature UI that calls an API",
+    "Verify each API request URL matches the expected endpoint",
+    "Verify each request body contains correct field names",
+    "Verify each response is parsed correctly by the UI",
+    "Test error cases (invalid input, network errors)",
+    "Verify no 404 or 500 errors in the Network tab"
+  ],
+  "passes": false
+}
+```
+
+#### Dynamic blockedBy
+
+The `blockedBy` array should list ALL `ui` category tasks from this feature, ensuring E2E tests run only after all UI is implemented.
+
+Example: If the feature has tasks `chat-api`, `join-room-ui`, `chat-messages-ui`:
+
+```json
+"blockedBy": ["join-room-ui", "chat-messages-ui"]
 ```
 
 ### Step 5: Write kanban-board.json
@@ -417,7 +511,7 @@ For a "create user profile page" feature:
   "tasks": [
     {
       "name": "user-profile-api",
-      "description": "## User Profile API Endpoint\n\nCreate a GET endpoint at `/api/users/profile` that returns the authenticated user's profile data.\n\n### Requirements\n- Return user data (name, email, avatar URL)\n- Require authentication\n- Handle user not found case",
+      "description": "## User Profile API Endpoint\n\nCreate a GET endpoint at `/api/users/profile` that returns the authenticated user's profile data.\n\n### Requirements\n- Return user data (name, email, avatar URL)\n- Require authentication\n- Handle user not found case\n\n## API Contract\n\n- **Endpoint**: `GET /api/users/profile`\n- **Request**: No body (authentication via cookie/header)\n- **Response (200)**: `{ name: string, email: string, avatarUrl: string | null }`\n- **Errors**:\n  - 401: Not authenticated\n  - 404: User not found",
       "category": "api",
       "blockedBy": [],
       "steps": [
@@ -434,7 +528,7 @@ For a "create user profile page" feature:
     },
     {
       "name": "profile-page-ui",
-      "description": "## Profile Page Component\n\nCreate a Vue page at `client/pages/profile.vue` displaying user information.\n\n### Layout\n- User avatar (large, centered)\n- User name and email\n- Edit profile button",
+      "description": "## Profile Page Component\n\nCreate a Vue page at `client/pages/profile.vue` displaying user information.\n\n### Layout\n- User avatar (large, centered)\n- User name and email\n- Edit profile button\n\n## API Dependencies\n\nThis component uses the following API endpoints from `user-profile-api`:\n\n- `GET /api/users/profile` - Fetch user data\n  - Response: `{ name, email, avatarUrl }`\n\n**IMPORTANT**: Read `user-profile-api` affected files FIRST to verify exact endpoint path and response format.",
       "category": "ui",
       "blockedBy": ["user-profile-api"],
       "steps": [
@@ -463,6 +557,23 @@ For a "create user profile page" feature:
         "Verify profile component tests pass",
         "Check test coverage report for profile-related files",
         "Verify edge cases are tested (no user, network error, etc.)"
+      ],
+      "passes": false
+    },
+    {
+      "name": "e2e-integration-test",
+      "description": "## End-to-End Integration Test\n\nValidate that client-server integration works correctly.\n\n### Purpose\nCatches integration bugs that unit tests miss:\n- Endpoint path mismatches\n- Request/response format mismatches\n- Authentication flow issues",
+      "category": "testing",
+      "blockedBy": ["profile-page-ui"],
+      "steps": [
+        "Start the development server with npm run dev",
+        "Open browser DevTools Network tab",
+        "Log in and navigate to /profile",
+        "Verify the GET /api/users/profile request appears in Network tab",
+        "Verify the request URL is exactly /api/users/profile (not /api/user/profile)",
+        "Verify the response is 200 with user data",
+        "Verify the UI correctly displays the name, email, and avatar from the response",
+        "Log out and verify /profile redirects or shows auth error"
       ],
       "passes": false
     }
